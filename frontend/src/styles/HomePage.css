@@ -1,0 +1,553 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+  }
+  
+  .homepage-container {
+    min-height: 100vh;
+    background: linear-gradient(to bottom, #0f2847, #0a1929);
+    color: white;
+    overflow-x: hidden;
+  }
+  
+  /* Stiluri pentru navbar - responsive */
+  .navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+  }
+  
+  @media (min-width: 640px) {
+    .navbar {
+      padding: 1rem 2rem;
+    }
+  }
+  
+  @media (min-width: 1024px) {
+    .navbar {
+      padding: 1rem 4%;
+    }
+  }
+  
+  .logo {
+    font-size: 1.25rem;
+    font-weight: bold;
+    color: white;
+  }
+  
+  @media (min-width: 640px) {
+    .logo {
+      font-size: 1.5rem;
+    }
+  }
+  
+  .nav-links {
+    display: none;
+  }
+  
+  .mobile-menu-button {
+    display: block;
+    color: white;
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+  }
+  
+  @media (min-width: 768px) {
+    .nav-links {
+      display: flex;
+      gap: 1.5rem;
+    }
+    
+    .mobile-menu-button {
+      display: none;
+    }
+  }
+  
+  .nav-link {
+    color: white;
+    text-decoration: none;
+    transition: color 0.3s ease;
+  }
+  
+  .nav-link:hover {
+    color: #93c5fd;
+  }
+  
+  /* Mobile menu */
+  .mobile-menu {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 70%;
+    height: 100vh;
+    background-color: #0f2847;
+    z-index: 100;
+    transform: translateX(100%);
+    transition: transform 0.3s ease-in-out;
+    display: flex;
+    flex-direction: column;
+    padding: 2rem;
+  }
+  
+  .mobile-menu.active {
+    transform: translateX(0);
+  }
+  
+  .close-menu {
+    align-self: flex-end;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    margin-bottom: 2rem;
+  }
+  
+  .mobile-nav-links {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .mobile-nav-link {
+    color: white;
+    text-decoration: none;
+    font-size: 1.25rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  /* Stiluri pentru secțiunea hero - responsive */
+  .hero-section {
+    padding: 1.5rem 1rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  @media (min-width: 640px) {
+    .hero-section {
+      padding: 2rem;
+    }
+  }
+  
+  @media (min-width: 1024px) {
+    .hero-section {
+      padding: 3rem 4%;
+    }
+  }
+  
+  .hero-content {
+    background-color: rgba(15, 40, 71, 0.5);
+    backdrop-filter: blur(8px);
+    border-radius: 0.75rem;
+    overflow: hidden;
+    padding: 1.5rem;
+  }
+  
+  @media (min-width: 640px) {
+    .hero-content {
+      padding: 2rem;
+    }
+  }
+  
+  .hero-text {
+    max-width: 100%;
+  }
+  
+  @media (min-width: 768px) {
+    .hero-text {
+      max-width: 36rem;
+    }
+  }
+  
+  .hero-title {
+    font-size: 1.75rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+  }
+  
+  @media (min-width: 640px) {
+    .hero-title {
+      font-size: 2rem;
+      margin-bottom: 0.75rem;
+    }
+  }
+  
+  @media (min-width: 1024px) {
+    .hero-title {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+  }
+  
+  .hero-subtitle {
+    color: #dbeafe;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  @media (min-width: 640px) {
+    .hero-subtitle {
+      font-size: 1.125rem;
+      margin-bottom: 1.5rem;
+    }
+  }
+  
+  /* Stiluri pentru formularul de căutare - responsive */
+  .search-form {
+    margin-top: 1.5rem;
+    background-color: rgba(30, 58, 138, 0.4);
+    backdrop-filter: blur(8px);
+    border-radius: 0.5rem;
+    padding: 1rem;
+  }
+  
+  @media (min-width: 640px) {
+    .search-form {
+      margin-top: 2rem;
+    }
+  }
+  
+  .search-fields {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  @media (min-width: 640px) {
+    .search-fields {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  
+  @media (min-width: 1024px) {
+    .search-fields {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+  
+  .search-field {
+    position: relative;
+  }
+  
+  .field-label {
+    display: block;
+    color: #dbeafe;
+    margin-bottom: 0.25rem;
+    font-size: 0.875rem;
+  }
+  
+  @media (min-width: 640px) {
+    .field-label {
+      font-size: 1rem;
+    }
+  }
+  
+  .field-input {
+    width: 100%;
+    padding: 0.75rem;
+    padding-left: 2.5rem;
+    border-radius: 0.5rem;
+    border: none;
+    background-color: white;
+    font-size: 0.875rem;
+  }
+  
+  @media (min-width: 640px) {
+    .field-input {
+      font-size: 1rem;
+    }
+  }
+  
+  .field-icon {
+    position: absolute;
+    left: 0.75rem;
+    top: calc(50% + 0.25rem);
+    transform: translateY(-50%);
+    color: #9ca3af;
+  }
+  
+  .search-button-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 1rem;
+  }
+  
+  @media (min-width: 768px) {
+    .search-button-container {
+      justify-content: flex-end;
+    }
+  }
+  
+  .search-button {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #2563eb;
+    color: white;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 9999px;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .search-button:hover {
+    background-color: #1d4ed8;
+  }
+  
+  /* Stiluri pentru secțiunea de hoteluri populare - responsive */
+  .hotels-section {
+    padding: 2rem 1rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  @media (min-width: 640px) {
+    .hotels-section {
+      padding: 2rem;
+    }
+  }
+  
+  @media (min-width: 1024px) {
+    .hotels-section {
+      padding: 3rem 4%;
+    }
+  }
+  
+  .section-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+  
+  @media (min-width: 640px) {
+    .section-title {
+      font-size: 1.875rem;
+      margin-bottom: 2rem;
+    }
+  }
+  
+  .hotel-grid {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 1rem;
+  }
+  
+  @media (min-width: 640px) {
+    .hotel-grid {
+      gap: 1.5rem;
+    }
+  }
+  
+  @media (min-width: 768px) {
+    .hotel-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  
+  @media (min-width: 1024px) {
+    .hotel-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+  
+  .hotel-card {
+    background-color: rgba(15, 40, 71, 0.4);
+    backdrop-filter: blur(8px);
+    border-radius: 0.5rem;
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  
+  .hotel-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  }
+  
+  .hotel-image {
+    width: 100%;
+    height: 10rem;
+    object-fit: cover;
+  }
+  
+  @media (min-width: 640px) {
+    .hotel-image {
+      height: 12rem;
+    }
+  }
+  
+  .hotel-details {
+    padding: 1rem;
+  }
+  
+  .hotel-name {
+    font-size: 1.125rem;
+    font-weight: bold;
+  }
+  
+  @media (min-width: 640px) {
+    .hotel-name {
+      font-size: 1.25rem;
+    }
+  }
+  
+  .hotel-location {
+    color: #bfdbfe;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+  }
+  
+  @media (min-width: 640px) {
+    .hotel-location {
+      font-size: 1rem;
+    }
+  }
+  
+  .hotel-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1rem;
+  }
+  
+  .hotel-price {
+    font-size: 1rem;
+    font-weight: bold;
+  }
+  
+  @media (min-width: 640px) {
+    .hotel-price {
+      font-size: 1.125rem;
+    }
+  }
+  
+  .book-button {
+    background-color: #2563eb;
+    color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    border: none;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  @media (min-width: 640px) {
+    .book-button {
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+    }
+  }
+  
+  .book-button:hover {
+    background-color: #1d4ed8;
+  }
+  
+  /* Stiluri pentru modal - responsive */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 50;
+    padding: 1rem;
+  }
+  
+  .modal-content {
+    background-color: white;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    width: 100%;
+    max-width: 20rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  }
+  
+  @media (min-width: 640px) {
+    .modal-content {
+      padding: 2rem;
+      max-width: 28rem;
+    }
+  }
+  
+  .modal-title {
+    font-size: 1.25rem;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 1.25rem;
+    color: #1e3a8a;
+  }
+  
+  @media (min-width: 640px) {
+    .modal-title {
+      font-size: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+  }
+  
+  .modal-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .guest-button {
+    width: 100%;
+    padding: 0.75rem;
+    background-color: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    font-size: 0.875rem;
+  }
+  
+  @media (min-width: 640px) {
+    .guest-button {
+      font-size: 1rem;
+    }
+  }
+  
+  .guest-button:hover {
+    background-color: #1d4ed8;
+  }
+  
+  .login-button {
+    width: 100%;
+    padding: 0.75rem;
+    background-color: white;
+    color: #2563eb;
+    border: 1px solid #2563eb;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    font-size: 0.875rem;
+  }
+  
+  @media (min-width: 640px) {
+    .login-button {
+      font-size: 1rem;
+    }
+  }
+  
+  .login-button:hover {
+    background-color: #eff6ff;
+  }

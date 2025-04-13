@@ -1,0 +1,31 @@
+.backdrop-blur-sm {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(100px);
+  }
+  
+  input:focus {
+    outline: none;
+    border: 1px solid #3498db;
+  }
+  
+  button {
+    transition: all 0.3s ease;
+  }
+  
+  button:hover {
+    transform: translateY(-2px);
+  }
+  
+  .shadow-lg {
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  }
+  
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+  
+  body {
+    overflow-x: hidden;
+  }

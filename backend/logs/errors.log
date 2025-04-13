@@ -1,0 +1,100 @@
+[2025-04-09T21:04:32.301Z] 
+    Error: Cast to ObjectId failed for value "ChIJY9GfM1HtSEcRKTj_-RyjAPs" (type string) at path "_id" for model "Hotel"
+    Stack: CastError: Cast to ObjectId failed for value "ChIJY9GfM1HtSEcRKTj_-RyjAPs" (type string) at path "_id" for model "Hotel"
+    at SchemaObjectId.cast (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\schema\objectId.js:251:11)
+    at SchemaType.applySetters (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\schemaType.js:1255:12)
+    at SchemaType.castForQuery (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\schemaType.js:1673:17)
+    at cast (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\cast.js:390:32)
+    at Query.cast (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\query.js:4907:12)
+    at Query._castConditions (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\query.js:2325:10)
+    at model.Query._findOne (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\query.js:2648:8)
+    at model.Query.exec (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\query.js:4456:80)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async C:\Users\condu\Desktop\proiect-web\backend\controllers\hotelController.js:99:15
+    URL: /api/hotels/ChIJY9GfM1HtSEcRKTj_-RyjAPs/price
+    Method: PATCH
+    IP: ::1
+    User: 67f64052c78263779a036ebb
+  
+[2025-04-09T21:21:33.825Z] 
+    Error: Cast to ObjectId failed for value "search" (type string) at path "_id" for model "Hotel"
+    Stack: CastError: Cast to ObjectId failed for value "search" (type string) at path "_id" for model "Hotel"
+    at SchemaObjectId.cast (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\schema\objectId.js:251:11)
+    at SchemaType.applySetters (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\schemaType.js:1255:12)
+    at SchemaType.castForQuery (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\schemaType.js:1673:17)
+    at cast (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\cast.js:390:32)
+    at Query.cast (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\query.js:4907:12)
+    at Query._castConditions (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\query.js:2325:10)
+    at model.Query._findOne (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\query.js:2648:8)
+    at model.Query.exec (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\query.js:4456:80)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async C:\Users\condu\Desktop\proiect-web\backend\controllers\hotelController.js:38:17
+    URL: /api/hotels/search?query=casa
+    Method: GET
+    IP: ::1
+    User: Not authenticated
+  
+[2025-04-09T21:28:15.703Z] 
+    Error: Cast to ObjectId failed for value "search" (type string) at path "_id" for model "Hotel"
+    Stack: CastError: Cast to ObjectId failed for value "search" (type string) at path "_id" for model "Hotel"
+    at SchemaObjectId.cast (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\schema\objectId.js:251:11)
+    at SchemaType.applySetters (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\schemaType.js:1255:12)
+    at SchemaType.castForQuery (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\schemaType.js:1673:17)
+    at cast (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\cast.js:390:32)
+    at Query.cast (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\query.js:4907:12)
+    at Query._castConditions (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\query.js:2325:10)
+    at model.Query._findOne (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\query.js:2648:8)
+    at model.Query.exec (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\query.js:4456:80)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async C:\Users\condu\Desktop\proiect-web\backend\controllers\hotelController.js:38:17
+    URL: /api/hotels/search?query=casa
+    Method: GET
+    IP: ::1
+    User: Not authenticated
+  
+[2025-04-11T06:30:56.137Z] 
+    Error: Cast to ObjectId failed for value "ChIJtzyr5LPpNEcRIadBi-o_2VQ" (type string) at path "_id" for model "Hotel"
+    Stack: CastError: Cast to ObjectId failed for value "ChIJtzyr5LPpNEcRIadBi-o_2VQ" (type string) at path "_id" for model "Hotel"
+    at SchemaObjectId.cast (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\schema\objectId.js:251:11)
+    at SchemaType.applySetters (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\schemaType.js:1255:12)
+    at SchemaType.castForQuery (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\schemaType.js:1673:17)
+    at cast (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\cast.js:390:32)
+    at Query.cast (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\query.js:4907:12)
+    at Query._castConditions (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\query.js:2325:10)
+    at model.Query._findOne (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\query.js:2648:8)
+    at model.Query.exec (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\query.js:4456:80)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async C:\Users\condu\Desktop\proiect-web\backend\controllers\hotelController.js:100:15
+    URL: /api/hotels/ChIJtzyr5LPpNEcRIadBi-o_2VQ/price
+    Method: PATCH
+    IP: ::1
+    User: 67f8b54f33903f2e27a35d64
+  
+[2025-04-11T06:34:14.155Z] 
+    Error: Cast to ObjectId failed for value "ChIJT5xz3EL_sUARtOYPZop1kXE" (type string) at path "_id" for model "Hotel"
+    Stack: CastError: Cast to ObjectId failed for value "ChIJT5xz3EL_sUARtOYPZop1kXE" (type string) at path "_id" for model "Hotel"
+    at SchemaObjectId.cast (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\schema\objectId.js:251:11)
+    at SchemaType.applySetters (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\schemaType.js:1255:12)
+    at SchemaType.castForQuery (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\schemaType.js:1673:17)
+    at cast (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\cast.js:390:32)
+    at Query.cast (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\query.js:4907:12)
+    at Query._castConditions (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\query.js:2325:10)
+    at model.Query._findOne (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\query.js:2648:8)
+    at model.Query.exec (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\query.js:4456:80)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async C:\Users\condu\Desktop\proiect-web\backend\controllers\hotelController.js:100:15
+    URL: /api/hotels/ChIJT5xz3EL_sUARtOYPZop1kXE/price
+    Method: PATCH
+    IP: ::1
+    User: 67f8b54f33903f2e27a35d64
+  
+[2025-04-12T13:23:22.846Z] 
+    Error: Error updating hotel price
+    Stack: Error: Error updating hotel price
+    at C:\Users\condu\Desktop\proiect-web\backend\controllers\hotelController.js:192:17
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    URL: /api/hotels/ChIJtzyr5LPpNEcRIadBi-o_2VQ/price
+    Method: PATCH
+    IP: ::1
+    User: 67fa54dca5e23308a00b6d91
+  

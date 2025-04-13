@@ -1,0 +1,44 @@
+.faq-item {
+    transition: all 0.3s ease;
+  }
+  
+  .faq-question {
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  
+  .faq-question:hover {
+    color: #60a5fa; /* blue-400 */
+  }
+  
+  .faq-answer {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+  }
+  
+  .faq-answer.active {
+    max-height: 500px;
+  }
+  
+  /* Styling pentru elementele de formular la focus */
+  input:focus, 
+  textarea:focus {
+    border-color: #3b82f6; /* blue-500 */
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  }
+  
+  /* Efecte de hover pentru butoane */
+  button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Animații pentru iconuri sociale */
+  .social-icon {
+    transition: transform 0.3s ease;
+  }
+  
+  .social-icon:hover {
+    transform: scale(1.2);
+  }

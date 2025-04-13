@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom Animations */
+@keyframes fadeIn {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes glow {
+  0% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.5); }
+  50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.8); }
+  100% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.5); }
+}
+
+.fade-in {
+  animation: fadeIn 1s ease-out forwards;
+}
+
+.bounce {
+  animation: bounce 0.5s ease infinite;
+}
+
+.glow {
+  animation: glow 2s ease-in-out infinite;
+}
+
+/* Glassmorphism Effect */
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Gradient Background */
+.gradient-bg {
+  background: linear-gradient(135deg, #6b48ff, #00ddeb);
+}

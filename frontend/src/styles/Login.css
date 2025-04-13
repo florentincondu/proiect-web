@@ -1,0 +1,49 @@
+/* Login.css
+
+/* Efect de sticlă pentru containerul principal */
+.backdrop-blur-sm {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  
+  /* Stilizare pentru inputuri */
+  input:focus {
+    outline: none;
+    border: 1px solid #3498db;
+  }
+  
+  /* Checkbox personalizat */
+  input[type="checkbox"] {
+    accent-color: #3498db;
+  }
+  
+  /* Animație pentru butoane */
+  button {
+    transition: all 0.3s ease;
+  }
+  
+  button:hover {
+    transform: translateY(-2px);
+  }
+  
+  /* Adăugare umbră pentru container pentru efect 3D */
+  .shadow-lg {
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  }
+  
+  /* Asigură că fundalul acoperă întreaga pagină */
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+  
+  /* Asigură că imaginea de fundal nu se repetă */
+  body {
+    overflow-x: hidden;
+  }
+  
+  /* Stilizare pentru opțiunea "continue with" */
+  .border-gray-700 {
+    border-color: rgba(55, 65, 81, 0.7);
+  } 
