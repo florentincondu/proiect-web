@@ -1,0 +1,22 @@
+
+-------------------------------------------
+[2025-04-13T19:03:05.584Z] Failed Email: New Admin Account Request
+-------------------------------------------
+To: condurflorentin@gmail.com
+
+Content: 
+        <h1>New Admin Account Request</h1>
+        <p>A new user has requested admin access:</p>
+        <ul>
+          <li><strong>Name:</strong> Flore Condur</li>
+          <li><strong>Email:</strong> florentincondur8@gmail.com</li>
+          <li><strong>Requested at:</strong> 13/04/2025, 22:03:05</li>
+        </ul>
+        <p>Please approve or reject this request:</p>
+        <div style="display: flex; gap: 10px;">
+          <a href="http://localhost:5173/admin/approve-admin-request?email=florentincondur8@gmail.com&token=e46bf5b5d74c8d65a0d4b015cacfa2bb1b6fa5238b14f20345bfe3ffe4ccf246" style="padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px; display: inline-block;">Approve Request</a>
+          <a href="http://localhost:5173/admin/reject-admin-request?email=florentincondur8@gmail.com&token=e46bf5b5d74c8d65a0d4b015cacfa2bb1b6fa5238b14f20345bfe3ffe4ccf246" style="padding: 10px 20px; background-color: #F44336; color: white; text-decoration: none; border-radius: 5px; display: inline-block;">Reject Request</a>
+        </div>
+        <p>Or you can approve/reject from the admin dashboard.</p>
+      
+-------------------------------------------

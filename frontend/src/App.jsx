@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Login from "./pages/login";
 import Signup from "./pages/signup";
 import HomePage from "./pages/HomePage";
@@ -19,6 +19,13 @@ import NotificationsPage from './pages/NotificationsPage';
 import { useAuth } from './context/authContext';
 import ContactUs from "./pages/ContactUs";
 import ResetPassword from './pages/ResetPassword';
+import AdminApprovalConfirmation from './pages/AdminApprovalConfirmation';
+
+// Special component to handle all admin approval URLs
+const AdminApprovalHandler = () => {
+  const location = useLocation();
+  return <AdminApprovalConfirmation />;
+};
 
 const HotelRoute = ({ children }) => {
   const { isAuthenticated, user } = useAuth();
@@ -33,13 +40,22 @@ const HotelRoute = ({ children }) => {
 function App() {
   return (
     <Routes>
+      {/* Admin approval process routes - keep these at the top for priority */}
+      <Route path="/admin/approve" element={<AdminApprovalConfirmation />} />
+      <Route path="/admin/reject" element={<AdminApprovalConfirmation />} />
+      <Route path="/admin/approve-admin-request" element={<AdminApprovalConfirmation />} />
+      <Route path="/admin/reject-admin-request" element={<AdminApprovalConfirmation />} />
+      {/* Catch-all for any admin approval URL to handle custom formats */}
+      <Route path="/admin/*" element={<AdminApprovalHandler />} />
+      <Route path="/admin-approval-success" element={<AdminApprovalConfirmation />} />
+      <Route path="/admin-rejection-success" element={<AdminApprovalConfirmation />} />
+      
       {/* Public routes */}
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
-      <Route path="/verify-admin" element={<AdminVerification />} />
-      <Route path="/verify-admin-link" element={<VerifyAdmin />} />
-      <Route path="/admin/approve/:requestId" element={<AdminRequestApproval action="approve" />} />
-      <Route path="/admin/reject/:requestId" element={<AdminRequestApproval action="reject" />} />
+      <Route path="/verify-admin" element={<VerifyAdmin />} />
+      <Route path="/admin-verification" element={<AdminVerification />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       
       {/* Public/Guest routes for viewing hotels - with special handling for hotel details */}
       <Route path="/homepage" element={<HomePage />} />
@@ -53,7 +69,7 @@ function App() {
         </HotelRoute>
       } />
       
-      {/* Routes for admin users only */}
+      {/* Routes for admin users only - make sure these come AFTER the admin approval routes */}
       <Route element={<AdminRoute />}>
         <Route path="/dashboard" element={<AdminDashboard />} />
         <Route path="/dashboard/*" element={<AdminDashboard />} />
@@ -72,9 +88,6 @@ function App() {
         <Route path="/my-bookings" element={<MyBookings />} />
         <Route path="/notifications" element={<NotificationsPage />} />
       </Route>
-      
-      {/* Add ResetPassword route */}
-      <Route path="/reset-password" element={<ResetPassword />} />
       
       {/* Redirect to appropriate page based on role */}
       <Route path="/" element={<HomePage />} />

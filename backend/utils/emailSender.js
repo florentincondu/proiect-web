@@ -11,10 +11,8 @@ let emailFunctional = false;
 let transporter = null;
 let fallbackTransporter = null;
 
-// Initialize the email transporter
 const initializeTransporter = () => {
   try {
-    // Create primary transporter using environment variables
     transporter = nodemailer.createTransport({
       host: process.env.EMAIL_HOST || 'smtp.gmail.com',
       port: parseInt(process.env.EMAIL_PORT || '587'),

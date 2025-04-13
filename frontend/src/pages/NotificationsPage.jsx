@@ -10,10 +10,10 @@ const NotificationsPage = () => {
   const { notifications, loading, error, fetchNotifications, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
   const [filter, setFilter] = useState('all'); 
 
-  // Fix the infinite loop by using useCallback
+  // Fix the infinite loop by removing fetchNotifications from dependencies
   const memoizedFetchNotifications = useCallback(() => {
     fetchNotifications();
-  }, [fetchNotifications]);
+  }, []); // Empty dependency array
 
   useEffect(() => {
     memoizedFetchNotifications();

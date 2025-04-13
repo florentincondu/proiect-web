@@ -98,3 +98,13 @@
     IP: ::1
     User: 67fa54dca5e23308a00b6d91
   
+[2025-04-13T11:43:09.840Z] 
+    Error: Error updating hotel price
+    Stack: Error: Error updating hotel price
+    at C:\Users\condu\Desktop\proiect-web\backend\controllers\hotelController.js:192:17
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    URL: /api/hotels/ChIJT5xz3EL_sUARtOYPZop1kXE/price
+    Method: PATCH
+    IP: ::1
+    User: 67fb9ff8d7eb9d5368396ca0
+  

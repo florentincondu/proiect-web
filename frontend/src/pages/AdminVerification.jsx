@@ -2,69 +2,186 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/authContext';
-import { FaLock, FaCheckCircle, FaExclamationTriangle, FaSpinner } from 'react-icons/fa';
+import { FaLock, FaCheckCircle, FaExclamationTriangle, FaSpinner, FaEnvelope } from 'react-icons/fa';
+import { verifyAdminCode } from '../api/auth';
+import { Link } from 'react-router-dom';
+import { TokenService } from '../api/auth';
 
 const AdminVerification = () => {
   const [verificationCode, setVerificationCode] = useState('');
   const [email, setEmail] = useState('');
+  const [token, setToken] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [success, setSuccess] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+  const queryParams = new URLSearchParams(location.search);
+  const tokenParam = queryParams.get('token');
+  const emailParam = queryParams.get('email');
 
   useEffect(() => {
-    // Extract email from location state if available
-    if (location.state?.email) {
+    // Set from URL parameters first, then from location state if available
+    if (tokenParam) {
+      setToken(tokenParam);
+    }
+    
+    if (emailParam) {
+      setEmail(emailParam);
+    } else if (location.state?.email) {
       setEmail(location.state.email);
+    }
+
+    // Check verification status if we have a token
+    if (tokenParam) {
+      checkVerificationStatus(tokenParam);
+    } else if (emailParam) {
+      // If we only have email but no token, try to look up the user's verification
+      checkVerificationStatusByEmail(emailParam);
     }
   }, [location]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!email || !verificationCode) {
-      setError('Please enter both email and verification code');
-      return;
-    }
-    
-    setLoading(true);
-    setError('');
-    setSuccess('');
-    
+  const checkVerificationStatus = async (verificationToken) => {
     try {
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/auth/verify-admin-registration`, 
-        { email, code: verificationCode }
+      const response = await axios.get(
+        `${API_URL}/api/admin-approval/status?token=${verificationToken}`
       );
       
-      setSuccess('Verification successful!');
-      
-      // If we receive a token and user data, log in the user automatically
-      if (response.data.token && response.data.user) {
-        // Store the user data and token
-        login(response.data.user, response.data.token);
-        
-        // Log the user data for debugging
-        console.log('User data stored:', response.data.user);
-        
-        // Redirect to admin dashboard after a short delay
-        setTimeout(() => {
-          navigate('/dashboard', { replace: true });
-        }, 1500);
-      } else {
-        // If no token, redirect to login
+      // If the user is already verified, redirect to dashboard
+      if (response.data.adminVerified) {
+        setSuccess('Your admin account is already verified.');
         setTimeout(() => {
           navigate('/login', { replace: true });
         }, 1500);
       }
+      
+      // If verification code is pending, update UI to show code input
+      if (response.data.verificationPending) {
+        setSuccess('Your admin request has been approved. Please enter the verification code sent to your email.');
+      }
+      
+      // If user is approved but hasn't yet received the code
+      if (response.data.adminApproved && !response.data.verificationPending) {
+        setSuccess('Your admin request has been approved, but it seems you haven\'t received the verification code yet. You can request to resend it.');
+      }
+      
+      // Store email from response if available
+      if (response.data.email && !email) {
+        setEmail(response.data.email);
+      }
     } catch (error) {
-      setError(error.response?.data?.message || 'Verification failed. Please try again.');
-    } finally {
+      console.error('Error checking verification status:', error);
+      setError('Could not verify your account status. Please try again.');
+    }
+  };
+
+  const checkVerificationStatusByEmail = async (userEmail) => {
+    try {
+      // Check if there's a pending verification for this email
+      const response = await axios.post(
+        `${API_URL}/api/admin-approval/resend-code`,
+        { email: userEmail }
+      );
+      
+      // If successful, update the UI
+      if (response.data.success) {
+        setSuccess('A verification code has been sent to your email. Please check your inbox.');
+      }
+    } catch (error) {
+      console.error('Error checking verification by email:', error);
+      setError('Could not verify your account status. Please try again or contact support.');
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    
+    try {
+      console.log(`Attempting verification with token: ${token}, code: ${verificationCode}, email: ${email}`);
+      
+      // Pass the email to help identify the user if token is invalid
+      const response = await verifyAdminCode(token || '', verificationCode, email);
+      
+      if (response.success) {
+        console.log('Verification successful:', response);
+        if (response.token && response.user) {
+          // Login the user automatically
+          TokenService.setToken(response.token);
+          TokenService.setUser(response.user);
+        }
+        setSuccess(true);
+      } else {
+        setError(response.message || 'Verification failed. Please try again.');
+      }
+      
+      setLoading(false);
+    } catch (error) {
+      console.error('Verification error:', error);
+      setError(error.message || 'Verification failed. Please try again.');
       setLoading(false);
     }
   };
+
+  const handleResendCode = async () => {
+    if (!token && !email) {
+      setError('Unable to resend verification code. Missing token or email.');
+      return;
+    }
+    
+    setResending(true);
+    setError('');
+    
+    try {
+      // Request to resend the verification code
+      const response = await axios.post(`${API_URL}/api/admin-approval/resend-code`, {
+        token,
+        email
+      });
+      
+      setSuccess('Verification code has been resent to your email. Please check your inbox.');
+    } catch (error) {
+      console.error('Error resending verification code:', error);
+      setError(error.response?.data?.message || 'Failed to resend verification code. Please try again.');
+    } finally {
+      setResending(false);
+    }
+  };
+
+  // Add check for missing parameters
+  useEffect(() => {
+    if (!token && !email) {
+      setError('Missing verification parameters. Please check your verification link or enter your email below.');
+    } else {
+      setError('');
+    }
+  }, [token, email]);
+
+  if (success === true) {
+    return (
+      <div className="container mt-5">
+        <div className="card mb-4">
+          <div className="card-body text-center">
+            <h2 className="card-title text-success">
+              <i className="fas fa-check-circle me-2"></i>
+              Verification Successful!
+            </h2>
+            <p className="card-text">
+              Your admin account has been successfully verified. You can now log in with your
+              credentials and access the admin dashboard.
+            </p>
+            <Link to="/login" className="btn btn-primary">
+              Go to Login
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
@@ -77,6 +194,11 @@ const AdminVerification = () => {
           <p className="text-gray-400 mt-2">
             Enter the verification code that was sent to your email
           </p>
+          {email && (
+            <p className="text-blue-400 mt-1 text-sm">
+              <FaEnvelope className="inline mr-1" /> {email}
+            </p>
+          )}
         </div>
         
         {error && (
@@ -93,10 +215,11 @@ const AdminVerification = () => {
           </div>
         )}
         
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
+        {/* Add email input if email is missing */}
+        {!email && (
+          <div className="mb-4">
             <label htmlFor="email" className="block text-sm font-medium text-gray-400 mb-1">
-              Email
+              Your Email
             </label>
             <input
               type="email"
@@ -104,12 +227,22 @@ const AdminVerification = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-3 py-2 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter your email"
+              placeholder="Enter your email address"
               required
-              disabled={location.state?.email}
             />
+            <button
+              onClick={() => {
+                if (email) checkVerificationStatusByEmail(email);
+              }}
+              disabled={!email || loading}
+              className="mt-2 w-full py-2 px-4 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Get Verification Code
+            </button>
           </div>
-          
+        )}
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="code" className="block text-sm font-medium text-gray-400 mb-1">
               Verification Code
@@ -143,9 +276,27 @@ const AdminVerification = () => {
         </form>
         
         <div className="mt-6 text-center">
+          <button
+            onClick={handleResendCode}
+            disabled={resending}
+            className="text-blue-400 hover:text-blue-300 transition-colors flex items-center justify-center mx-auto mb-4"
+          >
+            {resending ? (
+              <>
+                <FaSpinner className="animate-spin mr-2" />
+                Resending code...
+              </>
+            ) : (
+              <>
+                <FaEnvelope className="mr-2" />
+                Didn't receive the code? Resend it
+              </>
+            )}
+          </button>
+          
           <a 
             href="/login"
-            className="text-blue-400 hover:text-blue-300 transition-colors"
+            className="text-gray-400 hover:text-gray-300 transition-colors"
           >
             Back to Login
           </a>

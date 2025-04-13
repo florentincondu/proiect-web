@@ -204,52 +204,73 @@ const sendAdminVerificationEmail = async (user, verificationToken) => {
   }
 };
 
-// Alternative function for when email fails - generate a direct admin verification link
-const generateVerificationLink = (user, verificationToken) => {
-  const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-admin?token=${verificationToken}&email=${user.email}`;
-  return verificationUrl;
-};
-
-// Function to notify user of admin approval
-const sendAdminApprovalEmail = async (user) => {
-  const loginUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login`;
-  
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: user.email,
-    subject: 'Your Admin Account has been Approved',
-    html: `
-      <h1>Boksy Admin Account Approved</h1>
-      <p>Hello ${user.firstName},</p>
-      <p>Your request for administrator access to Boksy has been approved!</p>
-      <p>You can now log in with your admin privileges by clicking the link below:</p>
-      <a href="${loginUrl}" style="padding: 10px 20px; background-color: #4285f4; color: white; text-decoration: none; border-radius: 5px;">Login to Your Account</a>
-      <p>Thank you for being part of our team.</p>
-      <p>The Boksy Team</p>
-    `
-  };
-  
-  return sendEmailWithRetry(mailOptions);
-};
-
-// Generate verification code
-const generateVerificationCode = () => {
-  return crypto.randomInt(100000, 999999).toString();
-};
-
-// Store pending admin registration requests
-const pendingAdminRequests = new Map();
-
-// Clean up expired requests (after 24 hours)
-setInterval(() => {
-  const now = Date.now();
-  for (const [id, request] of pendingAdminRequests.entries()) {
-    // If request is older than 24 hours (86400000 ms), delete it
-    if (now - request.timestamp > 86400000) {
-      pendingAdminRequests.delete(id);
-    }
+// Function to send admin request notification to the admin email
+const sendAdminRequestNotification = async (user) => {
+  try {
+    // Create approval and rejection URLs with user information
+    const approveUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/approve-admin-request?email=${user.email}&token=${user.adminVerificationToken}`;
+    const rejectUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/reject-admin-request?email=${user.email}&token=${user.adminVerificationToken}`;
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: 'condurflorentin@gmail.com', // Send to this specific email
+      subject: 'New Admin Account Request',
+      html: `
+        <h1>New Admin Account Request</h1>
+        <p>A new user has requested admin access:</p>
+        <ul>
+          <li><strong>Name:</strong> ${user.firstName} ${user.lastName}</li>
+          <li><strong>Email:</strong> ${user.email}</li>
+          <li><strong>Requested at:</strong> ${new Date().toLocaleString()}</li>
+        </ul>
+        <p>Please approve or reject this request:</p>
+        <div style="display: flex; gap: 10px;">
+          <a href="${approveUrl}" style="padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px; display: inline-block;">Approve Request</a>
+          <a href="${rejectUrl}" style="padding: 10px 20px; background-color: #F44336; color: white; text-decoration: none; border-radius: 5px; display: inline-block;">Reject Request</a>
+        </div>
+        <p>Or you can approve/reject from the admin dashboard.</p>
+      `
+    };
+    
+    return await sendEmailWithRetry(mailOptions);
+  } catch (error) {
+    console.error('Error sending admin request notification:', error);
+    throw error;
   }
-}, 3600000); // Check every hour
+};
+
+// Function to send verification code to user after admin approval
+const sendAdminVerificationCode = async (user, verificationCode) => {
+  try {
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: user.email,
+      subject: 'Admin Account Verification Code',
+      html: `
+        <h1>Admin Verification Code</h1>
+        <p>Hello ${user.firstName},</p>
+        <p>Your admin account request has been approved!</p>
+        <p>Please use the following verification code to complete your registration:</p>
+        <div style="background-color: #f2f2f2; padding: 15px; border-radius: 5px; font-size: 24px; text-align: center; letter-spacing: 5px; font-weight: bold; margin: 20px 0;">
+          ${verificationCode}
+        </div>
+        <p>Enter this code on the verification page to activate your admin account.</p>
+        <p>This code will expire in 24 hours.</p>
+        <p>Thank you,<br>The Boksy Team</p>
+      `
+    };
+    
+    return await sendEmailWithRetry(mailOptions);
+  } catch (error) {
+    console.error('Error sending admin verification code:', error);
+    throw error;
+  }
+};
+
+// Generate a random 6-digit verification code
+const generateVerificationCode = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
 
 // Register user
 const register = async (req, res) => {
@@ -275,24 +296,30 @@ const register = async (req, res) => {
         lastName,
         email,
         password, // Will be hashed by pre-save hook
-        role: 'admin',
+        role: 'client', // Start as client until verified as admin
+        adminRequested: true, // Mark that admin role was requested
         adminVerified: false,
         adminVerificationToken: verificationToken,
         adminVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
       });
       
       await user.save();
-      console.log(`Admin user created with verification token: ${user._id}`);
+      console.log(`Admin request created with verification token: ${user._id}`);
       
-      // Send admin verification email
-      await sendAdminVerificationEmail(user, verificationToken);
+      // Send notification to admin email for approval
+      try {
+        await sendAdminRequestNotification(user);
+        console.log(`Admin request notification sent to condurflorentin@gmail.com`);
+      } catch (emailError) {
+        console.error('Error sending admin request notification:', emailError);
+        // Continue with registration even if email fails
+      }
       
       return res.status(200).json({
         success: true,
         requiresVerification: true,
-        message: 'Admin registration successful. Please check your email for verification.',
-        email: email,
-        redirectTo: '/verify-admin'
+        message: 'Admin registration request submitted. You will receive an email when your request is approved.',
+        email: email
       });
     }
 

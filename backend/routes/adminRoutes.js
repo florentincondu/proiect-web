@@ -15,6 +15,7 @@ const {
   getUserActivityDetails,
   getUserActivityStats
 } = require('../controllers/userActivityController');
+const adminApprovalController = require('../controllers/adminApprovalController');
 
 // Dashboard endpoints
 router.get('/dashboard/summary', protect, admin, adminController.getDashboardSummary);

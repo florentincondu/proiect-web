@@ -304,3 +304,27 @@ export const uploadCoverImage = async (file) => {
     );
   }
 };
+
+// Verify admin code
+export const verifyAdminCode = async (token, code, email) => {
+  try {
+    console.log(`Attempting verification with token: ${token}, code: ${code}, email: ${email}`);
+    const response = await axios.post(
+      '/api/admin-approval/verify-code',
+      { token, code, email }
+    );
+    
+    // Store user and token in localStorage if successful
+    if (response.data.token && response.data.user) {
+      TokenService.setToken(response.data.token);
+      TokenService.setUser(response.data.user);
+    }
+    
+    return response.data;
+  } catch (error) {
+    console.error('Error verifying admin code:', error);
+    throw new Error(
+      error.response?.data?.message || 'Failed to verify admin code.'
+    );
+  }
+};

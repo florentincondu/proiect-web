@@ -34,6 +34,11 @@ const SignUpPage = () => {
     setVerificationLink('');
 
     try {
+      // If admin role is selected, show a notification first
+      if (formData.role === 'admin') {
+        setSuccess('Registering admin account. Your request will be sent to condurflorentin@gmail.com for approval.');
+      }
+
       const data = await apiSignup(
         formData.firstName,
         formData.lastName,
@@ -46,16 +51,29 @@ const SignUpPage = () => {
       // If admin registration
       if (data.requiresVerification) {
         setSuccess(data.message);
-        // Redirect to admin verification page
+        // Show a clear message
+        setSuccess('Admin registration request submitted. You will receive an email with a verification code when your request is approved by the administrator.');
+        
+        // Store user email for verification
+        const userEmail = formData.email;
+        
+        // Clear form
+        setFormData({ 
+          firstName: '', 
+          lastName: '', 
+          email: '', 
+          password: '',
+          role: 'client',
+          subscriptionType: 'free'
+        });
+        
+        // Redirect to the verification page after a short delay
         setTimeout(() => {
-          navigate('/verify-admin', {
-            state: {
-              email: formData.email,
-              message: data.message
-            },
-            replace: true
+          navigate('/admin-verification', { 
+            state: { email: userEmail }
           });
-        }, 1500);
+        }, 2000);
+        
         return;
       }
 
