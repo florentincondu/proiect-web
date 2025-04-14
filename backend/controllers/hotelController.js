@@ -330,4 +330,224 @@ exports.updateRoomPrices = asyncHandler(async (req, res, next) => {
     success: true,
     data: hotel
   });
+});
+
+exports.createUserHotel = asyncHandler(async (req, res, next) => {
+  const {
+    title, description, propertyType, maxGuests, bedrooms, bathrooms,
+    amenities, address, price, currency, phoneNumber, houseRules,
+    cancellationPolicy, coordinates, photos, checkInTime, checkOutTime,
+    payment, weeklyDiscount, monthlyDiscount, status, isHotel, rating, reviews
+  } = req.body;
+
+  // Verifică dacă utilizatorul este autentificat
+  if (!req.user) {
+    return next(new CustomError('Nu sunteți autorizat să adăugați cazări. Vă rugăm să vă autentificați.', 401));
+  }
+
+  // Validări de bază
+  if (!title || !description || !address || !price) {
+    return next(new CustomError('Vă rugăm să completați toate câmpurile obligatorii', 400));
+  }
+
+  try {
+    // Inițializăm datele de bază pentru Hotel
+    const hotelData = {
+      name: title,
+      location: address,
+      description,
+      price: parseFloat(price),
+      propertyType,
+      maxGuests: parseInt(maxGuests) || 2,
+      bedrooms: parseInt(bedrooms) || 1,
+      bathrooms: parseInt(bathrooms) || 1,
+      phoneNumber,
+      houseRules,
+      cancellationPolicy,
+      checkInTime,
+      checkOutTime,
+      owner: req.user.id,
+      coordinates: coordinates || {},
+      status: status || 'pending', // Inițial, cazarea va fi în stare "pending" până când este aprobată de admin
+      amenities: [],
+      isHotel: isHotel || true,
+      rating: rating || 0,
+      reviews: reviews || [],
+      discounts: {
+        weekly: weeklyDiscount || false,
+        monthly: monthlyDiscount || false
+      }
+    };
+
+    // Procesăm amenitățile
+    if (amenities) {
+      // Convertim obiectul de amenități într-un array de string-uri
+      const amenitiesArray = [];
+      for (const [key, value] of Object.entries(amenities)) {
+        if (value === true) amenitiesArray.push(key);
+      }
+      hotelData.amenities = amenitiesArray;
+    }
+
+    // Setăm rooms pe baza informațiilor de bază
+    hotelData.rooms = [
+      {
+        type: 'single',
+        capacity: 1,
+        price: Math.round(parseFloat(price) * 0.7),
+        count: 2
+      },
+      {
+        type: 'double',
+        capacity: 2,
+        price: parseFloat(price),
+        count: 3
+      },
+      {
+        type: 'triple',
+        capacity: 3,
+        price: Math.round(parseFloat(price) * 1.3),
+        count: 1
+      },
+      {
+        type: 'quad',
+        capacity: 4,
+        price: Math.round(parseFloat(price) * 1.6),
+        count: 1
+      }
+    ];
+
+    // Setăm informațiile despre plată
+    if (payment) {
+      hotelData.payment = {
+        isPaid: true,
+        paymentDate: new Date(),
+        paymentMethod: payment.paymentMethod,
+        paymentId: payment.paymentToken || `PAY-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+        amount: 10, // Taxa standard de 10 EUR pentru listare
+        currency: 'EUR'
+      };
+
+      // Salvăm datele cardului dacă există (pentru simulare)
+      if (payment.cardDetails) {
+        hotelData.payment.cardDetails = {
+          // Salvăm doar ultimele 4 cifre ale cardului pentru securitate
+          cardNumber: payment.cardDetails.cardNumber.slice(-4),
+          expiryDate: payment.cardDetails.expiryDate,
+          cardholderName: payment.cardDetails.cardholderName
+        };
+      }
+    } else {
+      hotelData.payment = {
+        isPaid: true,
+        paymentDate: new Date(),
+        paymentMethod: 'card',
+        paymentId: `PAY-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+        amount: 10,
+        currency: 'EUR'
+      };
+    }
+
+    // Procesăm fotografiile (utilizatorul poate încărca fotografii în profilePage)
+    if (photos && photos.length > 0) {
+      // Aici ar trebui să procesezi array-ul de fotografii
+      // De obicei, acesta ar fi un array de URL-uri către imagini deja încărcate
+      hotelData.photos = photos;
+    }
+
+    // Creăm o nouă cazare
+    const hotel = await Hotel.create(hotelData);
+
+    // Trimitem un email de confirmare (opțional)
+    // sendConfirmationEmail(req.user.email, hotel);
+
+    // Răspundem cu datele cazării create
+    res.status(201).json({
+      success: true,
+      data: hotel,
+      message: 'Cazarea a fost adăugată cu succes și este în așteptare pentru aprobare.'
+    });
+  } catch (error) {
+    console.error('Eroare la crearea cazării:', error);
+    return next(new CustomError('A apărut o eroare la procesarea cererii. Vă rugăm să încercați din nou.', 500));
+  }
+});
+
+// Adăugăm o metodă pentru a permite utilizatorilor să-și vadă propriile cazări
+exports.getUserHotels = asyncHandler(async (req, res, next) => {
+  if (!req.user) {
+    return next(new CustomError('Nu sunteți autorizat. Vă rugăm să vă autentificați.', 401));
+  }
+
+  const hotels = await Hotel.find({ owner: req.user.id });
+
+  res.status(200).json({
+    success: true,
+    count: hotels.length,
+    data: hotels
+  });
+});
+
+// Adăugăm o metodă pentru procesarea plății pentru cazare
+exports.processHotelPayment = asyncHandler(async (req, res, next) => {
+  const { paymentMethod, hotelId } = req.body;
+
+  if (!req.user) {
+    return next(new CustomError('Nu sunteți autorizat. Vă rugăm să vă autentificați.', 401));
+  }
+
+  if (!paymentMethod) {
+    return next(new CustomError('Metoda de plată este obligatorie', 400));
+  }
+
+  try {
+    let hotel;
+
+    if (hotelId) {
+      // Actualizăm o cazare existentă
+      hotel = await Hotel.findById(hotelId);
+
+      if (!hotel) {
+        return next(new CustomError('Cazarea nu a fost găsită', 404));
+      }
+
+      if (hotel.owner.toString() !== req.user.id) {
+        return next(new CustomError('Nu sunteți autorizat să actualizați această cazare', 401));
+      }
+
+      hotel.payment = {
+        isPaid: true,
+        paymentDate: new Date(),
+        paymentMethod,
+        paymentId: `PAY-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+        amount: 10,
+        currency: 'EUR'
+      };
+
+      hotel.status = 'pending';
+      await hotel.save();
+    } else {
+      // Dacă nu avem un ID, înseamnă că plata este procesată înainte de crearea cazării
+      // În acest caz, vom returna un token de plată care va fi utilizat la crearea cazării
+      const paymentToken = `TOKEN-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+      
+      // Aici am putea stoca temporar token-ul în baza de date pentru validare ulterioară
+      // ...
+
+      return res.status(200).json({
+        success: true,
+        message: 'Plata a fost procesată cu succes',
+        paymentToken
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Plata a fost procesată cu succes',
+      data: hotel
+    });
+  } catch (error) {
+    console.error('Eroare la procesarea plății:', error);
+    return next(new CustomError('A apărut o eroare la procesarea plății. Vă rugăm să încercați din nou.', 500));
+  }
 }); 

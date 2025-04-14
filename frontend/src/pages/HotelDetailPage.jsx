@@ -39,7 +39,7 @@ const HotelDetailPage = ({ reservationMode }) => {
   const eurToRon = 4.97;
 
   // Google API Key
-  const GOOGLE_API_KEY = "AIzaSyA2ITzS0YozxlkFmdG7r8ZLo-rHUftwNEM";
+  const GOOGLE_API_KEY = import.meta.env.VITE_API_KEY || "AIzaSyA2ITzS0YozxlkFmdG7r8ZLo-rHUftwNEM";
   
   // Function to generate photo URL from Google Places API
   const getPhotoUrl = (photoReference, maxWidth = 800, maxHeight = null) => {
@@ -408,6 +408,18 @@ const HotelDetailPage = ({ reservationMode }) => {
   const initMap = () => {
     if (!window.google || !window.google.maps) {
       console.error('Google Maps API not loaded');
+      const mapElement = document.getElementById('hotel-map');
+      if (mapElement) {
+        mapElement.innerHTML = `
+          <div class="flex items-center justify-center h-full bg-gray-800/80">
+            <div class="text-center p-4">
+              <div class="text-red-400 text-3xl mb-3">⚠️</div>
+              <p class="text-gray-200">Could not load Google Maps</p>
+              <p class="text-sm text-gray-400 mt-2">Please check API key permissions or try again later.</p>
+            </div>
+          </div>
+        `;
+      }
       return;
     }
     
@@ -453,6 +465,18 @@ const HotelDetailPage = ({ reservationMode }) => {
       
     } catch (error) {
       console.error('Error initializing Google Maps:', error);
+      const mapElement = document.getElementById('hotel-map');
+      if (mapElement) {
+        mapElement.innerHTML = `
+          <div class="flex items-center justify-center h-full bg-gray-800/80">
+            <div class="text-center p-4">
+              <div class="text-red-400 text-3xl mb-3">⚠️</div>
+              <p class="text-gray-200">Error loading map</p>
+              <p class="text-sm text-gray-400 mt-2">${error.message || 'Unknown error'}</p>
+            </div>
+          </div>
+        `;
+      }
     }
   };
 

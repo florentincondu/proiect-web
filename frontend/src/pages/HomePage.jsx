@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { generateHotelPrice } from '../utils/priceUtils';
 import { FaUser } from 'react-icons/fa';
 import NotificationBell from '../components/NotificationBell';
+import TermsOfService from '../components/termsOfservice';
 
 const HomePage = () => {
   const [showModal, setShowModal] = useState(false);
@@ -35,14 +36,14 @@ const HomePage = () => {
 
   const requestData = {
     includedTypes: ["lodging"],
-    maxResultCount: 10,
+    maxResultCount: 20,
     locationRestriction: {
       circle: {
         center: {
           latitude: 44.4268,
           longitude: 26.1025
         },
-        radius: 1000.0
+        radius: 10000.0
       }
     }
   };
@@ -90,6 +91,7 @@ const HomePage = () => {
         console.log("API response received:", response.data);
         
         if (response.data && response.data.places) {
+          console.log("Number of hotels from API:", response.data.places.length);
           const hotelsWithPrices = response.data.places.map(hotel => ({
             ...hotel,
             estimatedPrice: generateHotelPrice(hotel),
@@ -103,11 +105,41 @@ const HomePage = () => {
             }
           }));
           
-          setPopularHotels(hotelsWithPrices);
+          // Check for mock hotels in localStorage and add them to the results
+          const mockHotels = JSON.parse(localStorage.getItem('mockHotels') || '[]');
+          console.log("Found mock hotels in localStorage:", mockHotels.length);
+          
+          // Only include approved hotels with status 'approved'
+          const approvedMockHotels = mockHotels.filter(hotel => hotel.status === 'approved');
+          
+          // Process mock hotels to have the same structure as API results
+          const processedMockHotels = approvedMockHotels.map(hotel => ({
+            id: hotel.id,
+            displayName: {
+              text: hotel.title
+            },
+            formattedAddress: hotel.address,
+            photos: hotel.photos?.length > 0 ? hotel.photos.map(url => ({ name: url })) : [],
+            rating: hotel.rating || 4.5,
+            userRatingCount: Math.floor(Math.random() * 100) + 10,
+            estimatedPrice: parseFloat(hotel.price),
+            currency: hotel.currency || 'RON',
+            amenities: hotel.amenities || {
+              wifi: true,
+              parking: true,
+              breakfast: true
+            },
+            isMockHotel: true, // Flag to identify mock hotels
+            coordinates: hotel.coordinates
+          }));
+          
+          // Combine API results with mock hotels
+          const combinedHotels = [...hotelsWithPrices, ...processedMockHotels];
+          setPopularHotels(combinedHotels);
           
           // Initialize current image index for each hotel
           const initialIndexes = {};
-          hotelsWithPrices.forEach((hotel) => {
+          combinedHotels.forEach((hotel) => {
             initialIndexes[hotel.id] = 0;
           });
           setCurrentImageIndexes(initialIndexes);
@@ -117,7 +149,57 @@ const HomePage = () => {
         setLoading(false);
       } catch (error) {
         console.error('Error fetching hotels:', error);
-        setError('Failed to fetch popular hotels. Please try again later.');
+        
+        // If API call fails, try to use mock hotels from localStorage
+        try {
+          const mockHotels = JSON.parse(localStorage.getItem('mockHotels') || '[]');
+          
+          if (mockHotels.length > 0) {
+            console.log("API call failed. Using mock hotels from localStorage:", mockHotels.length);
+            
+            // Only include approved hotels with status 'approved'
+            const approvedMockHotels = mockHotels.filter(hotel => hotel.status === 'approved');
+            
+            // Process mock hotels to have the same structure as API results
+            const processedMockHotels = approvedMockHotels.map(hotel => ({
+              id: hotel.id,
+              displayName: {
+                text: hotel.title
+              },
+              formattedAddress: hotel.address,
+              photos: hotel.photos?.length > 0 ? hotel.photos.map(url => ({ name: url })) : [],
+              rating: hotel.rating || 4.5,
+              userRatingCount: Math.floor(Math.random() * 100) + 10,
+              estimatedPrice: parseFloat(hotel.price),
+              currency: hotel.currency || 'RON',
+              amenities: hotel.amenities || {
+                wifi: true,
+                parking: true,
+                breakfast: true
+              },
+              isMockHotel: true, // Flag to identify mock hotels
+              coordinates: hotel.coordinates
+            }));
+            
+            setPopularHotels(processedMockHotels);
+            
+            // Initialize current image index for each hotel
+            const initialIndexes = {};
+            processedMockHotels.forEach((hotel) => {
+              initialIndexes[hotel.id] = 0;
+            });
+            setCurrentImageIndexes(initialIndexes);
+            
+            // Clear error since we have fallback data
+            setError(null);
+          } else {
+            setError('Failed to fetch popular hotels. Please try again later.');
+          }
+        } catch (localStorageError) {
+          console.error('Error accessing localStorage:', localStorageError);
+          setError('Failed to fetch popular hotels. Please try again later.');
+        }
+        
         setLoading(false);
       }
     };
@@ -145,6 +227,17 @@ const HomePage = () => {
 
   // Function to generate Google Places photo URL
   const getPhotoUrl = (photoReference, maxWidth = 400, maxHeight = null) => {
+    // Check if this is a direct URL (from mock hotels)
+    if (photoReference && typeof photoReference === 'string') {
+      return photoReference;
+    }
+    
+    // For mock hotel photos with different structure
+    if (photoReference && typeof photoReference.name === 'string' && 
+        (photoReference.name.startsWith('http://') || photoReference.name.startsWith('https://'))) {
+      return photoReference.name;
+    }
+    
     if (!photoReference || !photoReference.name) return backgr;
     
     // Use our backend proxy instead of direct Google API call
@@ -1126,7 +1219,7 @@ const HomePage = () => {
           <div>
             <h3 className="font-semibold mb-4">Legal</h3>
             <ul className="space-y-2">
-              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Terms of Service</a></li>
+              <li><a href="terms-of-service" className="text-gray-400 hover:text-white transition-colors">Terms of Service</a></li>
               <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Privacy Policy</a></li>
               <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Cookie Settings</a></li>
               <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Accessibility</a></li>

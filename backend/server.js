@@ -91,6 +91,52 @@ const reviewRoutes = require('./routes/reviewRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const placeRoutes = require('./routes/placeRoutes');
 
+// Add debugging and status routes
+app.get('/api/debug/status', (req, res) => {
+  res.json({
+    status: 'OK',
+    serverTime: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    mongoDBConnected: mongoose.connection.readyState === 1,
+    apiVersion: '1.0.0',
+    routes: {
+      hotels: '/api/hotels',
+      auth: '/api/auth',
+      users: '/api/users'
+    }
+  });
+});
+
+// Testing route for hotel API endpoints
+app.get('/api/debug/hotels', async (req, res) => {
+  try {
+    // Check if Hotel model is accessible
+    const Hotel = mongoose.models.Hotel || require('./models/Hotel');
+    
+    // Count documents in the Hotel collection
+    const count = await Hotel.countDocuments();
+    
+    res.json({
+      success: true,
+      count,
+      hotelRoutesRegistered: true,
+      message: `The hotels API is properly set up. Found ${count} hotels in the database.`,
+      sampleEndpoints: [
+        '/api/hotels',
+        '/api/hotels/user/my-hotels',
+        '/api/hotels/user-hotel'
+      ]
+    });
+  } catch (error) {
+    console.error('Debug hotel route error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      stack: process.env.NODE_ENV === 'production' ? undefined : error.stack
+    });
+  }
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/hotels', hotelRoutes);
@@ -106,6 +152,29 @@ app.use('/api/settings', settingRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/places', placeRoutes);
+
+// Add catch-all error handler for API routes - must be after all other route definitions
+app.use('/api/*', (req, res, next) => {
+  // Check if the response has already been sent
+  if (res.headersSent) {
+    return next();
+  }
+  
+  console.log(`404 Not Found: ${req.method} ${req.originalUrl}`);
+  res.status(404).json({
+    error: 'Endpoint not found',
+    message: `The requested URL ${req.originalUrl} was not found on this server.`,
+    availableEndpoints: [
+      '/api/hotels',
+      '/api/auth',
+      '/api/users',
+      '/api/bookings',
+      '/api/places',
+      '/api/debug/status',
+      '/api/debug/hotels'
+    ]
+  });
+});
 
 const logsDir = path.join(__dirname, 'logs');
 if (!fs.existsSync(logsDir)) {
@@ -549,6 +618,34 @@ app.get('/api/places/geocode', async (req, res) => {
     console.error('Error proxying to Google Geocoding API:', error.response?.data || error.message);
     res.status(error.response?.status || 500).json({
       error: error.response?.data || 'Error accessing Google Geocoding API'
+    });
+  }
+});
+
+// Reverse geocoding endpoint to get address from lat/lng
+app.get('/api/places/geocode/reverse', async (req, res) => {
+  try {
+    const { lat, lng } = req.query;
+    
+    if (!lat || !lng) {
+      return res.status(400).json({ error: 'Latitude and longitude are required' });
+    }
+
+    const response = await axios.get(
+      'https://maps.googleapis.com/maps/api/geocode/json',
+      {
+        params: {
+          latlng: `${lat},${lng}`,
+          key: process.env.API_KEY
+        }
+      }
+    );
+    
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error proxying to Google Reverse Geocoding API:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({
+      error: error.response?.data || 'Error accessing Google Reverse Geocoding API'
     });
   }
 });

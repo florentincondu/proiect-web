@@ -20,6 +20,7 @@ import { useAuth } from './context/authContext';
 import ContactUs from "./pages/ContactUs";
 import ResetPassword from './pages/ResetPassword';
 import AdminApprovalConfirmation from './pages/AdminApprovalConfirmation';
+import TermsOfService from "./components/termsOfservice";
 
 // Special component to handle all admin approval URLs
 const AdminApprovalHandler = () => {
@@ -62,6 +63,7 @@ function App() {
       <Route path="/popularhotels" element={<PopularHotelsPage />} />
       <Route path="/search-results" element={<SearchResults />} />
       <Route path="/contact-us" element={<ContactUs />} />
+      <Route path="/terms-of-service" element={<TermsOfService />} />
       <Route path="/hotel-search-results" element={<HotelSearchResults />} />
       <Route path="/hotel/:hotelId" element={
         <HotelRoute>

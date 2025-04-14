@@ -341,8 +341,8 @@ const HotelManagement = () => {
     }
   };
 
-  // Updated calculateDisplayPrice function to directly use generateHotelPrice like the homepage
-  const calculateDisplayPrice = (hotel) => {
+  // Single consolidated price calculation function
+  const calculatePrice = (hotel, isEditing = false) => {
     // If the hotel has a stored price that an admin set, prioritize it
     if (hotel.price && typeof hotel.price === 'number') {
       return hotel.price;
@@ -353,8 +353,7 @@ const HotelManagement = () => {
       return savedPrices[hotel.id];
     }
 
-    // Use the exact same generateHotelPrice function that HomePage uses
-    // This ensures consistency between admin view and user view
+    // Use the generateHotelPrice function for new hotels
     return generateHotelPrice(hotel);
   };
 
@@ -375,12 +374,14 @@ const HotelManagement = () => {
         throw new Error('Price must be a positive number');
       }
       
-      console.log(`Updating price for hotel ${hotelId} (${hotelName}) to ${newPrice}`);
+      const fullPrice = parseFloat(newPrice);
+      
+      console.log(`Updating price for hotel ${hotelId} (${hotelName}) to ${fullPrice}`);
       
       const response = await axios.patch(
         `${API_BASE_URL}/api/hotels/${hotelId}/price`,
         { 
-          price: parseFloat(newPrice),
+          price: fullPrice,
           name: hotelName
         },
         {
@@ -395,19 +396,19 @@ const HotelManagement = () => {
         // Update the price in both hotels and filteredHotels
         setHotels(prevHotels => 
           prevHotels.map(hotel => 
-            hotel._id === hotelId ? { ...hotel, price: parseFloat(newPrice) } : hotel
+            hotel._id === hotelId ? { ...hotel, price: fullPrice } : hotel
           )
         );
         setFilteredHotels(prevHotels => 
           prevHotels.map(hotel => 
-            hotel._id === hotelId ? { ...hotel, price: parseFloat(newPrice) } : hotel
+            hotel._id === hotelId ? { ...hotel, price: fullPrice } : hotel
           )
         );
         
         // Update saved prices
         setSavedPrices(prevPrices => ({
           ...prevPrices,
-          [hotelId]: parseFloat(newPrice)
+          [hotelId]: fullPrice
         }));
         
         setSuccessMessage('Price updated successfully');
@@ -535,12 +536,8 @@ const HotelManagement = () => {
     const hotelId = hotel._id || hotel.id;
     setEditingHotel(hotelId);
     
-    // Initialize with admin-set price if available, otherwise use estimatedPrice
-    if (hotel.price) {
-      setUpdatedPrice(hotel.price.toString());
-    } else {
-      setUpdatedPrice(hotel.estimatedPrice.toString());
-    }
+    // Use generateHotelPrice to get the price
+    setUpdatedPrice(generateHotelPrice(hotel).toString());
   };
 
   // Cancel editing
@@ -743,60 +740,11 @@ const HotelManagement = () => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      {editingHotel === (hotel._id || hotel.id) ? (
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            className="w-24 py-1 px-2 text-sm bg-gray-700 border border-gray-600 rounded-lg"
-                            value={updatedPrice}
-                            onChange={(e) => setUpdatedPrice(e.target.value)}
-                            min="1"
-                            max="10000"
-                            required
-                          />
-                          <div className="flex gap-1">
-                            <button
-                              className="p-1 text-green-500 hover:text-green-400 transition-colors"
-                              onClick={() => updateHotelPrice(hotel._id || hotel.id, updatedPrice, hotel.name)}
-                              title="Save"
-                              disabled={isUpdatingPrice}
-                            >
-                              {isUpdatingPrice ? <FaSpinner className="animate-spin" /> : <FaSave />}
-                            </button>
-                            <button
-                              className="p-1 text-red-500 hover:text-red-400 transition-colors"
-                              onClick={cancelEditing}
-                              title="Cancel"
-                              disabled={isUpdatingPrice}
-                            >
-                              <FaTimesCircle />
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center">
-                          <div className="bg-gray-700 px-3 py-1 rounded-md flex items-center">
-                            <span className="text-sm font-medium flex items-center">
-                              <span className="text-green-500 mr-1">RON</span>
-                              {calculateDisplayPrice(hotel).toFixed(2)}
-                            </span>
-                            <div className="ml-2 flex items-center">
-                              {/* Price level indicator */}
-                              {Array.from({ length: hotel.priceLevel || Math.min(Math.ceil(hotel.estimatedPrice / 100), 4) }, (_, i) => (
-                                <FaDollarSign key={i} className="text-green-500 text-xs" />
-                              ))}
-                            </div>
-                          </div>
-                          <button
-                            className="ml-2 p-1 text-blue-500 hover:text-blue-400 transition-colors"
-                            onClick={() => startEditing(hotel)}
-                            title="Edit price"
-                          >
-                            <FaEdit />
-                          </button>
-                        </div>
-                      )}
+                    <td className="px-4 py-4 whitespace-nowrap text-gray-300">
+                      <span className="text-sm font-medium flex items-center">
+                        <span className="text-green-500 mr-1">RON</span>
+                        {generateHotelPrice(hotel).toFixed(2)}
+                      </span>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
                       <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${

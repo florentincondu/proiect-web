@@ -24,7 +24,6 @@ const AdminVerification = () => {
   const emailParam = queryParams.get('email');
 
   useEffect(() => {
-    // Set from URL parameters first, then from location state if available
     if (tokenParam) {
       setToken(tokenParam);
     }
@@ -54,7 +53,7 @@ const AdminVerification = () => {
       if (response.data.adminVerified) {
         setSuccess('Your admin account is already verified.');
         setTimeout(() => {
-          navigate('/login', { replace: true });
+          navigate('/dashboard', { replace: true });
         }, 1500);
       }
       
@@ -114,12 +113,14 @@ const AdminVerification = () => {
           TokenService.setToken(response.token);
           TokenService.setUser(response.user);
         }
-        setSuccess(true);
+        
+        // Always redirect to dashboard on success, regardless of token presence
+        console.log('Redirecting to dashboard');
+        navigate('/dashboard', { replace: true });
       } else {
         setError(response.message || 'Verification failed. Please try again.');
+        setLoading(false);
       }
-      
-      setLoading(false);
     } catch (error) {
       console.error('Verification error:', error);
       setError(error.message || 'Verification failed. Please try again.');
@@ -161,22 +162,25 @@ const AdminVerification = () => {
     }
   }, [token, email]);
 
+  useEffect(() => {
+    if (success === true) {
+      // Redirect to dashboard immediately after successful verification
+      console.log('Success state is true, redirecting to dashboard immediately');
+      navigate('/dashboard', { replace: true });
+    }
+  }, [success, navigate]);
+
   if (success === true) {
     return (
-      <div className="container mt-5">
-        <div className="card mb-4">
-          <div className="card-body text-center">
-            <h2 className="card-title text-success">
-              <i className="fas fa-check-circle me-2"></i>
-              Verification Successful!
-            </h2>
-            <p className="card-text">
-              Your admin account has been successfully verified. You can now log in with your
-              credentials and access the admin dashboard.
-            </p>
-            <Link to="/login" className="btn btn-primary">
-              Go to Login
-            </Link>
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-gray-800 rounded-lg shadow-lg p-8 text-white text-center">
+          <FaCheckCircle className="mx-auto text-green-500 text-6xl mb-4" />
+          <h2 className="text-2xl font-bold mb-4">Verification Successful!</h2>
+          <p className="text-gray-300 mb-6">
+            Your admin account has been successfully verified. Redirecting to dashboard...
+          </p>
+          <div className="flex justify-center">
+            <FaSpinner className="text-blue-500 text-xl animate-spin" />
           </div>
         </div>
       </div>
@@ -297,8 +301,12 @@ const AdminVerification = () => {
           <a 
             href="/login"
             className="text-gray-400 hover:text-gray-300 transition-colors"
+            onClick={(e) => {
+              e.preventDefault();
+              navigate('/');
+            }}
           >
-            Back to Login
+            Back to Home
           </a>
         </div>
       </div>

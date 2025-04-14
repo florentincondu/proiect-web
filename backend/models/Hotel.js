@@ -10,7 +10,10 @@ const hotelSchema = new mongoose.Schema({
     required: true
   },
   description: String,
-  rating: Number,
+  rating: {
+    type: Number,
+    default: 0
+  },
   photos: [String],
   price: {
     type: Number,
@@ -61,6 +64,105 @@ const hotelSchema = new mongoose.Schema({
       endDate: Date,
       reason: String
     }]
+  },
+  owner: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  payment: {
+    isPaid: {
+      type: Boolean,
+      default: false
+    },
+    paymentDate: Date,
+    paymentMethod: {
+      type: String,
+      enum: ['card', 'paypal', 'bankTransfer'],
+      default: 'card'
+    },
+    paymentId: String,
+    amount: {
+      type: Number,
+      default: 10 // Valoarea implicită a taxei de listare (10 EUR)
+    },
+    currency: {
+      type: String,
+      default: 'EUR'
+    },
+    cardDetails: {
+      cardNumber: String, // Ultimele 4 cifre
+      expiryDate: String,
+      cardholderName: String
+    }
+  },
+  propertyType: {
+    type: String,
+    enum: ['apartment', 'house', 'villa', 'cabin'],
+    default: 'apartment'
+  },
+  maxGuests: {
+    type: Number,
+    default: 2
+  },
+  bedrooms: {
+    type: Number,
+    default: 1
+  },
+  bathrooms: {
+    type: Number,
+    default: 1
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'active', 'rejected', 'draft', 'approved'],
+    default: 'pending'
+  },
+  phoneNumber: String,
+  houseRules: String,
+  cancellationPolicy: {
+    type: String,
+    enum: ['flexible', 'moderate', 'strict', 'nonRefundable'],
+    default: 'moderate'
+  },
+  checkInTime: {
+    type: String,
+    default: '14:00'
+  },
+  checkOutTime: {
+    type: String,
+    default: '11:00'
+  },
+  isHotel: {
+    type: Boolean,
+    default: true
+  },
+  reviews: [{
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    rating: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 5
+    },
+    comment: String,
+    date: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  discounts: {
+    weekly: {
+      type: Boolean,
+      default: false
+    },
+    monthly: {
+      type: Boolean,
+      default: false
+    }
   }
 }, {
   timestamps: true
