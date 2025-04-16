@@ -20,3 +20,15 @@ Content:
         <p>Or you can approve/reject from the admin dashboard.</p>
       
 -------------------------------------------
+
+-------------------------------------------
+[2025-04-16T07:40:30.611Z] Unsent Email: Welcome to Boksy
+-------------------------------------------
+To: florentin@gmail.com
+
+Content: 
+          <h2>Welcome Florentin Condur!</h2>
+          <p>Thank you for registering on our platform.</p>
+          <p>You can now log in and start using our services.</p>
+        
+-------------------------------------------

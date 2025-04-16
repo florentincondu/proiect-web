@@ -61,40 +61,22 @@ const BookingFlow = () => {
   }, [hotelData, navigate, selectedRoom, location.state]);
   
   useEffect(() => {
-    // Calculate total price whenever room or extras change
+    // Calculate total price for booking
     let total = 0;
     
-    // Log the current state for debugging
-    console.log('Calculating total price with room:', selectedRoom);
-    
-    if (selectedRoom && selectedRoom.price) {
-      console.log('Using room price for calculation:', selectedRoom.price);
-      
-      const days = bookingDetails.checkOut && bookingDetails.checkIn ? 
-        getDaysDifference(bookingDetails.checkIn, bookingDetails.checkOut) : 1;
-      
-      console.log('Number of days:', days);
-      total += selectedRoom.price * days;
-      console.log('Room price total:', total);
-    } else if (hotelData && hotelData.price) {
-      // Fallback to hotel price if room price is not available
-      console.log('Falling back to hotel price:', hotelData.price);
-      
-      const days = bookingDetails.checkOut && bookingDetails.checkIn ? 
-        getDaysDifference(bookingDetails.checkIn, bookingDetails.checkOut) : 1;
-        
-      total += hotelData.price * days;
+    if (selectedRoom) {
+      const days = getDaysDifference(bookingDetails.checkIn, bookingDetails.checkOut);
+      total = selectedRoom.price * days;
     }
     
+    // Add costs for any extras
     if (selectedExtras.length > 0) {
+      const days = getDaysDifference(bookingDetails.checkIn, bookingDetails.checkOut);
       const extrasCost = selectedExtras.reduce((sum, extra) => {
         if (extra.priceType === 'per day') {
-          return sum + extra.price * (bookingDetails.checkOut && bookingDetails.checkIn ? 
-            getDaysDifference(bookingDetails.checkIn, bookingDetails.checkOut) : 1);
+          return sum + (extra.price * days);
         } else if (extra.priceType === 'per person/day') {
-          return sum + extra.price * (bookingDetails.adults + bookingDetails.children) * 
-            (bookingDetails.checkOut && bookingDetails.checkIn ? 
-              getDaysDifference(bookingDetails.checkIn, bookingDetails.checkOut) : 1);
+          return sum + (extra.price * (bookingDetails.adults + bookingDetails.children) * days);
         } else {
           return sum + extra.price;
         }
@@ -104,11 +86,18 @@ const BookingFlow = () => {
       total += extrasCost;
     }
     
-    console.log('Final total price:', total);
+    // Adăugare taxă de 12%
+    const subtotal = total;
+    const tax = subtotal * 0.12; // 12% tax
+    total = subtotal + tax;
+    
+    console.log('Final total price with tax:', total);
     
     setBookingDetails(prev => ({
       ...prev,
-      totalPrice: total
+      totalPrice: total,
+      subtotal: subtotal,
+      tax: tax
     }));
   }, [selectedRoom, selectedExtras, bookingDetails.checkIn, bookingDetails.checkOut, bookingDetails.adults, bookingDetails.children, hotelData]);
   
@@ -180,6 +169,9 @@ const BookingFlow = () => {
           children: bookingDetails.children
         },
         totalAmount: bookingDetails.totalPrice,
+        subtotal: bookingDetails.subtotal,
+        tax: bookingDetails.tax,
+        taxRate: 12, // 12% tax rate
         extras: selectedExtras,
         notes: bookingDetails.notes || '',
         // Payment details would normally be processed separately
@@ -187,6 +179,7 @@ const BookingFlow = () => {
       };
       
       console.log('Submitting booking with hotel data:', bookingData.hotel);
+      console.log('Price details: Subtotal:', bookingDetails.subtotal, 'Tax:', bookingDetails.tax, 'Total:', bookingDetails.totalPrice);
       
       // Submit booking to backend
       const response = await createHotelBooking(bookingData);
@@ -832,6 +825,18 @@ const PaymentStep = ({ onNext, onBack, bookingDetails, selectedRoom, selectedExt
   
   // Calculate tax and totals
   const calculateSummary = () => {
+    // Folosim valorile deja calculate și stocate în bookingDetails
+    if (bookingDetails.subtotal && bookingDetails.tax) {
+      return {
+        roomTotal: selectedRoom.price * nights,
+        extrasTotal: bookingDetails.subtotal - (selectedRoom.price * nights),
+        subtotal: bookingDetails.subtotal,
+        tax: bookingDetails.tax,
+        total: bookingDetails.totalPrice
+      };
+    }
+    
+    // Alternativa în caz că valorile nu sunt încă disponibile
     const roomTotal = selectedRoom.price * nights;
     
     let extrasTotal = 0;
@@ -1140,7 +1145,7 @@ const ConfirmationStep = ({ onFinish, bookingDetails, selectedRoom }) => {
           </div>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 pb-3 sm:pb-4 border-b border-blue-700">
           <div>
             <h4 className="text-blue-300 text-xs sm:text-sm mb-1">Check-in</h4>
             <p className="text-sm sm:text-base">{formatDate(bookingDetails.checkIn)}, from 3:00 PM</p>
@@ -1153,9 +1158,22 @@ const ConfirmationStep = ({ onFinish, bookingDetails, selectedRoom }) => {
             <h4 className="text-blue-300 text-xs sm:text-sm mb-1">Guests</h4>
             <p className="text-sm sm:text-base">{bookingDetails.adults} Adults, {bookingDetails.children} Children</p>
           </div>
-          <div>
-            <h4 className="text-blue-300 text-xs sm:text-sm mb-1">Total Amount</h4>
-            <p className="text-white font-semibold text-base sm:text-lg">{bookingDetails.totalPrice.toFixed(2)} RON</p>
+        </div>
+        
+        {/* Adăugare detalii de preț */}
+        <div className="mb-3">
+          <h4 className="text-blue-300 text-xs sm:text-sm mb-2">Payment Details</h4>
+          <div className="flex justify-between text-sm mb-1">
+            <span className="text-gray-300">Subtotal:</span>
+            <span>{bookingDetails.subtotal?.toFixed(2) || '0.00'} RON</span>
+          </div>
+          <div className="flex justify-between text-sm mb-1">
+            <span className="text-gray-300">Tax (12%):</span>
+            <span>{bookingDetails.tax?.toFixed(2) || '0.00'} RON</span>
+          </div>
+          <div className="flex justify-between font-semibold mt-2">
+            <span>Total Amount:</span>
+            <span className="text-white font-semibold text-base sm:text-lg">{bookingDetails.totalPrice.toFixed(2)} RON</span>
           </div>
         </div>
       </div>

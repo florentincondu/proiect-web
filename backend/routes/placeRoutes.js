@@ -4,8 +4,119 @@ const { protect, admin } = require('../middleware/authMiddleware');
 const PlacePrice = require('../models/PlacePrice');
 const PlaceRestriction = require('../models/PlaceRestriction');
 const axios = require('axios');
+const path = require('path');
+const fs = require('fs');
 
-// Get all place prices (public)
+// Endpoint search-nearby
+router.post('/search-nearby', async (req, res) => {
+  try {
+    console.log('Received search-nearby request with body:', JSON.stringify(req.body));
+    const response = await axios.post(
+      'https://places.googleapis.com/v1/places:searchNearby',
+      req.body,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': process.env.API_KEY,
+          'X-Goog-FieldMask': req.headers['x-goog-fieldmask'] || 'places.id,places.displayName,places.photos,places.formattedAddress,places.rating,places.types,places.websiteUri,places.priceLevel'
+        }
+      }
+    );
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error proxying to Google Places API:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({
+      error: error.response?.data || 'Error accessing Google Places API'
+    });
+  }
+});
+
+// Endpoint search-text
+router.post('/search-text', async (req, res) => {
+  try {
+    const { textQuery } = req.body;
+    
+    if (!textQuery) {
+      return res.status(400).json({ error: 'Text query is required' });
+    }
+    
+    console.log(`Searching for: "${textQuery}"`);
+    
+    const googleMapsUrl = 'https://places.googleapis.com/v1/places:searchText';
+    
+    const response = await axios.post(
+      googleMapsUrl,
+      {
+        textQuery: textQuery,
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': process.env.API_KEY,
+          'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.photos,places.rating,places.userRatingCount,places.priceLevel,places.id'
+        }
+      }
+    );
+    
+    console.log(`Found ${response.data.places?.length || 0} places`);
+    
+    return res.json(response.data);
+  } catch (error) {
+    console.error('Error searching places:', error.message);
+    
+    // Better error response with details
+    if (error.response) {
+      console.error('Google API error details:', error.response.data);
+      return res.status(error.response.status).json({
+        error: 'Error from Google Places API',
+        details: error.response.data
+      });
+    }
+    
+    return res.status(500).json({ error: 'Failed to search places' });
+  }
+});
+
+// Endpoint media
+router.get('/media/:photoName', async (req, res) => {
+  try {
+    // Get the full photo name from the request
+    const photoName = decodeURIComponent(req.params.photoName);
+    
+    console.log('Requesting photo:', photoName);
+    
+    // Validate the photo name format to make sure it looks like a valid Places photo ID
+    if (!photoName || !photoName.includes('/photos/')) {
+      console.error('Invalid photo name format:', photoName);
+      return res.redirect('https://placehold.co/400x300/172a45/ffffff?text=Invalid+Photo+ID');
+    }
+    
+    const response = await axios.get(
+      `https://places.googleapis.com/v1/${photoName}/media`,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': process.env.API_KEY
+        },
+        params: req.query,
+        responseType: 'stream'
+      }
+    );
+    
+    // Forward content type and other relevant headers
+    res.set('Content-Type', response.headers['content-type']);
+    
+    // Pipe the image data directly to the response
+    response.data.pipe(res);
+  } catch (error) {
+    console.error('Error proxying to Google Places photo API:', error.response?.data || error.message);
+    console.error('Photo request failed for:', req.params.photoName);
+    
+    // Send a placeholder image instead of an error
+    res.redirect('https://placehold.co/400x300/172a45/ffffff?text=Image+Not+Found');
+  }
+});
+
 router.get('/prices', async (req, res) => {
   try {
     const prices = await PlacePrice.find().sort({ name: 1 });
@@ -16,7 +127,6 @@ router.get('/prices', async (req, res) => {
   }
 });
 
-// Get place price by ID (admin only)
 router.get('/prices/:id', protect, admin, async (req, res) => {
   try {
     const price = await PlacePrice.findById(req.params.id);
@@ -30,7 +140,6 @@ router.get('/prices/:id', protect, admin, async (req, res) => {
   }
 });
 
-// Update place price (admin only)
 router.put('/prices/:id', protect, admin, async (req, res) => {
   try {
     const { price } = req.body;
@@ -55,7 +164,6 @@ router.put('/prices/:id', protect, admin, async (req, res) => {
   }
 });
 
-// Get all place restrictions (admin only)
 router.get('/restrictions', protect, admin, async (req, res) => {
   try {
     const restrictions = await PlaceRestriction.find().sort({ name: 1 });
@@ -66,7 +174,6 @@ router.get('/restrictions', protect, admin, async (req, res) => {
   }
 });
 
-// Get place restriction by ID (admin only)
 router.get('/restrictions/:id', protect, admin, async (req, res) => {
   try {
     const restriction = await PlaceRestriction.findById(req.params.id);
@@ -80,7 +187,6 @@ router.get('/restrictions/:id', protect, admin, async (req, res) => {
   }
 });
 
-// Update place restriction (admin only)
 router.put('/restrictions/:id', protect, admin, async (req, res) => {
   try {
     const { isRestricted, reason } = req.body;
@@ -106,28 +212,21 @@ router.put('/restrictions/:id', protect, admin, async (req, res) => {
   }
 });
 
-// Get place details (public)
 router.get('/:placeId', async (req, res) => {
   try {
     console.log('Received request for place ID:', req.params.placeId);
     console.log('Query parameters:', req.query);
     
-    // Check if the placeId is a Google Places API ID (starts with ChI)
     if (req.params.placeId.startsWith('ChI')) {
       console.log('Processing Google Places API request');
       
-      // Get fields from query parameters or use default fields
       const fields = req.query.fields || 
         'id,displayName,formattedAddress,location,rating,userRatingCount,photos,types,websiteUri,priceLevel,businessStatus,internationalPhoneNumber,editorialSummary';
       
-      // Forward the request to Google Places API
       const response = await axios.get(
         `https://places.googleapis.com/v1/places/${req.params.placeId}?fields=${encodeURIComponent(fields)}&key=${process.env.API_KEY}`
       );
       
-      console.log('Google Places API response:', response.data);
-      
-      // Transform the response to match our format
       const placeData = {
         id: response.data.id,
         name: response.data.displayName?.text || 'Unknown Place',
@@ -147,19 +246,14 @@ router.get('/:placeId', async (req, res) => {
           height: photo.heightPx
         }))
       };
-      
-      console.log('Transformed place data:', placeData);
       res.json(placeData);
     } else {
-      console.log('Processing internal place ID request');
-      // Handle our internal place IDs
       const [price, restriction] = await Promise.all([
         PlacePrice.findOne({ placeId: req.params.placeId }),
         PlaceRestriction.findOne({ placeId: req.params.placeId })
       ]);
       
       if (!price) {
-        console.log('Place not found in database');
         return res.status(404).json({ message: 'Place not found' });
       }
       
@@ -171,11 +265,9 @@ router.get('/:placeId', async (req, res) => {
         restrictionReason: restriction?.reason || ''
       };
       
-      console.log('Internal place data:', placeData);
       res.json(placeData);
     }
   } catch (error) {
-    console.error('Error fetching place details:', error);
     if (error.response) {
       console.error('Error response:', error.response.data);
       console.error('Error status:', error.response.status);

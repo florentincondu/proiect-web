@@ -8,31 +8,21 @@ const fs = require('fs');
 const connectDB = require('./db');
 const errorHandler = require('./middlewares/errorHandler');
 
-// Load environment variables
 dotenv.config();
-
-// Initialize Express app
 const app = express();
 
-// CORS configuration
 app.use(cors({
   origin: ['http://localhost:5173', 'http://localhost:5174'],
   credentials: true
 }));
 
-// Middleware
 app.use(express.json());
-
-// Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-console.log('Serving static files from:', path.join(__dirname, 'uploads'));
 
-// Add a test endpoint to check if images are being served correctly
 app.get('/check-uploads', (req, res) => {
   const uploadsPath = path.join(__dirname, 'uploads');
   
   try {
-    // Check if the uploads directory exists
     if (!fs.existsSync(uploadsPath)) {
       return res.status(404).json({ 
         error: 'Uploads directory not found',
@@ -40,7 +30,6 @@ app.get('/check-uploads', (req, res) => {
       });
     }
     
-    // List the profile and cover directories
     const directories = ['profile', 'cover'];
     const result = {};
     
@@ -181,225 +170,6 @@ if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
   console.log('Created logs directory at:', logsDir);
 }
-
-app.post('/api/places/search-nearby', async (req, res) => {
-  try {
-    const response = await axios.post(
-      'https://places.googleapis.com/v1/places:searchNearby',
-      req.body,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': process.env.API_KEY,
-          'X-Goog-FieldMask': req.headers['x-goog-fieldmask'] || 'places.id,places.displayName,places.photos,places.formattedAddress,places.rating,places.types,places.websiteUri,places.priceLevel'
-        }
-      }
-    );
-    res.json(response.data);
-  } catch (error) {
-    console.error('Error proxying to Google Places API:', error.response?.data || error.message);
-    res.status(error.response?.status || 500).json({
-      error: error.response?.data || 'Error accessing Google Places API'
-    });
-  }
-});
-
-app.post('/api/places/search-text', async (req, res) => {
-  try {
-    const { textQuery } = req.body;
-    
-    if (!textQuery) {
-      return res.status(400).json({ error: 'Text query is required' });
-    }
-    
-    console.log(`Searching for: "${textQuery}"`);
-    
-    const googleMapsUrl = 'https://places.googleapis.com/v1/places:searchText';
-    
-    const response = await axios.post(
-      googleMapsUrl,
-      {
-        textQuery: textQuery,
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': process.env.API_KEY,
-          'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.photos,places.rating,places.userRatingCount,places.priceLevel,places.id'
-        }
-      }
-    );
-    
-    console.log(`Found ${response.data.places?.length || 0} places`);
-    
-    return res.json(response.data);
-  } catch (error) {
-    console.error('Error searching places:', error.message);
-    
-    // Better error response with details
-    if (error.response) {
-      console.error('Google API error details:', error.response.data);
-      return res.status(error.response.status).json({
-        error: 'Error from Google Places API',
-        details: error.response.data
-      });
-    }
-    
-    return res.status(500).json({ error: 'Failed to search places' });
-  }
-});
-
-app.get('/api/places/media/:photoName', async (req, res) => {
-  try {
-    // Get the full photo name from the request
-    const photoName = decodeURIComponent(req.params.photoName);
-    
-    console.log('Requesting photo:', photoName);
-    
-    // Validate the photo name format to make sure it looks like a valid Places photo ID
-    if (!photoName || !photoName.includes('/photos/')) {
-      console.error('Invalid photo name format:', photoName);
-      return res.redirect('https://placehold.co/400x300/172a45/ffffff?text=Invalid+Photo+ID');
-    }
-    
-    const response = await axios.get(
-      `https://places.googleapis.com/v1/${photoName}/media`,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': process.env.API_KEY
-        },
-        params: req.query,
-        responseType: 'stream'
-      }
-    );
-    
-    // Forward content type and other relevant headers
-    res.set('Content-Type', response.headers['content-type']);
-    
-    // Pipe the image data directly to the response
-    response.data.pipe(res);
-  } catch (error) {
-    console.error('Error proxying to Google Places photo API:', error.response?.data || error.message);
-    console.error('Photo request failed for:', req.params.photoName);
-    
-    // Send a placeholder image instead of an error
-    res.redirect('https://placehold.co/400x300/172a45/ffffff?text=Image+Not+Found');
-  }
-});
-
-app.get('/api/places/prices', async (req, res) => {
-  try {
-    let PlacePrice;
-    try {
-      const modelPath = path.join(__dirname, 'models', 'PlacePrice.js');
-      
-      if (!fs.existsSync(modelPath)) {
-        console.error('PlacePrice model file does not exist at path:', modelPath);
-        return res.status(200).json({
-          success: true,
-          prices: []
-        });
-      }
-      
-      PlacePrice = require('./models/PlacePrice');
-    } catch (err) {
-      console.error('Error importing PlacePrice model:', err.message);
-      console.error(err.stack);
-      return res.status(200).json({
-        success: true,
-        prices: []
-      });
-    }
-    
-    if (!PlacePrice) {
-      return res.status(200).json({
-        success: true,
-        prices: []
-      });
-    }
-    
-    let prices = [];
-    try {
-      prices = await PlacePrice.find().lean();
-    } catch (dbErr) {
-      console.error('Database error when fetching prices:', dbErr.message);
-      console.error(dbErr.stack);
-    }
-    
-    return res.status(200).json({
-      success: true,
-      prices: prices || []
-    });
-  } catch (error) {
-    console.error('Error getting place prices:', error.message);
-    console.error(error.stack);
-    return res.status(200).json({
-      success: true,
-      prices: []
-    });
-  }
-});
-
-app.get('/api/places/restrictions', async (req, res) => {
-  try {
-    let PlaceRestriction;
-    try {
-      const modelPath = path.join(__dirname, 'models', 'PlaceRestriction.js');
-      
-      if (!fs.existsSync(modelPath)) {
-        console.error('PlaceRestriction model file does not exist at path:', modelPath);
-        return res.status(200).json({
-          success: true,
-          restrictions: []
-        });
-      }
-      
-      PlaceRestriction = require('./models/PlaceRestriction');
-    } catch (err) {
-      console.error('Error importing PlaceRestriction model:', err.message);
-      console.error(err.stack);
-      return res.status(200).json({
-        success: true,
-        restrictions: []
-      });
-    }
-    
-    if (!PlaceRestriction) {
-      console.log('PlaceRestriction model is undefined, returning empty array');
-      return res.status(200).json({
-        success: true,
-        restrictions: []
-      });
-    }
-    
-    // Get all place restrictions with connection error handling
-    let restrictions = [];
-    try {
-      console.log('Attempting to fetch restrictions from database');
-      restrictions = await PlaceRestriction.find().lean();
-      console.log(`Found ${restrictions.length} restrictions in database`);
-    } catch (dbErr) {
-      console.error('Database error when fetching restrictions:', dbErr.message);
-      console.error(dbErr.stack);
-      // Just return an empty array in case of DB errors
-    }
-    
-    console.log('Sending restrictions response');
-    return res.status(200).json({
-      success: true,
-      restrictions: restrictions || []
-    });
-  } catch (error) {
-    console.error('Error getting place restrictions:', error.message);
-    console.error(error.stack);
-    // Return empty array instead of error to prevent UI issues
-    return res.status(200).json({
-      success: true,
-      restrictions: []
-    });
-  }
-});
 
 // Add a direct API for hotel search
 app.get('/api/hotels/search', async (req, res) => {
