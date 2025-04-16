@@ -7,8 +7,12 @@ const mongoose = require('mongoose');
 const fs = require('fs');
 const path = require('path');
 
-const generateToken = (id, expiresIn) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn });
+const generateToken = (id) => {
+  return jwt.sign(
+    { id }, 
+    process.env.JWT_SECRET, 
+    { expiresIn: '30d' }  // Set token to expire in 30 days
+  );
 };
 
 // Configure email transporter
@@ -339,7 +343,7 @@ const register = async (req, res) => {
     console.log(`User registered successfully: ${user._id}, role: ${user.role}`);
 
     // Generate token
-    const token = generateToken(user._id, '30d');
+    const token = generateToken(user._id);
 
     // Send welcome email to client
     try {
@@ -534,7 +538,7 @@ const verifyAdmin = async (req, res) => {
     await user.save();
     
     // Generate auth token for automatic login
-    const authToken = generateToken(user._id, '30d');
+    const authToken = generateToken(user._id);
     
     res.status(200).json({ 
       message: 'Admin account verified successfully!',
@@ -557,98 +561,102 @@ const verifyAdmin = async (req, res) => {
 // Login user
 const login = async (req, res) => {
   try {
-    const { email, password, rememberMe } = req.body;
-    console.log(`Login attempt for: ${email}`);
+    const { email, password } = req.body;
 
-    // Validate input
-    if (!email || !password) {
-      console.log('Missing email or password');
-      return res.status(400).json({ message: 'Please provide email and password' });
-    }
+    // Find user by email with all fields except password
+    const user = await User.findOne({ email })
+      .select('-password')
+      .lean();
 
-    // Find user by email
-    const user = await User.findOne({ email });
     if (!user) {
-      console.log(`User not found for email: ${email}`);
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ message: 'Invalid email or password' });
     }
-    
-    console.log(`User found: ${user._id}, role: ${user.role}`);
-    
-    // Verify password using bcrypt
-    try {
-      console.log('Attempting password comparison...');
-      const isMatch = await bcrypt.compare(password, user.password);
-      console.log(`Password comparison result: ${isMatch}`);
+
+    // Check if user is blocked
+    if (user.blockInfo && user.blockInfo.isBlocked) {
+      const now = new Date();
+      const blockedUntil = new Date(user.blockInfo.blockedUntil);
       
-      if (!isMatch) {
-        console.log('Password verification failed');
-        return res.status(401).json({ message: 'Invalid credentials' });
+      if (!user.blockInfo.blockedUntil || now < blockedUntil) {
+        return res.status(403).json({ 
+          message: 'Your account has been blocked', 
+          reason: user.blockInfo.reason,
+          blockedUntil: user.blockInfo.blockedUntil 
+        });
       }
-    } catch (passwordError) {
-      console.error('Error during password comparison:', passwordError);
-      return res.status(500).json({ message: 'Error verifying password' });
+      
+      // If block period has expired, unblock user
+      if (now >= blockedUntil) {
+        await User.findByIdAndUpdate(user._id, {
+          $set: {
+            'blockInfo.isBlocked': false,
+            'blockInfo.reason': null,
+            'blockInfo.blockedUntil': null,
+            'blockInfo.blockedBy': null,
+            'blockInfo.blockedAt': null
+          }
+        });
+      }
     }
 
-    // Check if user is an admin but not verified
-    if (user.role === 'admin' && !user.adminVerified) {
-      return res.status(403).json({
-        message: 'Your admin account needs verification',
-        status: 'admin_pending',
-        requiresVerification: true,
-        email: user.email,
-        redirectTo: '/verify-admin'
-      });
+    // Get the full user document for password comparison
+    const userDoc = await User.findById(user._id);
+    const isMatch = await userDoc.comparePassword(password);
+    
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid email or password' });
     }
 
-    // Update user activity data
-    user.lastLogin = new Date();
-    user.loginCount += 1;
-    user.lastActive = new Date();
-    
-    // Add login activity to logs
-    user.activityLogs.push({
-      action: 'login',
-      timestamp: new Date(),
-      details: {
-        ip: req.ip || 'unknown',
-        userAgent: req.headers['user-agent'] || 'unknown'
+    // Update login stats and get updated user data
+    const updatedUser = await User.findByIdAndUpdate(
+      user._id,
+      {
+        $set: {
+          lastLogin: new Date(),
+          lastActive: new Date()
+        },
+        $inc: { loginCount: 1 }
+      },
+      { 
+        new: true,
+        select: '-password -resetPasswordToken -resetPasswordExpires -adminVerificationToken -adminVerificationExpires'
       }
-    });
-    
-    // Limit the size of the activity logs array to prevent it from growing too large
-    if (user.activityLogs.length > 100) {
-      user.activityLogs = user.activityLogs.slice(-100); // Keep only the last 100 entries
-    }
-    
-    await user.save();
+    );
 
     // Generate JWT token
-    const token = generateToken(user._id, rememberMe ? '30d' : '24h');
+    const token = generateToken(updatedUser._id);
 
-    // Format user data for response
-    const userData = {
-      id: user._id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      role: user.role,
-      profileImage: user.profileImage,
-      subscription: user.bePartOfUs?.type || 'free'
-    };
-
+    // Return the exact structure expected by the frontend
     res.json({
-      id: user._id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      role: user.role,
-      profileImage: user.profileImage,
-      token: token,
-      user: userData,
-      subscription: user.bePartOfUs?.type || 'free',
-      lastLogin: user.lastLogin,
-      loginCount: user.loginCount
+      token,
+      user: {
+        id: updatedUser._id.toString(),
+        _id: updatedUser._id.toString(),
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        name: `${updatedUser.firstName} ${updatedUser.lastName}`,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        status: updatedUser.status || 'active',
+        profileImage: updatedUser.profileImage || '',
+        phone: updatedUser.phone || '',
+        address: updatedUser.address || '',
+        lastLogin: updatedUser.lastLogin,
+        lastActive: updatedUser.lastActive,
+        loginCount: updatedUser.loginCount,
+        createdAt: updatedUser.createdAt,
+        updatedAt: updatedUser.updatedAt,
+        preferences: updatedUser.preferences || {
+          notifications: {
+            email: true,
+            push: true
+          },
+          language: 'en',
+          theme: 'system'
+        },
+        subscription: updatedUser.bePartOfUs?.type || 'free',
+        blockInfo: updatedUser.blockInfo || null
+      }
     });
   } catch (error) {
     console.error('Login error:', error);

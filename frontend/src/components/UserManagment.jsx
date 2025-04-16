@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaCheck, FaTimes, FaSearch, FaEllipsisV, FaEdit, FaKey, FaUserShield, FaUserCog, FaHistory, FaEnvelope } from 'react-icons/fa';
+import { FaCheck, FaTimes, FaSearch, FaEllipsisV, FaEdit, FaKey, FaUserShield, FaUserCog, FaHistory, FaEnvelope, FaBan } from 'react-icons/fa';
 import axios from 'axios';
 
 const UserManagement = () => {
@@ -15,6 +15,11 @@ const UserManagement = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [userBookingHistory, setUserBookingHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [blockModalOpen, setBlockModalOpen] = useState(false);
+  const [blockInfo, setBlockInfo] = useState({
+    reason: '',
+    duration: '1' // Default 1 day
+  });
   
   useEffect(() => {
     fetchUsers();
@@ -115,13 +120,51 @@ const UserManagement = () => {
     setIsEditModalOpen(true);
   };
   
+  const handleBlockUser = async (user) => {
+    setCurrentUser(user);
+    setBlockModalOpen(true);
+  };
+  
+  const handleConfirmBlock = async () => {
+    try {
+      const response = await axios.put(
+        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/admin/users/${currentUser._id}`,
+        {
+          status: 'blocked',
+          blockReason: blockInfo.reason,
+          blockDuration: blockInfo.duration
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`
+          }
+        }
+      );
+      
+      // Update the users list with the new data
+      setUsers(users.map(user => 
+        user._id === currentUser._id ? {
+          ...user,
+          ...response.data,
+          status: 'blocked'
+        } : user
+      ));
+      
+      setBlockModalOpen(false);
+      setBlockInfo({ reason: '', duration: '1' });
+      setError(null);
+    } catch (err) {
+      setError('Failed to block user. Please try again later.');
+      console.error('Error blocking user:', err);
+    }
+  };
+  
   const handleViewHistory = async (user) => {
     setCurrentUser(user);
     setIsViewHistoryModalOpen(true);
     setHistoryLoading(true);
     
     try {
-      // Fetch user booking history
       const response = await axios.get(
         `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/admin/users/${user._id}/bookings`,
         {
@@ -131,48 +174,10 @@ const UserManagement = () => {
         }
       );
       
-      // If the API returns real booking data, use it
-      if (response.data && Array.isArray(response.data)) {
-        setUserBookingHistory(response.data);
-      } else {
-        // Fallback mock data if no real data is available
-        const mockBookings = [
-          { 
-            id: '1', 
-            service: 'Hotel Booking',
-            date: new Date().toLocaleDateString(),
-            status: 'confirmed',
-            amount: '$120'
-          },
-          { 
-            id: '2', 
-            service: 'Car Rental',
-            date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-            status: 'completed',
-            amount: '$85'
-          },
-          { 
-            id: '3', 
-            service: 'Tour Package',
-            date: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-            status: 'canceled',
-            amount: '$210'
-          }
-        ];
-        setUserBookingHistory(mockBookings);
-      }
+      setUserBookingHistory(response.data);
     } catch (err) {
-      console.error('Error fetching user history:', err);
-      // Set fallback data on error
-      setUserBookingHistory([
-        { 
-          id: '1', 
-          service: 'Hotel Booking',
-          date: new Date().toLocaleDateString(),
-          status: 'confirmed',
-          amount: '$120'
-        }
-      ]);
+      console.error('Failed to fetch user history:', err);
+      setError('Failed to fetch user history');
     } finally {
       setHistoryLoading(false);
     }
@@ -217,8 +222,10 @@ const UserManagement = () => {
   };
 
   const handleDeleteUser = async (userId) => {
-    if (!window.confirm('Are you sure you want to delete this user?')) return;
-
+    if (!window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+      return;
+    }
+    
     try {
       await axios.delete(
         `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/admin/users/${userId}`,
@@ -229,7 +236,7 @@ const UserManagement = () => {
         }
       );
       
-      // Remove the user from the list
+      // Remove user from the list
       setUsers(users.filter(user => user._id !== userId));
       setError(null);
     } catch (err) {
@@ -430,18 +437,30 @@ const UserManagement = () => {
                         <button
                           onClick={() => handleEditUser(user)}
                           className="text-blue-400 hover:text-blue-300 transition-colors"
+                          title="Edit User"
                         >
                           <FaEdit />
                         </button>
                         <button
                           onClick={() => handleViewHistory(user)}
                           className="text-gray-400 hover:text-gray-300 transition-colors"
+                          title="View History"
                         >
                           <FaHistory />
                         </button>
+                        {user.status !== 'blocked' && (
+                          <button
+                            onClick={() => handleBlockUser(user)}
+                            className="text-yellow-400 hover:text-yellow-300 transition-colors"
+                            title="Block User"
+                          >
+                            <FaBan />
+                          </button>
+                        )}
                         <button
                           onClick={() => handleDeleteUser(user._id)}
                           className="text-red-400 hover:text-red-300 transition-colors"
+                          title="Delete User"
                         >
                           <FaTimes />
                         </button>
@@ -542,6 +561,66 @@ const UserManagement = () => {
         </div>
       )}
       
+      {/* Block User Modal */}
+      {blockModalOpen && currentUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg w-full max-w-lg mx-4">
+            <div className="border-b border-gray-700 px-6 py-4 flex items-center justify-between">
+              <h3 className="text-lg font-medium">Block User</h3>
+              <button onClick={() => setBlockModalOpen(false)} className="text-gray-400 hover:text-white">
+                <FaTimes />
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">
+                    Block Reason
+                  </label>
+                  <textarea
+                    className="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-4 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                    value={blockInfo.reason}
+                    onChange={(e) => setBlockInfo({...blockInfo, reason: e.target.value})}
+                    rows="3"
+                    placeholder="Enter reason for blocking..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">
+                    Block Duration (days)
+                  </label>
+                  <select
+                    className="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-4 text-white focus:outline-none focus:border-blue-500"
+                    value={blockInfo.duration}
+                    onChange={(e) => setBlockInfo({...blockInfo, duration: e.target.value})}
+                  >
+                    <option value="1">1 day</option>
+                    <option value="3">3 days</option>
+                    <option value="7">7 days</option>
+                    <option value="30">30 days</option>
+                    <option value="0">Permanent</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="border-t border-gray-700 px-6 py-4 flex justify-end space-x-3">
+              <button
+                onClick={() => setBlockModalOpen(false)}
+                className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmBlock}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-500"
+              >
+                Block User
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* View History Modal */}
       {isViewHistoryModalOpen && currentUser && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -553,69 +632,69 @@ const UserManagement = () => {
               </button>
             </div>
             <div className="p-6">
-              <div className="overflow-x-auto">
-                {historyLoading ? (
-                  <div className="flex justify-center py-8">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-blue-500"></div>
-                    <p className="ml-3 text-gray-400">Loading history...</p>
-                  </div>
-                ) : userBookingHistory.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400">
-                    No booking history found for this user.
-                  </div>
-                ) : (
+              {historyLoading ? (
+                <div className="text-center py-10">
+                  <div className="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-blue-500"></div>
+                  <p className="mt-2 text-gray-400">Loading history...</p>
+                </div>
+              ) : userBookingHistory.length === 0 ? (
+                <div className="text-center py-10 text-gray-400">
+                  No booking history found for this user.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-700">
-                    <thead className="bg-gray-800">
+                    <thead>
                       <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                          ID
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                          Booking ID
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                          Service
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                          Hotel
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                          Date
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                          Check In
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                          Check Out
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                           Status
                         </th>
-                        <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
                           Amount
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-gray-800 divide-y divide-gray-700">
+                    <tbody className="divide-y divide-gray-700">
                       {userBookingHistory.map((booking) => (
-                        <tr key={booking.id} className="hover:bg-gray-750">
+                        <tr key={booking._id} className="hover:bg-gray-750">
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {booking.id}
+                            {booking._id}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {booking.service}
+                            {booking.hotel?.name || 'N/A'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {booking.date}
+                            {new Date(booking.checkIn).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            {new Date(booking.checkOut).toLocaleDateString()}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span 
-                              className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                booking.status === 'confirmed' ? 'bg-blue-500/20 text-blue-400' :
-                                booking.status === 'completed' ? 'bg-green-500/20 text-green-400' :
-                                'bg-red-500/20 text-red-400'
-                              }`}
-                            >
-                              {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                            <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(booking.status)}`}>
+                              {booking.status}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                            {booking.amount}
+                            ${booking.totalAmount}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                )}
-              </div>
+                </div>
+              )}
             </div>
             <div className="border-t border-gray-700 px-6 py-4 flex justify-end">
               <button

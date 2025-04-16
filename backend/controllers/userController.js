@@ -72,54 +72,58 @@ const updateUser = asyncHandler(async (req, res) => {
     throw new Error('User not found');
   }
   
-  // Extract fields to update
-  const {
-    firstName,
-    lastName,
-    email,
-    role,
-    isVerified,
-    status,
-    notes
-  } = req.body;
+  const { status, blockReason, blockDuration, ...updateData } = req.body;
   
-  // Update only provided fields
-  if (firstName !== undefined) user.firstName = firstName;
-  if (lastName !== undefined) user.lastName = lastName;
-  if (email !== undefined) user.email = email;
-  if (role !== undefined) user.role = role;
-  if (isVerified !== undefined) user.isVerified = isVerified;
-  if (status !== undefined) user.status = status;
-  if (notes !== undefined) user.notes = notes;
+  // Handle blocking/unblocking
+  if (status === 'blocked') {
+    user.blockInfo = {
+      isBlocked: true,
+      reason: blockReason,
+      blockedUntil: blockDuration ? new Date(Date.now() + parseInt(blockDuration) * 24 * 60 * 60 * 1000) : null,
+      blockedBy: req.user._id,
+      blockedAt: new Date()
+    };
+    user.status = 'blocked';
+  } else if (status === 'active' && user.status === 'blocked') {
+    user.blockInfo = {
+      isBlocked: false,
+      reason: null,
+      blockedUntil: null,
+      blockedBy: null,
+      blockedAt: null
+    };
+    user.status = 'active';
+  }
   
-  // Add admin activity log
-  user.activityLogs.push({
-    action: 'profile_updated_by_admin',
-    timestamp: new Date(),
-    details: {
-      adminId: req.user._id,
-      changes: req.body
+  // Update other fields
+  Object.keys(updateData).forEach(key => {
+    if (updateData[key] !== undefined) {
+      user[key] = updateData[key];
     }
   });
   
-  // Keep only the last 100 logs
-  if (user.activityLogs.length > 100) {
-    user.activityLogs = user.activityLogs.slice(-100);
-  }
-  
   const updatedUser = await user.save();
   
-  res.json({
-    _id: updatedUser._id,
-    firstName: updatedUser.firstName,
-    lastName: updatedUser.lastName,
-    email: updatedUser.email,
-    role: updatedUser.role,
-    isVerified: updatedUser.isVerified,
-    status: updatedUser.status,
-    notes: updatedUser.notes,
-    message: 'User updated successfully'
-  });
+  // Send notification to user about being blocked
+  if (status === 'blocked') {
+    try {
+      const { createNotification } = require('./notificationController');
+      await createNotification({
+        user: user._id,
+        type: 'account_blocked',
+        title: 'Account Blocked',
+        message: `Your account has been blocked. Reason: ${blockReason}`,
+        data: {
+          blockedUntil: user.blockInfo.blockedUntil,
+          reason: blockReason
+        }
+      });
+    } catch (error) {
+      console.error('Failed to send block notification:', error);
+    }
+  }
+  
+  res.json(updatedUser);
 });
 
 // @desc    Delete user
