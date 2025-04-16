@@ -10,7 +10,8 @@ const {
   getProfile,
   resetPassword,
   forgotPassword,
-  resetPasswordWithToken
+  resetPasswordWithToken,
+  changePassword
 } = require('../controllers/authController.js');
 const { protect, admin } = require('../middleware/authMiddleware');
 const profileRoutes = require('./profileRoutes');
@@ -24,6 +25,7 @@ router.post('/change-subscription', protect, changeSubscription);
 router.post('/reset-password', resetPassword);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password-with-token', resetPasswordWithToken);
+router.post('/change-password', protect, changePassword);
 
 // Test route - only for development
 if (process.env.NODE_ENV !== 'production') {

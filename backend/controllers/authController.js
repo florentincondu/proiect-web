@@ -907,6 +907,52 @@ const resetPasswordWithToken = async (req, res) => {
   }
 };
 
+// Change password for authenticated user
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user.id;
+
+    // Find user by ID
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check if current password matches
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Current password is incorrect' });
+    }
+
+    // Update password
+    user.password = newPassword;
+    await user.save();
+
+    // Send confirmation email
+    await sendEmailWithRetry({
+      from: process.env.EMAIL_USER,
+      to: user.email,
+      subject: 'Password Changed Successfully',
+      html: `
+        <h1>Password Change Confirmation</h1>
+        <p>Dear ${user.firstName},</p>
+        <p>Your password has been successfully changed.</p>
+        <p>If you did not request this change, please contact support immediately.</p>
+        <p>Thank you,<br>The Boksy Team</p>
+      `
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -917,5 +963,6 @@ module.exports = {
   resendAdminVerification,
   resetPassword,
   forgotPassword,
-  resetPasswordWithToken
+  resetPasswordWithToken,
+  changePassword
 };

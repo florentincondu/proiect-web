@@ -328,3 +328,20 @@ export const verifyAdminCode = async (token, code, email) => {
     );
   }
 };
+
+// Change user password
+export const changePassword = async (currentPassword, newPassword) => {
+  try {
+    const response = await axios.post('/api/auth/change-password', {
+      currentPassword,
+      newPassword
+    });
+    
+    return response.data;
+  } catch (error) {
+    console.error('Password change error:', error);
+    throw new Error(
+      error.response?.data?.message || 'Failed to change password.'
+    );
+  }
+};

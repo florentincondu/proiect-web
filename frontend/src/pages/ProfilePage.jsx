@@ -12,7 +12,7 @@ import {
 } from 'react-icons/fa';
 import { RiCameraLensFill } from 'react-icons/ri';
 import { useAuth } from '../context/authContext';
-import { getProfile, updateProfile, uploadProfileImage, uploadCoverImage } from '../api/auth';
+import { getProfile, updateProfile, uploadProfileImage, uploadCoverImage, changePassword } from '../api/auth';
 import axios from 'axios';
 
 const ProfilePage = () => {
@@ -33,6 +33,14 @@ const ProfilePage = () => {
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [userHotels, setUserHotels] = useState([]);
   const [hotelsLoading, setHotelsLoading] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [passwordError, setPasswordError] = useState(null);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   // State pentru formularul de cazare
   const [accommodation, setAccommodation] = useState({
@@ -911,6 +919,70 @@ const ProfilePage = () => {
     console.warn('Image failed to load:', e.target.src);
     e.target.onerror = null; // Prevent infinite error loop
     e.target.src = 'https://placehold.co/400x300/172a45/ffffff?text=Image+Not+Available';
+  };
+
+  // Adaugă funcții pentru gestionarea formularului de parolă
+  const handlePasswordChange = (e) => {
+    const { name, value } = e.target;
+    setPasswordForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    // Resetează mesajele de eroare când utilizatorul începe să tasteze
+    setPasswordError(null);
+    setPasswordSuccess(false);
+  };
+
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    
+    const { currentPassword, newPassword, confirmPassword } = passwordForm;
+    
+    // Validări
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordError('Toate câmpurile sunt obligatorii.');
+      return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Noua parolă și confirmarea acesteia nu se potrivesc.');
+      return;
+    }
+    
+    if (newPassword.length < 8) {
+      setPasswordError('Parola trebuie să aibă cel puțin 8 caractere.');
+      return;
+    }
+    
+    // Verifică dacă parola conține cel puțin un număr și un caracter special
+    const hasNumber = /\d/.test(newPassword);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(newPassword);
+    
+    if (!hasNumber || !hasSpecial) {
+      setPasswordError('Parola trebuie să conțină cel puțin un număr și un caracter special.');
+      return;
+    }
+    
+    try {
+      setIsChangingPassword(true);
+      await changePassword(currentPassword, newPassword);
+      
+      // Resetează formularul și afișează un mesaj de succes
+      setPasswordForm({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+      
+      setPasswordSuccess(true);
+      setPasswordError(null);
+      showNotification('Parola a fost schimbată cu succes!', 'success');
+    } catch (error) {
+      setPasswordError(error.message || 'A apărut o eroare la schimbarea parolei. Verificați parola curentă.');
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   if (loading) return (
@@ -2321,11 +2393,22 @@ const ProfilePage = () => {
       <div className="absolute -top-24 -right-24 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl"></div>
       <div className="absolute -bottom-16 -left-16 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl"></div>
       
+      {passwordSuccess && (
+        <div className="bg-green-500/20 border border-green-500/30 rounded-xl p-4 mb-6 text-green-400 flex items-center gap-3">
+          <FaCheckCircle className="text-green-400 text-xl flex-shrink-0" />
+          <span>Parola a fost actualizată cu succes!</span>
+        </div>
+      )}
+      
+      {passwordError && (
+        <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-4 mb-6 text-red-400 flex items-center gap-3">
+          <FaInfoCircle className="text-red-400 text-xl flex-shrink-0" />
+          <span>{passwordError}</span>
+        </div>
+      )}
+      
       <form 
-        onSubmit={(e) => {
-          e.preventDefault();
-          showNotification('Password changed successfully!', 'success');
-        }} 
+        onSubmit={handlePasswordSubmit} 
         className="space-y-8 relative z-10"
       >
         <div>
@@ -2336,6 +2419,9 @@ const ProfilePage = () => {
             </div>
             <input
               type="password"
+              name="currentPassword"
+              value={passwordForm.currentPassword}
+              onChange={handlePasswordChange}
               className="pl-12 block w-full rounded-xl border border-gray-600 bg-gray-800/50 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500/40 focus:ring-opacity-50 transition-all text-white py-3"
               placeholder="Enter your current password"
               required
@@ -2351,6 +2437,9 @@ const ProfilePage = () => {
             </div>
             <input
               type="password"
+              name="newPassword"
+              value={passwordForm.newPassword}
+              onChange={handlePasswordChange}
               className="pl-12 block w-full rounded-xl border border-gray-600 bg-gray-800/50 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500/40 focus:ring-opacity-50 transition-all text-white py-3"
               placeholder="Enter your new password"
               required
@@ -2374,6 +2463,9 @@ const ProfilePage = () => {
             </div>
             <input
               type="password"
+              name="confirmPassword"
+              value={passwordForm.confirmPassword}
+              onChange={handlePasswordChange}
               className="pl-12 block w-full rounded-xl border border-gray-600 bg-gray-800/50 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500/40 focus:ring-opacity-50 transition-all text-white py-3"
               placeholder="Confirm your new password"
               required
@@ -2384,12 +2476,25 @@ const ProfilePage = () => {
         <div className="pt-4">
           <button
             type="submit"
+            disabled={isChangingPassword}
             className="w-full sm:w-auto px-6 py-3 border border-transparent shadow-md text-sm font-medium rounded-xl text-white bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-blue-500 transition-all flex items-center justify-center gap-2"
           >
-            <span>Update Password</span>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
+            {isChangingPassword ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Processing...</span>
+              </>
+            ) : (
+              <>
+                <span>Update Password</span>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </>
+            )}
           </button>
         </div>
       </form>
