@@ -193,102 +193,104 @@ exports.getRecentLogs = async (req, res) => {
   try {
     console.log('Recent logs requested');
     
-    // Try to fetch real logs from the database
-    let logs = [];
-    
-    try {
-      // Get the most recent 20 system logs
-      logs = await SystemLog.find()
+    // Get the most recent activities from different collections
+    const [bookings, payments, users, systemLogs] = await Promise.all([
+      // Recent bookings
+      Booking.find()
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .populate('user', 'firstName lastName email')
+        .populate('hotel', 'name')
+        .lean(),
+      
+      // Recent payments
+      Payment.find()
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .populate('user', 'firstName lastName email')
+        .populate('booking')
+        .lean(),
+      
+      // Recent user registrations
+      User.find()
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .select('firstName lastName email createdAt')
+        .lean(),
+      
+      // System logs
+      SystemLog.find()
         .sort({ timestamp: -1 })
-        .limit(20)
+        .limit(10)
         .populate('userId', 'firstName lastName email')
-        .lean();
-      
-      console.log(`Found ${logs.length} real logs in database`);
-    } catch (dbError) {
-      console.error('Error fetching logs from database:', dbError);
-      // If database fetch fails, we'll fall back to empty array
-    }
-    
-    // Format logs for frontend consumption
-    const formattedLogs = logs.map(log => {
-      // Create standard action based on log level and action
-      let action = log.action || 'System event';
-      if (log.level === 'error') action = 'Error reported';
-      if (log.level === 'warning') action = 'Warning triggered';
-      
-      return {
+        .lean()
+    ]);
+
+    // Combine and format all activities
+    let allActivities = [
+      // Format booking activities
+      ...bookings.map(booking => ({
+        id: booking._id,
+        user: booking.user ? `${booking.user.firstName} ${booking.user.lastName}` : 'Unknown User',
+        action: 'Booking created',
+        module: 'bookings',
+        message: `Booked ${booking.hotel?.name || 'a hotel'} for ${booking.totalAmount} RON`,
+        timestamp: booking.createdAt,
+        level: 'info',
+        type: 'booking'
+      })),
+
+      // Format payment activities
+      ...payments.map(payment => ({
+        id: payment._id,
+        user: payment.user ? `${payment.user.firstName} ${payment.user.lastName}` : 'Unknown User',
+        action: 'Payment processed',
+        module: 'payments',
+        message: `${payment.status === 'refunded' ? 'Refunded' : 'Paid'} ${payment.total} RON for booking`,
+        timestamp: payment.createdAt,
+        level: payment.status === 'refunded' ? 'warning' : 'info',
+        type: 'payment'
+      })),
+
+      // Format user registration activities
+      ...users.map(user => ({
+        id: user._id,
+        user: `${user.firstName} ${user.lastName}`,
+        action: 'User registered',
+        module: 'users',
+        message: `New user account created for ${user.email}`,
+        timestamp: user.createdAt,
+        level: 'info',
+        type: 'user'
+      })),
+
+      // Format system logs
+      ...systemLogs.map(log => ({
         id: log._id,
-        user: log.userId ? `${log.userId.firstName || ''} ${log.userId.lastName || ''}`.trim() : 'System',
-        action: action,
+        user: log.userId ? `${log.userId.firstName} ${log.userId.lastName}` : 'System',
+        action: log.action || 'System event',
         module: log.module || 'system',
         message: log.message,
         timestamp: log.timestamp,
-        level: log.level
-      };
-    });
-    
-    // If no logs found, create some sample activity
-    if (formattedLogs.length === 0) {
-      console.log('No real logs found, creating sample activity data');
-      
-      const now = new Date();
-      
-      // Create sample activity data with realistic timestamps
-      formattedLogs.push(
-        {
-          id: 'sample-1',
-          user: 'System',
-          action: 'User registered',
-          module: 'users',
-          message: 'New user account created',
-          timestamp: new Date(now.getTime() - 10 * 60000), // 10 minutes ago
-          level: 'info'
-        },
-        {
-          id: 'sample-2',
-          user: 'Admin',
-          action: 'Booking created',
-          module: 'bookings',
-          message: 'New booking confirmed',
-          timestamp: new Date(now.getTime() - 25 * 60000), // 25 minutes ago
-          level: 'info'
-        },
-        {
-          id: 'sample-3',
-          user: 'System',
-          action: 'Payment processed',
-          module: 'payments',
-          message: 'Payment successfully processed',
-          timestamp: new Date(now.getTime() - 45 * 60000), // 45 minutes ago
-          level: 'info'
-        },
-        {
-          id: 'sample-4',
-          user: 'Admin',
-          action: 'Hotel updated',
-          module: 'hotels',
-          message: 'Hotel details updated',
-          timestamp: new Date(now.getTime() - 120 * 60000), // 2 hours ago
-          level: 'info'
-        },
-        {
-          id: 'sample-5',
-          user: 'System',
-          action: 'System maintenance',
-          module: 'system',
-          message: 'Routine system maintenance completed',
-          timestamp: new Date(now.getTime() - 240 * 60000), // 4 hours ago
-          level: 'info'
-        }
-      );
-    }
-    
-    console.log('Returning activity logs data, count:', formattedLogs.length);
-    res.json({ logs: formattedLogs });
+        level: log.level || 'info',
+        type: 'system'
+      }))
+    ];
+
+    // Sort all activities by timestamp
+    allActivities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    // Limit to most recent 20 activities
+    allActivities = allActivities.slice(0, 20);
+
+    console.log(`Returning ${allActivities.length} formatted activities`);
+    res.json({ logs: allActivities });
   } catch (error) {
-    console.error('Error fetching recent logs:', error);
-    res.status(500).json({ message: 'Failed to fetch recent logs' });
+    console.error('Error fetching activity logs:', error);
+    res.status(500).json({ 
+      message: 'Failed to fetch activity logs',
+      error: error.message 
+    });
   }
 };
 

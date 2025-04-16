@@ -8,25 +8,46 @@ const userSchema = new mongoose.Schema({
   },
   firstName: {
     type: String,
-    required: true
+    required: [true, 'First name is required']
   },
   lastName: {
     type: String,
-    required: true
+    required: [true, 'Last name is required']
   },
   email: {
     type: String,
-    required: true,
-    unique: true
+    required: [true, 'Email is required'],
+    unique: true,
+    lowercase: true,
+    trim: true
   },
   password: {
     type: String,
-    required: true
+    required: [true, 'Password is required'],
+    minlength: [6, 'Password must be at least 6 characters long']
   },
   role: {
     type: String,
-    enum: ['client', 'admin', 'host', 'guest'],
+    enum: ['admin', 'client'],
     default: 'client'
+  },
+  status: {
+    type: String,
+    enum: ['active', 'inactive', 'blocked'],
+    default: 'active'
+  },
+  blockInfo: {
+    isBlocked: {
+      type: Boolean,
+      default: false
+    },
+    reason: String,
+    blockedUntil: Date,
+    blockedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    blockedAt: Date
   },
   adminRequested: {
     type: Boolean,
@@ -57,10 +78,7 @@ const userSchema = new mongoose.Schema({
     type: String
   },
   // User activity tracking
-  lastLogin: {
-    type: Date,
-    default: null
-  },
+  lastLogin: Date,
   loginCount: {
     type: Number,
     default: 0
@@ -379,6 +397,13 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
     console.error('[User Model] Error comparing passwords:', error);
     throw error;
   }
+};
+
+// Method to check if user is blocked
+userSchema.methods.isBlocked = function() {
+  if (!this.blockInfo.isBlocked) return false;
+  if (!this.blockInfo.blockedUntil) return true;
+  return new Date() < new Date(this.blockInfo.blockedUntil);
 };
 
 const User = mongoose.model('User', userSchema);

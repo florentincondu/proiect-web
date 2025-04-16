@@ -397,26 +397,6 @@ const Analytics = () => {
               />
             </div>
           </div>
-          
-          <div className="flex gap-2">
-            <button
-              onClick={() => handleExport('csv')}
-              disabled={exportLoading.csv || isLoading}
-              className={`flex items-center bg-blue-500 text-white px-3 py-2 rounded-md text-sm hover:bg-blue-600 transition duration-300 ${(exportLoading.csv || isLoading) ? 'opacity-70 cursor-not-allowed' : ''}`}
-            >
-              <FaFileExport className="mr-2" />
-              {exportLoading.csv ? 'Exporting...' : 'Export CSV'}
-            </button>
-            
-            <button
-              onClick={() => handleExport('pdf')}
-              disabled={exportLoading.pdf || isLoading}
-              className={`flex items-center bg-gray-800 text-white px-3 py-2 rounded-md text-sm hover:bg-gray-700 transition duration-300 ${(exportLoading.pdf || isLoading) ? 'opacity-70 cursor-not-allowed' : ''}`}
-            >
-              <FaDownload className="mr-2" />
-              {exportLoading.pdf ? 'Exporting...' : 'Export PDF'}
-            </button>
-          </div>
         </div>
       </div>
       

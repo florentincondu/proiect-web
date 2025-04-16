@@ -176,6 +176,8 @@ const PaymentsInvoicesManagement = () => {
   const [filteredPayments, setFilteredPayments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [totalRefunds, setTotalRefunds] = useState(0);
+  const [refundedBookingsCount, setRefundedBookingsCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All Statuses');
   const [filterMethod, setFilterMethod] = useState('All Methods');
@@ -220,7 +222,7 @@ const PaymentsInvoicesManagement = () => {
     setError(null);
     
     try {
-      console.log('Fetching payments data...');
+      console.log('Fetching payments and bookings data...');
       let url = `${API_BASE_URL}/api/payments?page=${currentPage}&limit=${pageSize}&sort=${sortBy}&order=${sortOrder}`;
       
       // Add filters to the query
@@ -232,45 +234,95 @@ const PaymentsInvoicesManagement = () => {
       if (filterAmountMax) url += `&maxAmount=${filterAmountMax}`;
       if (searchTerm) url += `&search=${searchTerm}`;
       
-      console.log('API URL:', url);
+      // Fetch both payments and refunded bookings
+      const [paymentsResponse, bookingsResponse] = await Promise.all([
+        axios.get(url, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get(`${API_BASE_URL}/api/bookings?status=cancelled&paymentStatus=refunded`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
       
-      const response = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` }
+      console.log('API Responses:', { 
+        payments: paymentsResponse.data,
+        refundedBookings: bookingsResponse.data 
       });
       
-      console.log('API Response:', response.data);
-      
-      if (response.data && response.data.payments) {
-        console.log('Setting payments from API response');
+      // Create a map of refunded bookings by booking ID
+      const refundedBookingsMap = new Map();
+      let localRefundedBookingsCount = 0;
+
+      if (bookingsResponse.data) {
+        console.log("Raw bookings data:", bookingsResponse.data);
         
-        // Map the API response to add missing fields if needed
-        const processedPayments = response.data.payments.map(payment => {
-          // Construct full customer name from user data if available
+        bookingsResponse.data.forEach(booking => {
+          if (booking.paymentStatus === 'refunded' && booking.status === 'cancelled') {
+            refundedBookingsMap.set(booking._id, {
+              amount: booking.totalAmount,
+              refundDate: booking.updatedAt,
+              status: 'refunded'
+            });
+            localRefundedBookingsCount++;
+          }
+        });
+      }
+      
+      // Calculate total refunds
+      const localTotalRefunds = Array.from(refundedBookingsMap.values())
+        .reduce((sum, booking) => sum + booking.amount, 0);
+
+      // Update the state with the new values
+      setTotalRefunds(localTotalRefunds);
+      setRefundedBookingsCount(localRefundedBookingsCount);
+
+      console.log("TotalRefunds:", localTotalRefunds);
+      console.log("RefundCount:", localRefundedBookingsCount);
+      
+      if (paymentsResponse.data && paymentsResponse.data.payments) {
+        const processedPayments = paymentsResponse.data.payments.map(payment => {
+          const refundInfo = payment.booking ? refundedBookingsMap.get(payment.booking._id) : null;
+          const totalRefunded = refundInfo ? refundInfo.amount : 0;
           const customerName = payment.user ? 
             `${payment.user.firstName || ''} ${payment.user.lastName || ''}`.trim() : 
             (payment.customerInfo?.name || 'Unknown Customer');
-          
           const customerEmail = payment.user?.email || payment.customerInfo?.email || 'unknown@example.com';
-          
+          const paymentStatus = refundInfo ? 'refunded' : payment.status;
           return {
             ...payment,
             id: payment._id || payment.id,
             customerName,
             customerEmail,
             invoiceNumber: payment.invoiceNumber,
-            // Format dates consistently 
+            status: paymentStatus,
             date: payment.createdAt || payment.issueDate || payment.date,
             dueDate: payment.dueDate || null,
-            lastUpdated: payment.updatedAt || null
+            lastUpdated: payment.updatedAt || null,
+            totalRefunded,
+            isFullyRefunded: refundInfo !== null,
+            refundDate: refundInfo ? refundInfo.refundDate : null
           };
         });
         
         setPayments(processedPayments);
         setFilteredPayments(processedPayments);
-        setTotalPages(Math.ceil(response.data.pagination.total / pageSize));
+        setTotalPages(Math.ceil(paymentsResponse.data.pagination.total / pageSize));
+        
+        setPaymentStats({
+          totalRevenue: paymentsResponse.data.totals?.revenue || 0,
+          revenueChange: 0,
+          successfulPayments: paymentsResponse.data.totals?.successfulCount || 0,
+          successRate: paymentsResponse.data.totals?.successRate || 0,
+          pendingPayments: paymentsResponse.data.totals?.pendingCount || 0,
+          pendingAmount: paymentsResponse.data.totals?.pendingAmount || 0,
+          refundedAmount: localTotalRefunds,
+          refundCount: localRefundedBookingsCount,
+          byStatus: paymentsResponse.data.byStatus || [],
+          byMethod: paymentsResponse.data.byMethod || [],
+          monthlyRevenue: paymentsResponse.data.monthlyRevenue || []
+        });
       } else {
         console.warn('API response format unexpected, using fallback data');
-        // Only use mock data during development or as fallback
         setPayments(initialPayments);
         setFilteredPayments(initialPayments);
         setTotalPages(Math.ceil(initialPayments.length / pageSize));
@@ -278,8 +330,6 @@ const PaymentsInvoicesManagement = () => {
     } catch (err) {
       console.error('Error fetching payments:', err);
       setError('Failed to load payments data. Please try again later.');
-      
-      // Only use mock data during development or as fallback
       setPayments(initialPayments);
       setFilteredPayments(initialPayments);
       setTotalPages(Math.ceil(initialPayments.length / pageSize));
@@ -582,23 +632,6 @@ const PaymentsInvoicesManagement = () => {
     }, 800);
   };
 
-  // Generate PDF invoice (mock function)
-  const generateInvoicePDF = () => {
-    setIsLoading(true);
-    
-    // In a real app, you would make an API call here to generate the PDF
-    setTimeout(() => {
-      if (selectedPayment) {
-        alert(`Invoice ${selectedPayment.id || 'Unknown'} has been generated and is ready for download.`);
-      } else {
-        alert(`Invoice has been generated and is ready for download.`);
-      }
-      setIsLoading(false);
-      // Close modal after brief delay to show the success message
-      setTimeout(() => setShowInvoiceModal(false), 500);
-    }, 1000);
-  };
-
   // Get payment method icon
   const getPaymentMethodIcon = (method) => {
     switch (method) {
@@ -703,9 +736,11 @@ const PaymentsInvoicesManagement = () => {
         {/* Refunded Amount Card */}
         <div className="bg-gray-800 rounded-lg border border-gray-700 p-4 sm:p-6">
           <h3 className="text-sm font-medium text-gray-400 mb-2">Refunded Amount</h3>
-          <p className="text-2xl font-bold text-white">{formatCurrency(paymentStats.refundedAmount || 0)}</p>
-          <div className="mt-2 text-xs text-gray-500">
-            {paymentStats.refundCount || 0} refunds processed
+          <p className="text-2xl font-bold text-orange-400">{formatCurrency(totalRefunds || 0)}</p>
+          <div className="mt-2 text-xs">
+            <span className="text-gray-300">
+              {refundedBookingsCount || 0} {refundedBookingsCount === 1 ? 'booking' : 'bookings'} refunded
+            </span>
           </div>
         </div>
       </div>
@@ -955,14 +990,21 @@ const PaymentsInvoicesManagement = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-white font-medium">
                       {formatCurrency(payment.total || payment.amount, payment.currency)}
                       {payment.totalRefunded > 0 && (
-                        <div className="text-xs text-orange-400">
-                          {formatCurrency(payment.totalRefunded, payment.currency)} refunded
+                        <div className="text-xs text-orange-400 mt-1">
+                          Refunded: {formatCurrency(payment.totalRefunded, payment.currency)}
+                          {payment.refundDate && (
+                            <span className="text-gray-400 ml-1">
+                              ({formatDate(payment.refundDate)})
+                            </span>
+                          )}
                         </div>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColorClass(payment.status)}`}>
-                        {payment.status?.charAt(0).toUpperCase() + payment.status?.slice(1) || 'Unknown'}
+                        {payment.status === 'refunded' ? 'Refunded' :
+                         payment.status === 'partially_refunded' ? 'Partially Refunded' :
+                         payment.status?.charAt(0).toUpperCase() + payment.status?.slice(1) || 'Unknown'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
@@ -985,29 +1027,22 @@ const PaymentsInvoicesManagement = () => {
                             setSelectedPayment(payment);
                             setShowInvoiceModal(true);
                           }}
-                          className="text-gray-400 hover:text-white transition-colors"
-                          title="View Invoice"
+                          className="text-gray-400 hover:text-white transition-colors p-2 rounded-full hover:bg-gray-700"
+                          title="View Payment Details"
                         >
-                          <FaEye />
+                          <FaEye className="w-4 h-4" />
                         </button>
-                        <button
-                          onClick={() => generateInvoicePDF(payment.id)}
-                          className="text-gray-400 hover:text-white transition-colors"
-                          title="Download Invoice"
-                        >
-                          <FaDownload />
-                        </button>
-                        {payment.status === 'paid' && (
+                        {payment.status === 'paid' && !payment.isFullyRefunded && (
                           <button
                             onClick={() => {
                               setSelectedPayment(payment);
-                              setRefundAmount(payment.total);
+                              setRefundAmount(payment.total || payment.amount || 0);
                               setShowRefundModal(true);
                             }}
-                            className="text-gray-400 hover:text-white transition-colors"
+                            className="text-gray-400 hover:text-white transition-colors p-2 rounded-full hover:bg-gray-700"
                             title="Process Refund"
                           >
-                            <FaUndoAlt />
+                            <FaUndoAlt className="w-4 h-4" />
                           </button>
                         )}
                       </div>
@@ -1080,7 +1115,7 @@ const PaymentsInvoicesManagement = () => {
         </div>
       </div>
 
-      {/* View Invoice Modal */}
+      {/* View Payment Modal */}
       {showInvoiceModal && selectedPayment && (
         <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
           <div className="flex items-center justify-center min-h-screen">
@@ -1096,168 +1131,111 @@ const PaymentsInvoicesManagement = () => {
                 </button>
               </div>
               
-              {/* Invoice Header */}
+              {/* Modal Header */}
               <div className="p-6 border-b border-gray-700">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
-                  <div>
-                    <h3 className="text-2xl font-bold text-white" id="modal-title">
-                      Invoice {selectedPayment.id || 'Unknown'}
-                    </h3>
-                    <p className="text-gray-400 mt-1">
-                      Issued on {format(new Date(selectedPayment.date || new Date()), 'MMMM d, yyyy')}
-                    </p>
-                  </div>
-                  <div className="mt-4 md:mt-0 flex space-x-3">
-                    <button 
-                      onClick={generateInvoicePDF}
-                      className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-md flex items-center transition duration-300"
-                      disabled={isLoading}
-                    >
-                      {isLoading ? (
-                        <span className="flex items-center">
-                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Processing...
-                        </span>
-                      ) : (
-                        <>
-                          <FaDownload className="mr-2" /> Download PDF
-                        </>
-                      )}
-                    </button>
-                    <button 
-                      onClick={generateInvoicePDF}
-                      className="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-md flex items-center transition duration-300"
-                    >
-                      <FaPrint className="mr-2" /> Print
-                    </button>
-                  </div>
-                </div>
+                <h3 className="text-2xl font-bold text-white">
+                  Payment Details
+                </h3>
+                <p className="text-gray-400 mt-1">
+                  {selectedPayment.invoiceNumber || `INV-${selectedPayment.id?.substring(0, 8)}`}
+                </p>
               </div>
               
-              {/* Invoice Content */}
+              {/* Modal Content */}
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                  {/* Customer Information */}
                   <div>
-                    <h4 className="text-gray-400 font-medium mb-2">Billed To:</h4>
-                    <p className="text-white font-medium">{selectedPayment.customerName || 'Unknown Customer'}</p>
-                    <p className="text-gray-300">{selectedPayment.customerEmail || 'No email provided'}</p>
-                    <p className="text-gray-300">Customer ID: {selectedPayment.customerId || 'Unknown'}</p>
+                    <h4 className="text-gray-400 font-medium mb-2">Customer Details</h4>
+                    <p className="text-white font-medium">{selectedPayment.customerName}</p>
+                    <p className="text-gray-300">{selectedPayment.customerEmail}</p>
+                    {selectedPayment.booking && (
+                      <div className="mt-2">
+                        <p className="text-gray-400">Booking Reference:</p>
+                        <p className="text-white">{selectedPayment.booking._id}</p>
+                      </div>
+                    )}
                   </div>
+                  
+                  {/* Payment Information */}
                   <div className="md:text-right">
-                    <h4 className="text-gray-400 font-medium mb-2">Payment Details:</h4>
-                    <p className="text-white">
-                      <span className={`inline-flex px-2 py-1 text-xs leading-5 font-semibold rounded-full ${getStatusColorClass(selectedPayment.status)}`}>
-                        {selectedPayment.status || 'Unknown'}
-                      </span>
+                    <h4 className="text-gray-400 font-medium mb-2">Payment Details</h4>
+                    <p className="text-white text-2xl font-bold">
+                      {formatCurrency(selectedPayment.total || selectedPayment.amount || 0)}
+                    </p>
+                    <p className={`inline-flex px-2 py-1 text-xs leading-5 font-semibold rounded-full ${getStatusColorClass(selectedPayment.status)}`}>
+                      {selectedPayment.status}
                     </p>
                     <p className="text-gray-300 mt-2">
-                      <span className="flex items-center md:justify-end">
-                        {getPaymentMethodIcon(selectedPayment.paymentMethod)}
-                        <span className="ml-2">{selectedPayment.paymentMethod || 'Unknown'}</span>
-                        {selectedPayment.lastFour && <span className="ml-1">(*{selectedPayment.lastFour})</span>}
-                      </span>
+                      {format(new Date(selectedPayment.date), 'PPP')}
                     </p>
-                    {selectedPayment.transactionId && (
-                      <p className="text-gray-300">Transaction ID: {selectedPayment.transactionId}</p>
-                    )}
-                    {selectedPayment.refundId && (
-                      <p className="text-gray-300">Refund ID: {selectedPayment.refundId}</p>
-                    )}
                   </div>
                 </div>
                 
-                {/* Invoice Items */}
-                <div className="border border-gray-700 rounded-lg overflow-hidden mb-6">
-                  <table className="min-w-full divide-y divide-gray-700">
-                    <thead className="bg-gray-900">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Item</th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Quantity</th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Unit Price</th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-gray-800 divide-y divide-gray-700">
-                      {selectedPayment.items?.map((item) => (
-                        <tr key={item.id}>
-                          <td className="px-6 py-4 text-sm text-white">{item.description}</td>
-                          <td className="px-6 py-4 text-sm text-white text-right">{item.quantity}</td>
-                          <td className="px-6 py-4 text-sm text-white text-right">{formatCurrency(item.unitPrice, selectedPayment.currency)}</td>
-                          <td className="px-6 py-4 text-sm text-white text-right">{formatCurrency(item.quantity * item.unitPrice, selectedPayment.currency)}</td>
-                        </tr>
-                      )) || <tr><td colSpan="4" className="px-6 py-4 text-sm text-gray-400 text-center">No items available</td></tr>}
-                    </tbody>
-                    <tfoot className="bg-gray-900">
-                      <tr>
-                        <td colSpan="3" className="px-6 py-3 text-right text-sm font-medium text-gray-300">Total</td>
-                        <td className="px-6 py-3 text-right text-sm font-bold text-white">{formatCurrency(selectedPayment.amount || 0, selectedPayment.currency || 'USD')}</td>
-                      </tr>
-                      {selectedPayment.refundAmount > 0 && (
-                        <tr>
-                          <td colSpan="3" className="px-6 py-3 text-right text-sm font-medium text-gray-300">Refunded</td>
-                          <td className="px-6 py-3 text-right text-sm font-bold text-red-400">-{formatCurrency(selectedPayment.refundAmount, selectedPayment.currency || 'USD')}</td>
-                        </tr>
-                      )}
-                    </tfoot>
-                  </table>
-                </div>
-                
-                {/* Notes */}
-                {selectedPayment.notes && (
+                {/* Payment Items */}
+                {selectedPayment.booking && (
                   <div className="mb-6">
-                    <h4 className="text-gray-400 font-medium mb-2">Notes:</h4>
-                    <div className="bg-gray-700 rounded-lg p-4 text-gray-200">
-                      {selectedPayment.notes.split('\n').map((line, i) => <p key={i}>{line}</p>)}
+                    <h4 className="text-gray-400 font-medium mb-2">Booking Details</h4>
+                    <div className="bg-gray-700 rounded-lg p-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-gray-400">Check-in:</p>
+                          <p className="text-white">{format(new Date(selectedPayment.booking.checkIn), 'PPP')}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400">Check-out:</p>
+                          <p className="text-white">{format(new Date(selectedPayment.booking.checkOut), 'PPP')}</p>
+                        </div>
+                        {selectedPayment.booking.hotel && (
+                          <div className="col-span-2">
+                            <p className="text-gray-400">Hotel:</p>
+                            <p className="text-white">{selectedPayment.booking.hotel.name}</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
                 
-                {/* Payment Timeline */}
-                <div>
-                  <h4 className="text-gray-400 font-medium mb-2">Payment Timeline:</h4>
-                  <div className="relative pb-8">
-                    <div className="absolute h-full w-0.5 bg-gray-700 left-3.5"></div>
-                    
-                    <div className="relative flex items-start mb-4">
-                      <div className="h-8 w-8 rounded-full bg-blue-900 text-blue-200 flex items-center justify-center z-10">
-                        <FaFileInvoiceDollar className="h-4 w-4" />
-                      </div>
-                      <div className="ml-4">
-                        <p className="text-white">{format(new Date(selectedPayment.date || new Date()), 'MMMM d, yyyy')}</p>
-                        <p className="text-sm text-gray-400">Invoice created and sent to customer</p>
-                      </div>
+                {/* Refund Information */}
+                {selectedPayment.totalRefunded > 0 && (
+                  <div className="mb-6">
+                    <h4 className="text-gray-400 font-medium mb-2">Refund Information</h4>
+                    <div className="bg-gray-700 rounded-lg p-4">
+                      <p className="text-gray-400">Refunded Amount:</p>
+                      <p className="text-orange-400 text-lg font-bold">
+                        {formatCurrency(selectedPayment.totalRefunded)}
+                      </p>
+                      {selectedPayment.refundDate && (
+                        <p className="text-gray-300 text-sm mt-1">
+                          Refunded on {format(new Date(selectedPayment.refundDate), 'PPP')}
+                        </p>
+                      )}
                     </div>
-                    
-                    {selectedPayment.status !== 'Pending' && selectedPayment.status !== 'Overdue' && (
-                      <div className="relative flex items-start mb-4">
-                        <div className="h-8 w-8 rounded-full bg-green-900 text-green-200 flex items-center justify-center z-10">
-                          <FaCheckCircle className="h-4 w-4" />
-                        </div>
-                        <div className="ml-4">
-                          <p className="text-white">{format(new Date(selectedPayment.date || new Date()), 'MMMM d, yyyy')}</p>
-                          <p className="text-sm text-gray-400">Payment received via {selectedPayment.paymentMethod || 'Unknown method'}</p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {(selectedPayment.status === 'Refunded' || selectedPayment.status === 'Partially Refunded') && (
-                      <div className="relative flex items-start">
-                        <div className="h-8 w-8 rounded-full bg-purple-900 text-purple-200 flex items-center justify-center z-10">
-                          <FaUndoAlt className="h-4 w-4" />
-                        </div>
-                        <div className="ml-4">
-                          <p className="text-white">{format(new Date(selectedPayment.refundDate || new Date()), 'MMMM d, yyyy')}</p>
-                          <p className="text-sm text-gray-400">
-                            {selectedPayment.status === 'Refunded' ? 'Full refund' : 'Partial refund'} of {formatCurrency(selectedPayment.refundAmount || selectedPayment.amount || 0, selectedPayment.currency || 'USD')} processed
-                          </p>
-                        </div>
-                      </div>
-                    )}
+                  </div>
+                )}
+                
+                {/* Payment Method */}
+                <div className="mb-6">
+                  <h4 className="text-gray-400 font-medium mb-2">Payment Method</h4>
+                  <div className="flex items-center">
+                    {getPaymentMethodIcon(selectedPayment.paymentMethod)}
+                    <span className="ml-2 text-white">
+                      {selectedPayment.paymentMethod}
+                      {selectedPayment.lastFour && ` (*${selectedPayment.lastFour})`}
+                    </span>
                   </div>
                 </div>
+              </div>
+              
+              {/* Modal Footer */}
+              <div className="px-6 py-4 border-t border-gray-700 flex justify-end">
+                <button
+                  onClick={() => setShowInvoiceModal(false)}
+                  className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition-colors"
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>

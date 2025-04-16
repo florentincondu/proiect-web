@@ -89,8 +89,35 @@ exports.updateBooking = async (req, res) => {
     const previousStatus = booking.status;
     const previousPaymentStatus = booking.paymentStatus;
     
-    // Update booking fields if provided
+    // Verifică dacă statusul poate fi modificat
     if (status) {
+      // Nu permite modificarea statusului dacă a fost deja schimbat din pending în cancelled sau confirmed
+      if (previousStatus !== 'pending' && ['cancelled', 'confirmed'].includes(previousStatus) && status !== 'completed') {
+        return res.status(400).json({ 
+          message: 'Cannot change status once it has been cancelled or confirmed' 
+        });
+      }
+
+      // Verifică dacă poate fi marcat ca completed
+      if (status === 'completed') {
+        // Verifică dacă rezervarea este confirmată
+        if (previousStatus !== 'confirmed') {
+          return res.status(400).json({ 
+            message: 'Only confirmed bookings can be marked as completed' 
+          });
+        }
+
+        // Verifică dacă a trecut timpul de închiriere
+        const currentDate = new Date();
+        const checkOutDate = new Date(booking.checkOut);
+        
+        if (currentDate < checkOutDate) {
+          return res.status(400).json({ 
+            message: 'Booking cannot be marked as completed before the check-out date' 
+          });
+        }
+      }
+
       booking.status = status;
     }
     
@@ -105,47 +132,23 @@ exports.updateBooking = async (req, res) => {
         const existingPayment = await Payment.findOne({ booking: booking._id });
         
         if (!existingPayment) {
-          // Create a new payment record
-          const invoiceNumber = await Payment.generateInvoiceNumber();
-          
-          // Create line item for the booking
-          const bookingItem = {
-            description: `Booking at ${booking.hotel.name || 'Hotel'} - ${booking.roomType || 'Room'}`,
-            quantity: 1,
-            unitPrice: booking.totalAmount,
-            tax: 0,
-            discount: 0,
-            total: booking.totalAmount
-          };
-          
-          // Set due date and issue date
-          const today = new Date();
-          const dueDate = new Date();
-          dueDate.setDate(today.getDate() + 1);
-          
+          // Create new payment record
           const newPayment = new Payment({
-            invoiceNumber,
-            user: booking.user,
+            user: booking.user._id,
             booking: booking._id,
-            items: [bookingItem],
-            subtotal: booking.totalAmount,
-            tax: 0,
-            discount: 0,
             total: booking.totalAmount,
-            currency: 'USD',
             status: 'paid',
-            paymentMethod: 'credit_card', // Default method
-            transactionId: `ADMIN-${Date.now()}`,
-            issueDate: today,
-            dueDate,
-            paidDate: today,
-            notes: `Payment created by admin during booking update: ${req.user.firstName} ${req.user.lastName}`
+            paidDate: new Date(),
+            items: [{
+              description: `Booking at ${booking.hotel?.name || 'Hotel'}`,
+              amount: booking.totalAmount
+            }]
           });
           
           await newPayment.save();
           
           if (global.logToFile) {
-            global.logToFile(`New payment record created for booking ${booking._id} with invoice number ${invoiceNumber} during booking update`);
+            global.logToFile(`New payment record created for booking ${booking._id}`);
           }
         } else if (existingPayment.status !== 'paid') {
           // Update existing payment to paid status
@@ -154,7 +157,7 @@ exports.updateBooking = async (req, res) => {
           await existingPayment.save();
           
           if (global.logToFile) {
-            global.logToFile(`Existing payment ${existingPayment._id} updated to paid status for booking ${booking._id} during booking update`);
+            global.logToFile(`Existing payment ${existingPayment._id} updated to paid status for booking ${booking._id}`);
           }
         }
       }
@@ -188,6 +191,7 @@ exports.updateBooking = async (req, res) => {
         if (status && status !== previousStatus) {
           if (status === 'confirmed') notificationType = 'confirmed';
           else if (status === 'cancelled') notificationType = 'cancelled';
+          else if (status === 'completed') notificationType = 'completed';
           else notificationType = 'updated';
         } else if (paymentStatus && paymentStatus !== previousPaymentStatus) {
           notificationType = 'payment_updated';
@@ -483,8 +487,102 @@ exports.cancelBooking = async (req, res) => {
         message: `Cannot cancel a booking with status: ${booking.status}` 
       });
     }
+
+    const Payment = require('../models/Payment');
     
+    try {
+      // Check if a payment already exists for this booking
+      const existingPayment = await Payment.findOne({ booking: booking._id });
+      
+      if (existingPayment) {
+        // Update existing payment to refunded status
+        existingPayment.status = 'refunded';
+        
+        // Generate refund transaction ID
+        const refundTransactionId = `REF-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+        
+        // Initialize refunds array if it doesn't exist
+        if (!existingPayment.refunds) {
+          existingPayment.refunds = [];
+        }
+        
+        // Add refund record
+        existingPayment.refunds.push({
+          amount: existingPayment.total,
+          reason: 'Booking cancelled by user',
+          status: 'completed',
+          refundedBy: req.user._id,
+          transactionId: refundTransactionId,
+          createdAt: new Date()
+        });
+        
+        await existingPayment.save();
+        
+        if (global.logToFile) {
+          global.logToFile(`Payment ${existingPayment._id} updated to refunded status for booking ${booking._id}`);
+        }
+        console.log(`Existing payment ${existingPayment._id} updated to refunded status for booking ${booking._id}`);
+      } else if (booking.totalAmount > 0) {
+        // Create a new payment record for refund
+        const invoiceNumber = await Payment.generateInvoiceNumber();
+        
+        // Create line item for the refund
+        const refundItem = {
+          description: `Refund for cancelled booking at ${booking.hotel?.name || 'Hotel'} - ${booking.roomType || 'Room'}`,
+          quantity: 1,
+          unitPrice: booking.totalAmount,
+          tax: 0,
+          discount: 0,
+          total: booking.totalAmount
+        };
+        
+        // Generate refund transaction ID
+        const refundTransactionId = `REF-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+        
+        const newPayment = new Payment({
+          invoiceNumber,
+          user: booking.user._id,
+          booking: booking._id,
+          items: [refundItem],
+          subtotal: booking.totalAmount,
+          tax: 0,
+          discount: 0,
+          total: booking.totalAmount,
+          currency: 'USD',
+          status: 'refunded',
+          paymentMethod: 'credit_card',
+          transactionId: refundTransactionId,
+          issueDate: new Date(),
+          dueDate: new Date(),
+          paidDate: new Date(),
+          notes: 'Payment refunded due to booking cancellation',
+          refunds: [{
+            amount: booking.totalAmount,
+            reason: 'Booking cancelled by user',
+            status: 'completed',
+            refundedBy: req.user._id,
+            transactionId: refundTransactionId,
+            createdAt: new Date()
+          }]
+        });
+        
+        await newPayment.save();
+        
+        if (global.logToFile) {
+          global.logToFile(`New refund payment record created for booking ${booking._id} with invoice number ${invoiceNumber}`);
+        }
+        console.log(`New refund payment record created for booking ${booking._id} with invoice number ${invoiceNumber}`);
+      }
+    } catch (paymentError) {
+      console.error('Failed to create/update payment record for refund:', paymentError);
+      if (global.logToFile) {
+        global.logToFile(`ERROR creating/updating refund payment: ${paymentError.message}\n${paymentError.stack}`);
+      }
+    }
+    
+    // Update booking status after payment handling
     booking.status = 'cancelled';
+    booking.paymentStatus = 'refunded';
     await booking.save();
     
     // Send notification about cancellation
@@ -494,12 +592,14 @@ exports.cancelBooking = async (req, res) => {
       console.log(`Cancellation notification sent to user ${booking.user._id}`);
     } catch (notifError) {
       console.error('Failed to send cancellation notification:', notifError);
-      // Continue even if notification fails
     }
     
     res.json({ message: 'Booking cancelled successfully', booking });
   } catch (error) {
     console.error('Cancel booking error:', error);
+    if (global.logToFile) {
+      global.logToFile(`ERROR cancelling booking: ${error.message}\n${error.stack}`);
+    }
     res.status(500).json({ message: 'Failed to cancel booking' });
   }
 };
