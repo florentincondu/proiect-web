@@ -96,11 +96,11 @@ const BookingsManagement = () => {
   
   // Returns the appropriate payment status based on booking status
   const getMatchingPaymentStatus = (bookingStatus) => {
-    switch(bookingStatus) {
+    switch (bookingStatus) {
       case 'confirmed':
         return 'paid';
       case 'completed':
-        return 'completed';
+        return 'paid';
       case 'cancelled':
         return 'refunded';
       case 'pending':

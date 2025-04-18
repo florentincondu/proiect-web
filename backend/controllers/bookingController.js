@@ -79,146 +79,65 @@ exports.getBookingById = async (req, res) => {
 exports.updateBooking = async (req, res) => {
   try {
     const { status, paymentStatus, notes } = req.body;
+    
+    // Log the incoming request
+    console.log('Update booking request:', {
+      bookingId: req.params.id,
+      status,
+      paymentStatus,
+      notes
+    });
+
     const booking = await Booking.findById(req.params.id)
       .populate('user', 'firstName lastName email');
     
     if (!booking) {
+      console.log('Booking not found:', req.params.id);
       return res.status(404).json({ message: 'Booking not found' });
     }
     
     const previousStatus = booking.status;
     const previousPaymentStatus = booking.paymentStatus;
     
-    // Verifică dacă statusul poate fi modificat
-    if (status) {
-      // Nu permite modificarea statusului dacă a fost deja schimbat din pending în cancelled sau confirmed
-      if (previousStatus !== 'pending' && ['cancelled', 'confirmed'].includes(previousStatus) && status !== 'completed') {
-        return res.status(400).json({ 
-          message: 'Cannot change status once it has been cancelled or confirmed' 
-        });
-      }
+    // Validate payment status if provided
+    if (paymentStatus && !['pending', 'paid', 'refunded'].includes(paymentStatus)) {
+      console.log('Invalid payment status:', paymentStatus);
+      return res.status(400).json({ 
+        message: 'Invalid payment status. Must be one of: pending, paid, refunded' 
+      });
+    }
 
-      // Verifică dacă poate fi marcat ca completed
-      if (status === 'completed') {
-        // Verifică dacă rezervarea este confirmată
-        if (previousStatus !== 'confirmed') {
-          return res.status(400).json({ 
-            message: 'Only confirmed bookings can be marked as completed' 
-          });
-        }
+    // Validate booking status if provided
+    if (status && !['pending', 'confirmed', 'cancelled', 'completed'].includes(status)) {
+      console.log('Invalid booking status:', status);
+      return res.status(400).json({ 
+        message: 'Invalid booking status. Must be one of: pending, confirmed, cancelled, completed' 
+      });
+    }
 
-        // Verifică dacă a trecut timpul de închiriere
-        const currentDate = new Date();
-        const checkOutDate = new Date(booking.checkOut);
-        
-        if (currentDate < checkOutDate) {
-          return res.status(400).json({ 
-            message: 'Booking cannot be marked as completed before the check-out date' 
-          });
-        }
-      }
+    // Update the booking
+    if (status) booking.status = status;
+    if (paymentStatus) booking.paymentStatus = paymentStatus;
+    if (notes) booking.notes = notes;
 
-      booking.status = status;
-    }
-    
-    if (paymentStatus) {
-      booking.paymentStatus = paymentStatus;
-      
-      // If payment status is updated to paid, we might need to create a payment record
-      if (paymentStatus === 'paid') {
-        const Payment = require('../models/Payment');
-        
-        // Check if a payment already exists for this booking
-        const existingPayment = await Payment.findOne({ booking: booking._id });
-        
-        if (!existingPayment) {
-          // Create new payment record
-          const newPayment = new Payment({
-            user: booking.user._id,
-            booking: booking._id,
-            total: booking.totalAmount,
-            status: 'paid',
-            paidDate: new Date(),
-            items: [{
-              description: `Booking at ${booking.hotel?.name || 'Hotel'}`,
-              amount: booking.totalAmount
-            }]
-          });
-          
-          await newPayment.save();
-          
-          if (global.logToFile) {
-            global.logToFile(`New payment record created for booking ${booking._id}`);
-          }
-        } else if (existingPayment.status !== 'paid') {
-          // Update existing payment to paid status
-          existingPayment.status = 'paid';
-          existingPayment.paidDate = new Date();
-          await existingPayment.save();
-          
-          if (global.logToFile) {
-            global.logToFile(`Existing payment ${existingPayment._id} updated to paid status for booking ${booking._id}`);
-          }
-        }
-      }
-    }
-    
-    // Update notes if provided
-    if (notes) {
-      booking.notes = notes;
-    }
-    
-    // Log changes
-    if (global.logToFile) {
-      global.logToFile(`Booking updated:
-        ID: ${booking._id}
-        Status: ${status || 'unchanged'} 
-        Payment Status: ${paymentStatus || 'unchanged'}
-        Updated by: ${req.user.firstName} ${req.user.lastName} (${req.user._id})
-        Notes: ${notes || 'unchanged'}
-      `);
-    }
-    
     await booking.save();
     
-    // Create notification for the user if booking status changed
-    if ((status && status !== previousStatus) || (paymentStatus && paymentStatus !== previousPaymentStatus)) {
-      try {
-        const { createBookingNotification } = require('./notificationController');
-        
-        // Determine notification type based on what changed
-        let notificationType = 'updated';
-        if (status && status !== previousStatus) {
-          if (status === 'confirmed') notificationType = 'confirmed';
-          else if (status === 'cancelled') notificationType = 'cancelled';
-          else if (status === 'completed') notificationType = 'completed';
-          else notificationType = 'updated';
-        } else if (paymentStatus && paymentStatus !== previousPaymentStatus) {
-          notificationType = 'payment_updated';
-        }
-        
-        // Send notification to the booking owner
-        await createBookingNotification(booking, booking.user, notificationType);
-        console.log(`Notification sent to user ${booking.user._id} about booking ${notificationType}`);
-      } catch (notifError) {
-        console.error('Failed to send booking update notification:', notifError);
-        // Continue even if notification fails
-      }
-    }
-    
-    // Format the response with full user information
-    const formattedBooking = booking.toObject();
-    if (formattedBooking.user) {
-      formattedBooking.user.name = `${formattedBooking.user.firstName || ''} ${formattedBooking.user.lastName || ''}`.trim() || 'Unknown User';
-    }
-    
-    res.json(formattedBooking);
+    // Log the successful update
+    console.log('Booking updated successfully:', {
+      bookingId: booking._id,
+      previousStatus,
+      newStatus: status,
+      previousPaymentStatus,
+      newPaymentStatus: paymentStatus
+    });
+
+    res.json(booking);
   } catch (error) {
     console.error('Update booking error:', error);
-    if (global.logToFile) {
-      global.logToFile(`ERROR updating booking: ${error.message}`);
-    }
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ 
+      message: 'Failed to update booking',
+      error: error.message 
+    });
   }
 };
 
