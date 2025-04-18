@@ -11,7 +11,7 @@ import { IoArrowForward, IoRefreshSharp } from 'react-icons/io5';
 const PopularHotelsPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  // Get hotels from homepage if they exist
+
   const homepageHotels = location.state?.homepageHotels || [];
   
   const [hotels, setHotels] = useState([]);
@@ -33,10 +33,10 @@ const PopularHotelsPage = () => {
   const searchRef = useRef(null);
   const initialLoadRef = useRef(false);
   
-  // Exchange rate (approximate): 1 RON ≈ 0.20 EUR (just for display purposes)
+
   const ronToEur = 0.20;
 
-  // API Base URL
+
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
   const { isAuthenticated, loading: authLoading } = useAuth();
@@ -62,7 +62,7 @@ const PopularHotelsPage = () => {
   ];
 
   useEffect(() => {
-    // Prevent re-fetching if we've already loaded once
+
     if (initialLoadRef.current) {
       return;
     }
@@ -71,7 +71,7 @@ const PopularHotelsPage = () => {
       try {
         setLoading(true);
         
-        // First fetch saved prices from our database
+
         let savedPrices = {};
         try {
           const savedPricesResponse = await axios.get(`${API_BASE_URL}/api/places/prices`);
@@ -87,7 +87,7 @@ const PopularHotelsPage = () => {
         
         let allHotels = [];
         
-        // First, process hotels from homepage if present
+
         if (homepageHotels.length > 0) {
           console.log('Using hotels from homepage:', homepageHotels.length);
           allHotels = [...homepageHotels];
@@ -98,8 +98,8 @@ const PopularHotelsPage = () => {
           return; // Skip API call if we already have hotels
         }
         
-        // If we don't have hotels from the homepage, fetch from API
-        // Use exact same request structure as HomePage for consistency
+
+
         const requestData = {
           includedTypes: ["lodging"],
           maxResultCount: 20,
@@ -122,7 +122,7 @@ const PopularHotelsPage = () => {
         try {
           console.log('Sending search-nearby request with data:', JSON.stringify(requestData, null, 2));
           
-          // Make API call
+
         const response = await axios.post(
             `${API_BASE_URL}/api/places/search-nearby`,
           requestData,
@@ -132,23 +132,23 @@ const PopularHotelsPage = () => {
           console.log('Hotels fetched from nearby search:', response.data?.places?.length || 0);
           
         if (response.data && response.data.places) {
-            // Filter hotels with rating >= 4.0
+
             let nearbyHotels = response.data.places.filter(hotel => 
               hotel.rating >= 4.0 && 
               hotel.userRatingCount >= 40 &&
             hotel.businessStatus === "OPERATIONAL"
           );
           
-          // Map Google Places data to our hotel structure
+
             const mappedHotels = nearbyHotels.map((hotel) => {
-            // Use saved price if available, otherwise generate one
+
             const price = savedPrices[hotel.id] || generateHotelPrice(hotel);
             
-            // Create a deterministic value from hotel ID
+
             const hotelIdSum = hotel.id.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
             const normalizedHash = (hotelIdSum % 100) / 100; // Value between 0-1 based on hotel ID
             
-            // Deterministic amenities based on price and hotel ID hash
+
             const hasPool = price > 200 ? normalizedHash > 0.4 : normalizedHash > 0.8;
             const hasBreakfast = price > 170 ? normalizedHash > 0.3 : normalizedHash > 0.5;
             const hasSpa = price > 270 ? normalizedHash > 0.4 : normalizedHash > 0.9;
@@ -175,15 +175,15 @@ const PopularHotelsPage = () => {
             };
           });
           
-            // Combine with existing hotels
-            // Ensure no duplicates by checking hotel IDs
+
+
             const existingIds = new Set(allHotels.map(hotel => hotel.id));
             const uniqueNewHotels = mappedHotels.filter(hotel => !existingIds.has(hotel.id));
             
-            // Add the unique new hotels to our collection
+
             allHotels = [...allHotels, ...uniqueNewHotels];
             
-            // Log the total number of hotels found
+
             console.log('Total unique hotels found:', allHotels.length);
           }
         } catch (error) {
@@ -191,7 +191,7 @@ const PopularHotelsPage = () => {
           setError("Nu am putut încărca hotelurile. Vă rugăm încercați din nou mai târziu.");
         }
         
-        // If we have too many hotels, limit to around 40 to maintain performance
+
         if (allHotels.length > 40) {
           allHotels = allHotels.slice(0, 40);
         }
@@ -199,7 +199,7 @@ const PopularHotelsPage = () => {
         setHotels(allHotels);
         setFilteredHotels(allHotels);
           
-          // Initialize image indexes
+
           const initialIndexes = {};
         allHotels.forEach((hotel) => {
             initialIndexes[hotel.id] = 0;
@@ -218,7 +218,7 @@ const PopularHotelsPage = () => {
 
     fetchHotels();
     
-    // Scroll to search on page load with animation
+
     setTimeout(() => {
       if (searchRef.current) {
         window.scrollTo({
@@ -229,13 +229,13 @@ const PopularHotelsPage = () => {
     }, 1500);
   }, []);
   
-  // Apply sorting and filtering
+
   useEffect(() => {
     if (hotels.length === 0) return;
 
     let result = [...hotels];
     
-    // Apply search query filter - search in both name and address
+
     if (searchQuery.trim() !== '') {
       const query = searchQuery.toLowerCase();
       result = result.filter(hotel => 
@@ -244,12 +244,12 @@ const PopularHotelsPage = () => {
       );
     }
     
-    // Apply location filter if not "All locations"
+
     if (locationFilter !== 'Toate locațiile') {
       result = result.filter(hotel => hotel.formattedAddress.includes(locationFilter));
     }
     
-    // Apply sorting with better sorting logic
+
     switch (sortOption) {
       case 'price-asc':
         result.sort((a, b) => {
@@ -267,9 +267,9 @@ const PopularHotelsPage = () => {
         break;
       case 'rating':
         result.sort((a, b) => {
-          // First sort by rating
+
           const ratingDiff = (b.rating || 0) - (a.rating || 0);
-          // If ratings are equal, sort by number of reviews
+
           if (ratingDiff === 0) {
             return (b.userRatingCount || 0) - (a.userRatingCount || 0);
           }
@@ -286,22 +286,22 @@ const PopularHotelsPage = () => {
     setFilteredHotels(result);
   }, [hotels, locationFilter, sortOption, searchQuery]);
 
-  // Get unique locations for the filter dropdown
+
   const locations = ['Toate locațiile', ...new Set(hotels.map(hotel => {
-    // Extract city from address (simplified approach)
+
     const addressParts = hotel.formattedAddress.split(',');
     return addressParts.length > 1 ? addressParts[1].trim() : addressParts[0].trim();
   }))];
 
-  // Function to generate Google Places photo URL
+
   const getPhotoUrl = (photo, maxWidth = 400) => {
     if (!photo || !photo.name) return backgroundImage;
     
-    // Use our backend proxy instead of direct Google API call
+
     return `${API_BASE_URL}/api/places/media/${encodeURIComponent(photo.name)}?maxWidthPx=${maxWidth}`;
   };
   
-  // Function to navigate through hotel images
+
   const navigateImage = (hotelId, direction, event) => {
     event.stopPropagation(); // Prevent triggering hotel click
     
@@ -327,14 +327,14 @@ const PopularHotelsPage = () => {
   };
 
   const handleBookNow = (hotelId, event) => {
-    // Prevent the click from propagating to the parent (hotel card)
+
     event.stopPropagation();
     
     if (isAuthenticated) {
-      // Navigate to the reservation page for this hotel
+
       navigate(`/reserve/${hotelId}`);
     } else {
-      // If not authenticated, redirect to login first
+
       navigate('/login', { state: { returnUrl: `/reserve/${hotelId}` } });
     }
   };
@@ -375,7 +375,7 @@ const PopularHotelsPage = () => {
   };
 
   const handleRatingSelect = (rating) => {
-    // Toggle rating if it's already selected
+
     if (selectedRating === rating) {
       setSelectedRating(0);
     } else {
@@ -383,43 +383,43 @@ const PopularHotelsPage = () => {
     }
   };
   
-  // Animation variants
+
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0 },
     hover: { scale: 1.03, transition: { duration: 0.2 } }
   };
   
-  // More filtering based on active filters and price range
+
   const filteredHotelsByFilters = filteredHotels.filter(hotel => {
-    // Filter by price range - handle both estimatedPrice and currentPrice
+
     const hotelPrice = hotel.currentPrice || hotel.estimatedPrice || 0;
     if (hotelPrice < priceRange[0] || hotelPrice > priceRange[1]) {
       return false;
     }
     
-    // Filter by rating with null handling
+
     if (selectedRating > 0 && (!hotel.rating || hotel.rating < selectedRating)) {
       return false;
     }
     
-    // Filter by amenities with improved handling for different amenity storage formats
+
     if (activeFilters.length > 0) {
-      // Check if hotel has all selected amenities
+
       for (const filter of activeFilters) {
-        // Handle case where hotel.amenities is an object with boolean values
+
         if (typeof hotel.amenities === 'object' && !Array.isArray(hotel.amenities)) {
           if (!hotel.amenities[filter]) {
             return false;
           }
         } 
-        // Handle case where hotel.amenities is an array of strings
+
         else if (Array.isArray(hotel.amenities)) {
           if (!hotel.amenities.includes(filter)) {
             return false;
           }
         }
-        // If hotel has no amenities at all
+
         else {
           return false;
         }
@@ -429,20 +429,20 @@ const PopularHotelsPage = () => {
     return true;
   });
 
-  // Pagination logic
+
   const hotelsPerPage = 6; // Display fewer hotels per page for better navigation
   const indexOfLastHotel = currentPage * hotelsPerPage;
   const indexOfFirstHotel = indexOfLastHotel - hotelsPerPage;
   const currentHotels = filteredHotelsByFilters.slice(indexOfFirstHotel, indexOfLastHotel);
   const totalPages = Math.ceil(filteredHotelsByFilters.length / hotelsPerPage);
 
-  // Function to render page numbers
+
   const renderPageNumbers = () => {
     const pageNumbers = [];
     const ellipsis = <span className="px-2 flex items-center justify-center text-gray-400">...</span>;
     
     if (totalPages <= 5) {
-      // Show all page numbers if 5 or fewer
+
       for (let i = 1; i <= totalPages; i++) {
         pageNumbers.push(
           <button
@@ -459,8 +459,8 @@ const PopularHotelsPage = () => {
         );
       }
     } else {
-      // Show 1, current-1, current, current+1, and last page with ellipsis
-      // Always add page 1
+
+
       pageNumbers.push(
         <button
           key={1}
@@ -475,14 +475,14 @@ const PopularHotelsPage = () => {
         </button>
       );
       
-      // Add ellipsis if current page is > 3
+
       if (currentPage > 3) {
         pageNumbers.push(
           <span key="ellipsis1" className="px-2 flex items-center justify-center text-gray-400">...</span>
         );
       }
       
-      // Add prev, current, next pages
+
       const startPage = Math.max(2, currentPage - 1);
       const endPage = Math.min(totalPages - 1, currentPage + 1);
       
@@ -502,14 +502,14 @@ const PopularHotelsPage = () => {
         );
       }
       
-      // Add ellipsis if current page is < totalPages - 2
+
       if (currentPage < totalPages - 2) {
         pageNumbers.push(
           <span key="ellipsis2" className="px-2 flex items-center justify-center text-gray-400">...</span>
         );
       }
       
-      // Always add last page
+
       if (totalPages > 1) {
         pageNumbers.push(
           <button
@@ -535,7 +535,7 @@ const PopularHotelsPage = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Function to get star rating UI
+
   const getStarRating = (rating) => {
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating - fullStars >= 0.5;
@@ -560,7 +560,7 @@ const PopularHotelsPage = () => {
     );
   };
 
-  // Click outside hooks for dropdowns
+
   useEffect(() => {
     function handleClickOutside(event) {
       if (filterRef.current && !filterRef.current.contains(event.target)) {
@@ -574,7 +574,7 @@ const PopularHotelsPage = () => {
   }, [filterRef]);
 
   const refreshHotels = () => {
-    // Reset filters
+
     setSearchQuery('');
     setLocationFilter('Toate locațiile');
     setSortOption('rating');
@@ -582,20 +582,20 @@ const PopularHotelsPage = () => {
     setPriceRange([70, 700]);
     setSelectedRating(0);
     
-    // Reset flags and loading state
+
     initialLoadRef.current = false;
     setLoading(true);
     setError(null);
     
-    // Trigger a re-fetch of hotels by setting hotels to empty
+
     setHotels([]);
     setFilteredHotels([]);
     
-    // This will trigger the useEffect to fetch hotels again
+
     setTimeout(() => {
       const fetchHotels = async () => {
         try {
-          // Use search-text for Bucharest hotels for consistent results
+
           const response = await axios.post(
             `${API_BASE_URL}/api/places/search-text`,
             { textQuery: 'hotels in Bucharest' },
@@ -623,7 +623,7 @@ const PopularHotelsPage = () => {
             setHotels(hotelsWithPrices);
             setFilteredHotels(hotelsWithPrices);
             
-            // Initialize image indexes
+
             const initialIndexes = {};
             hotelsWithPrices.forEach((hotel) => {
               initialIndexes[hotel.id] = 0;

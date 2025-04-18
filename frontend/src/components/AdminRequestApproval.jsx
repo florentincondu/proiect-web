@@ -20,7 +20,7 @@ const AdminRequestApproval = ({ action }) => {
         if (response.data.success) {
           setSuccess(true);
           setUserEmail(response.data.userEmail);
-          // Redirect admin back to dashboard
+
           setTimeout(() => {
             navigate('/dashboard');
           }, 3000);

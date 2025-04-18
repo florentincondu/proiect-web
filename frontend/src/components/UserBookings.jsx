@@ -18,12 +18,12 @@ const UserBookings = () => {
   const { isAuthenticated, loading: authLoading } = useAuth();
   
   useEffect(() => {
-    // Check if user is authenticated before fetching bookings
+
     if (!authLoading) {
       if (isAuthenticated) {
         fetchBookings();
       } else {
-        // Redirect to login if not authenticated
+
         navigate('/login', { 
           state: { 
             returnUrl: '/my-bookings',
@@ -39,18 +39,18 @@ const UserBookings = () => {
     setError(null);
     
     try {
-      // Fetch active bookings
+
       const activeData = await getUserBookings('active');
       console.log('Active bookings:', activeData);
       
-      // Process bookings to ensure hotel data is present
+
       const processedActiveBookings = activeData.map(booking => {
         console.log(`Processing booking ${booking._id}:`, booking);
         
-        // Create a copy of the booking to avoid mutations
+
         const processedBooking = { ...booking };
         
-        // Ensure hotel object exists
+
         if (!processedBooking.hotel) {
           processedBooking.hotel = { 
             name: 'Hotel',
@@ -59,7 +59,7 @@ const UserBookings = () => {
           };
           console.warn(`Creating missing hotel object for booking ${processedBooking._id}`);
         } else {
-          // Ensure hotel name and location exist
+
           if (!processedBooking.hotel.name) {
             console.warn(`Missing hotel name for booking ${processedBooking._id}, adding default name`);
             processedBooking.hotel.name = 'Hotel';
@@ -76,16 +76,16 @@ const UserBookings = () => {
       
       setActiveBookings(processedActiveBookings);
       
-      // Fetch past bookings
+
       const pastData = await getUserBookings('past');
       console.log('Past bookings:', pastData);
       
-      // Process past bookings similarly
+
       const processedPastBookings = pastData.map(booking => {
-        // Create a copy of the booking to avoid mutations
+
         const processedBooking = { ...booking };
         
-        // Ensure hotel object exists
+
         if (!processedBooking.hotel) {
           processedBooking.hotel = { 
             name: 'Hotel',
@@ -93,7 +93,7 @@ const UserBookings = () => {
             image: null
           };
         } else {
-          // Ensure hotel name and location exist
+
           if (!processedBooking.hotel.name) {
             processedBooking.hotel.name = 'Hotel';
           }
@@ -124,7 +124,7 @@ const UserBookings = () => {
     
     try {
       await cancelBooking(bookingId);
-      // Refresh bookings after cancellation
+
       fetchBookings();
     } catch (err) {
       console.error('Error cancelling booking:', err);

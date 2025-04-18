@@ -77,7 +77,7 @@ const userSchema = new mongoose.Schema({
   coverImage: {
     type: String
   },
-  // User activity tracking
+
   lastLogin: Date,
   loginCount: {
     type: Number,
@@ -91,7 +91,7 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
-  // Activity history
+
   activityLogs: [{
     action: String,  // login, booking, review, etc.
     timestamp: {
@@ -355,7 +355,7 @@ const userSchema = new mongoose.Schema({
   }
 });
 
-// Middleware to automatically set the name field before validation
+
 userSchema.pre('validate', function(next) {
   if (this.firstName && this.lastName) {
     this.name = `${this.firstName} ${this.lastName}`;
@@ -363,19 +363,19 @@ userSchema.pre('validate', function(next) {
   next();
 });
 
-// Middleware for password hashing
+
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
 
   try {
-    // Use a consistent salt round value
+
     const saltRounds = 10;
     console.log('[User Model] Hashing password for user:', this.email);
     
-    // Generate a salt
+
     const salt = await bcrypt.genSalt(saltRounds);
     
-    // Hash the password with the generated salt
+
     this.password = await bcrypt.hash(this.password, salt);
     
     console.log('[User Model] Password hashed successfully');
@@ -386,7 +386,7 @@ userSchema.pre('save', async function (next) {
   }
 });
 
-// Method to compare password
+
 userSchema.methods.comparePassword = async function (candidatePassword) {
   try {
     console.log('[User Model] Comparing passwords for user:', this.email);
@@ -399,7 +399,7 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
   }
 };
 
-// Method to check if user is blocked
+
 userSchema.methods.isBlocked = function() {
   if (!this.blockInfo.isBlocked) return false;
   if (!this.blockInfo.blockedUntil) return true;

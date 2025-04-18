@@ -11,14 +11,14 @@ const ReserveRoom = () => {
   const [newFeedback, setNewFeedback] = useState({ name: '', rating: 5, comment: '' });
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   
-  // Exchange rate (approximate): 1 AED ≈ 1.2 RON
+
   const aedToRon = 1.2;
 
-  // Sample hotel data - In a real app, you would fetch this from an API
+
   useEffect(() => {
-    // Simulating API fetch
+
     const fetchHotel = () => {
-      // Sample data
+
       const hotelData = {
         id: parseInt(hotelId),
         name: "Hilton Hotel",
@@ -111,7 +111,7 @@ const ReserveRoom = () => {
   const handleFeedbackSubmit = (e) => {
     e.preventDefault();
     
-    // In a real app, you would send this to an API
+
     const newFeedbackItem = {
       id: hotel.feedback.length + 1,
       name: newFeedback.name,

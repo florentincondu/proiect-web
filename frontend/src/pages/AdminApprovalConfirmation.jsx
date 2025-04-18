@@ -17,7 +17,7 @@ const AdminApprovalConfirmation = () => {
 
   useEffect(() => {
     const processRequest = async () => {
-      // Get query parameters
+
       const params = new URLSearchParams(location.search);
       const token = params.get('token');
       const email = params.get('email');
@@ -25,7 +25,7 @@ const AdminApprovalConfirmation = () => {
 
       console.log(`Processing admin request on path: ${path} with token: ${token} and email: ${email}`);
       
-      // Set email and token if they're in the URL
+
       if (email) {
         setUserEmail(email);
       }
@@ -34,12 +34,12 @@ const AdminApprovalConfirmation = () => {
         setUserToken(token);
       }
       
-      // Determine if this is an approval or rejection
+
       const isApproval = path.includes('/approve');
       const isRejection = path.includes('/reject');
       
       if (!token && !email) {
-        // Just displaying the confirmation page with status in query params
+
         const statusParam = params.get('status');
         const messageParam = params.get('message');
         
@@ -50,7 +50,7 @@ const AdminApprovalConfirmation = () => {
         return;
       }
       
-      // Don't attempt approval/rejection if already tried
+
       if (approvalAttempted) {
         setLoading(false);
         return;
@@ -63,7 +63,7 @@ const AdminApprovalConfirmation = () => {
           let apiEndpoint = '';
           
           if (isApproval) {
-            // Construct API URL with both token and email if available
+
             apiEndpoint = `${API_URL}/api/admin-approval/approve`;
             const queryParams = [];
             
@@ -76,7 +76,7 @@ const AdminApprovalConfirmation = () => {
             
             console.log(`Making approval request to: ${apiEndpoint}`);
             
-            // Approve the admin request
+
             response = await axios.get(apiEndpoint);
             setStatus('approved');
             setMessage(`Admin access approved successfully. A verification code has been sent to the user's email.`);
@@ -87,7 +87,7 @@ const AdminApprovalConfirmation = () => {
               setUserEmail(email);
             }
           } else if (isRejection) {
-            // Construct API URL with both token and email if available
+
             apiEndpoint = `${API_URL}/api/admin-approval/reject`;
             const queryParams = [];
             
@@ -100,7 +100,7 @@ const AdminApprovalConfirmation = () => {
             
             console.log(`Making rejection request to: ${apiEndpoint}`);
             
-            // Reject the admin request
+
             response = await axios.get(apiEndpoint);
             setStatus('rejected');
             setMessage('Admin access request has been rejected. The user has been notified.');
@@ -122,7 +122,7 @@ const AdminApprovalConfirmation = () => {
           setProcessingComplete(true);
         }
       } else {
-        // Default status if not processing a request
+
         setStatus('approved');
         setMessage('Admin request has been processed successfully.');
         setLoading(false);
@@ -216,7 +216,7 @@ const AdminApprovalConfirmation = () => {
       );
     }
     
-    // Error state
+
     return (
       <>
         <FaTimesCircle className="mx-auto text-red-500 text-6xl mb-4" />
@@ -234,10 +234,10 @@ const AdminApprovalConfirmation = () => {
     );
   };
 
-  // Prevent page reload and stay on this page
+
   const handleHomeClick = (e) => {
     e.preventDefault();
-    // Show confirmation first
+
     if (window.confirm('Are you sure you want to leave this page? The admin verification has been completed.')) {
       navigate('/');
     }

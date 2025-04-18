@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-// Define schema for individual messages in a ticket
+
 const messageSchema = new mongoose.Schema({
   sender: {
     type: mongoose.Schema.Types.ObjectId,
@@ -27,7 +27,7 @@ const messageSchema = new mongoose.Schema({
   }]
 }, { timestamps: true });
 
-// Main ticket schema
+
 const supportTicketSchema = new mongoose.Schema({
   title: {
     type: String,
@@ -84,7 +84,7 @@ const supportTicketSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Update lastActivity when a new message is added
+
 supportTicketSchema.pre('save', function(next) {
   if (this.isModified('messages')) {
     this.lastActivity = Date.now();
@@ -92,7 +92,7 @@ supportTicketSchema.pre('save', function(next) {
   next();
 });
 
-// Create indexes for efficient querying
+
 supportTicketSchema.index({ userId: 1 });
 supportTicketSchema.index({ status: 1 });
 supportTicketSchema.index({ priority: 1 });

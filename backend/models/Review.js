@@ -73,7 +73,7 @@ const reviewSchema = new mongoose.Schema(
   }
 );
 
-// Middleware to check if the review is from a verified stay
+
 reviewSchema.pre('save', async function(next) {
   if (this.bookingId) {
     try {
@@ -88,7 +88,7 @@ reviewSchema.pre('save', async function(next) {
     }
   }
   
-  // Initialize comments and reactions if they don't exist
+
   if (!this.comments) {
     console.log('Initializing empty comments array');
     this.comments = [];
@@ -101,7 +101,7 @@ reviewSchema.pre('save', async function(next) {
       hearts: { count: 0, users: [] }
     };
   } else {
-    // Ensure likes and hearts exist
+
     if (!this.reactions.likes) {
       this.reactions.likes = { count: 0, users: [] };
     }
@@ -113,7 +113,7 @@ reviewSchema.pre('save', async function(next) {
   next();
 });
 
-// Add middleware to ensure comments and reactions exist when querying
+
 reviewSchema.post('find', function(docs) {
   if (!docs) return;
   
@@ -128,7 +128,7 @@ reviewSchema.post('find', function(docs) {
         hearts: { count: 0, users: [] }
       };
     } else {
-      // Ensure likes and hearts exist
+
       if (!doc.reactions.likes) {
         doc.reactions.likes = { count: 0, users: [] };
       }
@@ -152,7 +152,7 @@ reviewSchema.post('findOne', function(doc) {
       hearts: { count: 0, users: [] }
     };
   } else {
-    // Ensure likes and hearts exist
+
     if (!doc.reactions.likes) {
       doc.reactions.likes = { count: 0, users: [] };
     }
@@ -162,12 +162,12 @@ reviewSchema.post('findOne', function(doc) {
   }
 });
 
-// Static method to get average rating for a hotel
+
 reviewSchema.statics.getAverageRating = async function(hotelId) {
   try {
     console.log('Calculating average rating for hotelId:', hotelId);
     
-    // Additional logging to help debug
+
     console.log('MongoDB connection state:', mongoose.connection.readyState);
     console.log('Review model exists:', !!mongoose.models.Review);
     

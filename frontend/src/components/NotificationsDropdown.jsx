@@ -18,7 +18,7 @@ const NotificationsDropdown = () => {
     addTestNotification 
   } = useNotifications();
 
-  // Close dropdown when clicking outside
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -32,7 +32,7 @@ const NotificationsDropdown = () => {
     };
   }, []);
 
-  // Format date to be more readable
+
   const formatDate = (dateString) => {
     if (!dateString) return '';
     try {
@@ -42,7 +42,7 @@ const NotificationsDropdown = () => {
     }
   };
 
-  // Get icon based on notification type
+
   const getNotificationIcon = (type) => {
     switch (type) {
       case 'booking':
@@ -54,18 +54,18 @@ const NotificationsDropdown = () => {
     }
   };
 
-  // Toggle dropdown
+
   const toggleDropdown = () => {
     setIsOpen(!isOpen);
   };
 
-  // Go to all notifications page
+
   const viewAllNotifications = () => {
     setIsOpen(false);
     navigate('/notifications');
   };
 
-  // Get notification message with truncation if too long
+
   const getNotificationMessage = (message) => {
     if (message.length > 100) {
       return message.substring(0, 100) + '...';

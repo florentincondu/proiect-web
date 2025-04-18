@@ -7,12 +7,12 @@ const PlacePrice = require('../models/PlacePrice');
 const PlaceRestriction = require('../models/PlaceRestriction');
 const mongoose = require('mongoose');
 
-// Get dashboard summary data
+
 exports.getDashboardSummary = async (req, res) => {
   try {
     console.log('Dashboard summary requested');
 
-    // Get real data from database
+
     let realData = {
       totalUsers: 0,
       totalBookings: 0,
@@ -23,16 +23,16 @@ exports.getDashboardSummary = async (req, res) => {
     };
 
     try {
-      // Count total users
+
       realData.totalUsers = await User.countDocuments({});
       
-      // Count total bookings
+
       realData.totalBookings = await Booking.countDocuments({});
       
-      // Count pending bookings
+
       realData.pendingBookings = await Booking.countDocuments({ status: 'pending' });
       
-      // Calculate total revenue
+
       console.log('Calculating total revenue...');
       const revenueData = await Payment.aggregate([
         { $match: { status: { $in: ['paid', 'partially_refunded'] } } },
@@ -47,12 +47,12 @@ exports.getDashboardSummary = async (req, res) => {
       } else {
         console.log('No revenue data returned from aggregation');
         
-        // Let's try a more direct approach as a fallback
+
         const payments = await Payment.find({ status: { $in: ['paid', 'partially_refunded'] } });
         console.log(`Found ${payments.length} payments with paid status`);
         
         if (payments.length > 0) {
-          // Calculate total manually
+
           let totalRevenue = 0;
           for (const payment of payments) {
             console.log(`Payment ID: ${payment._id}, Total: ${payment.total}`);
@@ -63,7 +63,7 @@ exports.getDashboardSummary = async (req, res) => {
         }
       }
       
-      // Get recent bookings with user and hotel details
+
       realData.recentBookings = await Booking.find()
         .populate('user', 'firstName lastName email profileImage')
         .sort({ createdAt: -1 })
@@ -93,7 +93,7 @@ exports.getDashboardSummary = async (req, res) => {
         createdAt: booking.createdAt || new Date(),
       }));
       
-      // Get user registrations over past 7 days
+
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
       
@@ -119,14 +119,14 @@ exports.getDashboardSummary = async (req, res) => {
       console.log('Real dashboard data fetched successfully');
     } catch (dbError) {
       console.error('Error fetching real dashboard data:', dbError);
-      // We'll continue with whatever real data we were able to fetch
+
     }
     
-    // If no real bookings data, provide fallback with zeros
+
     if (realData.recentBookings.length === 0) {
       console.log('No real booking data found, using fallback with zeros');
       
-      // Provide structure with zeros for the frontend
+
       realData.recentBookings = Array(5).fill(0).map((_, i) => ({
         id: `mock-${i + 1}`,
         user: {
@@ -151,7 +151,7 @@ exports.getDashboardSummary = async (req, res) => {
       }));
     }
     
-    // Format and return the dashboard data
+
     const dashboardData = {
       statistics: {
         totalUsers: realData.totalUsers,
@@ -172,7 +172,7 @@ exports.getDashboardSummary = async (req, res) => {
         })
     };
     
-    // Add stats alias for backwards compatibility
+
     dashboardData.stats = dashboardData.statistics;
     
     console.log('Returning dashboard summary data');
@@ -180,7 +180,7 @@ exports.getDashboardSummary = async (req, res) => {
   } catch (error) {
     console.error('Error fetching dashboard summary:', error);
     
-    // Send simplified error response
+
     res.status(500).json({ 
       message: 'Failed to fetch dashboard summary',
       error: error.message 
@@ -188,14 +188,14 @@ exports.getDashboardSummary = async (req, res) => {
   }
 };
 
-// Get recent activity logs
+
 exports.getRecentLogs = async (req, res) => {
   try {
     console.log('Recent logs requested');
     
-    // Get the most recent activities from different collections
+
     const [bookings, payments, users, systemLogs] = await Promise.all([
-      // Recent bookings
+
       Booking.find()
         .sort({ createdAt: -1 })
         .limit(10)
@@ -203,7 +203,7 @@ exports.getRecentLogs = async (req, res) => {
         .populate('hotel', 'name')
         .lean(),
       
-      // Recent payments
+
       Payment.find()
         .sort({ createdAt: -1 })
         .limit(10)
@@ -211,14 +211,14 @@ exports.getRecentLogs = async (req, res) => {
         .populate('booking')
         .lean(),
       
-      // Recent user registrations
+
       User.find()
         .sort({ createdAt: -1 })
         .limit(10)
         .select('firstName lastName email createdAt')
         .lean(),
       
-      // System logs
+
       SystemLog.find()
         .sort({ timestamp: -1 })
         .limit(10)
@@ -226,9 +226,9 @@ exports.getRecentLogs = async (req, res) => {
         .lean()
     ]);
 
-    // Combine and format all activities
+
     let allActivities = [
-      // Format booking activities
+
       ...bookings.map(booking => ({
         id: booking._id,
         user: booking.user ? `${booking.user.firstName} ${booking.user.lastName}` : 'Unknown User',
@@ -240,7 +240,7 @@ exports.getRecentLogs = async (req, res) => {
         type: 'booking'
       })),
 
-      // Format payment activities
+
       ...payments.map(payment => ({
         id: payment._id,
         user: payment.user ? `${payment.user.firstName} ${payment.user.lastName}` : 'Unknown User',
@@ -252,7 +252,7 @@ exports.getRecentLogs = async (req, res) => {
         type: 'payment'
       })),
 
-      // Format user registration activities
+
       ...users.map(user => ({
         id: user._id,
         user: `${user.firstName} ${user.lastName}`,
@@ -264,7 +264,7 @@ exports.getRecentLogs = async (req, res) => {
         type: 'user'
       })),
 
-      // Format system logs
+
       ...systemLogs.map(log => ({
         id: log._id,
         user: log.userId ? `${log.userId.firstName} ${log.userId.lastName}` : 'System',
@@ -277,10 +277,10 @@ exports.getRecentLogs = async (req, res) => {
       }))
     ];
 
-    // Sort all activities by timestamp
+
     allActivities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-    // Limit to most recent 20 activities
+
     allActivities = allActivities.slice(0, 20);
 
     console.log(`Returning ${allActivities.length} formatted activities`);
@@ -294,7 +294,7 @@ exports.getRecentLogs = async (req, res) => {
   }
 };
 
-// Create a new system log entry
+
 exports.createLogEntry = async (req, res) => {
   try {
     const { action, message, level = 'info', module } = req.body;
@@ -303,7 +303,7 @@ exports.createLogEntry = async (req, res) => {
       return res.status(400).json({ message: 'Action and message are required' });
     }
     
-    // Mock response for log creation
+
     const mockLog = {
       _id: Math.random().toString(36).substring(2, 15),
       action,
@@ -322,9 +322,9 @@ exports.createLogEntry = async (req, res) => {
   }
 };
 
-// Funcții pentru gestionarea hotelurilor de către admin
 
-// Obține toate hotelurile pentru panoul de administrare
+
+
 exports.getHotelsForAdmin = async (req, res) => {
   try {
     const hotels = await Hotel.find().sort({ name: 1 }).lean();
@@ -335,7 +335,7 @@ exports.getHotelsForAdmin = async (req, res) => {
   }
 };
 
-// Caută hoteluri după nume
+
 exports.searchHotels = async (req, res) => {
   try {
     const { name } = req.query;
@@ -355,7 +355,7 @@ exports.searchHotels = async (req, res) => {
   }
 };
 
-// Obține un hotel specific după ID
+
 exports.getHotelById = async (req, res) => {
   try {
     const hotel = await Hotel.findById(req.params.id).lean();
@@ -371,7 +371,7 @@ exports.getHotelById = async (req, res) => {
   }
 };
 
-// Actualizează prețurile unui hotel
+
 exports.updateHotelPrice = async (req, res) => {
   try {
     const { price, roomPrices } = req.body;
@@ -386,12 +386,12 @@ exports.updateHotelPrice = async (req, res) => {
       return res.status(404).json({ message: 'Hotel not found' });
     }
     
-    // Actualizează prețul de bază al hotelului dacă este furnizat
+
     if (price !== undefined) {
       hotel.price = price;
     }
     
-    // Actualizează prețurile camerelor, dacă sunt furnizate
+
     if (roomPrices && Array.isArray(roomPrices)) {
       roomPrices.forEach(roomPrice => {
         const room = hotel.rooms.find(r => r._id.toString() === roomPrice.roomId);
@@ -403,7 +403,7 @@ exports.updateHotelPrice = async (req, res) => {
     
     await hotel.save();
     
-    // Înregistrează acțiunea în log
+
     const logEntry = new SystemLog({
       userId: req.user._id,
       action: 'update_hotel_price',
@@ -430,7 +430,7 @@ exports.updateHotelPrice = async (req, res) => {
   }
 };
 
-// Actualizează restricțiile unui hotel
+
 exports.updateHotelRestrictions = async (req, res) => {
   try {
     const { isRestricted, restrictionReason, restrictedDates } = req.body;
@@ -441,29 +441,29 @@ exports.updateHotelRestrictions = async (req, res) => {
       return res.status(404).json({ message: 'Hotel not found' });
     }
     
-    // Adaugă câmpuri pentru restricții dacă nu există deja
+
     if (!hotel.restrictions) {
       hotel.restrictions = {};
     }
     
-    // Actualizează starea restricționării
+
     if (isRestricted !== undefined) {
       hotel.restrictions.isRestricted = isRestricted;
     }
     
-    // Actualizează motivul restricției
+
     if (restrictionReason) {
       hotel.restrictions.reason = restrictionReason;
     }
     
-    // Actualizează datele restricționate
+
     if (restrictedDates && Array.isArray(restrictedDates)) {
       hotel.restrictions.restrictedDates = restrictedDates;
     }
     
     await hotel.save();
     
-    // Înregistrează acțiunea în log
+
     const logEntry = new SystemLog({
       userId: req.user._id,
       action: 'update_hotel_restrictions',
@@ -491,9 +491,9 @@ exports.updateHotelRestrictions = async (req, res) => {
   }
 };
 
-// Places API hotel management functions
 
-// Get saved prices for places (hotels)
+
+
 exports.getPlacesPrices = async (req, res) => {
   try {
     const prices = await PlacePrice.find().sort({ updatedAt: -1 }).lean();
@@ -517,7 +517,7 @@ exports.getPlacesPrices = async (req, res) => {
   }
 };
 
-// Update price for a hotel from Places API
+
 exports.updatePlacePrice = async (req, res) => {
   try {
     const { placeId, name, price } = req.body;
@@ -531,7 +531,7 @@ exports.updatePlacePrice = async (req, res) => {
       });
     }
     
-    // Create a log entry for this action
+
     const logEntry = new SystemLog({
       userId: req.user._id,
       action: 'update_place_price',
@@ -549,7 +549,7 @@ exports.updatePlacePrice = async (req, res) => {
     
     await logEntry.save();
     
-    // Upsert price record in the PlacePrice model
+
     const updatedPrice = await PlacePrice.findOneAndUpdate(
       { placeId: placeId },
       { 
@@ -586,7 +586,7 @@ exports.updatePlacePrice = async (req, res) => {
   }
 };
 
-// Update restrictions for a hotel from Places API
+
 exports.updatePlaceRestriction = async (req, res) => {
   try {
     const { placeId, name, isRestricted, reason } = req.body;
@@ -598,7 +598,7 @@ exports.updatePlaceRestriction = async (req, res) => {
       });
     }
     
-    // Create a log entry for this action
+
     const logEntry = new SystemLog({
       userId: req.user._id,
       action: 'update_place_restriction',
@@ -617,7 +617,7 @@ exports.updatePlaceRestriction = async (req, res) => {
     
     await logEntry.save();
     
-    // Update restrictions in the PlaceRestriction model
+
     await PlaceRestriction.findOneAndUpdate(
       { placeId: placeId },
       { 
@@ -653,7 +653,7 @@ exports.updatePlaceRestriction = async (req, res) => {
   }
 };
 
-// Get all hotel restrictions
+
 exports.getPlacesRestrictions = async (req, res) => {
   try {
     const restrictions = await PlaceRestriction.find({}).lean();

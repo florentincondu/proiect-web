@@ -28,10 +28,10 @@ import {
 import axios from 'axios';
 
 const Settings = () => {
-  // Active tab state
+
   const [activeTab, setActiveTab] = useState('authentication');
   
-  // Form states for each settings section
+
   const [authSettings, setAuthSettings] = useState({
     requireMfa: false,
     passwordPolicy: {
@@ -116,29 +116,29 @@ const Settings = () => {
     }
   });
   
-  // UI states
+
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
   const [showSecrets, setShowSecrets] = useState({});
   const [isEditing, setIsEditing] = useState(null);
   
-  // Load settings from API
+
   useEffect(() => {
     const fetchSettings = async () => {
       setLoading(true);
       try {
-        // In production, replace with actual API call
+
         const response = await axios.get(
           `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/settings`
         );
         
-        // Update states with fetched data
-        // This is commented out since we're using mock data for now
-        // setAuthSettings(response.data.authSettings);
-        // setAppPreferences(response.data.appPreferences);
-        // setIntegrations(response.data.integrations);
-        // setNotifications(response.data.notifications);
+
+
+
+
+
+
       } catch (error) {
         console.error('Failed to fetch settings:', error);
         setError('Failed to load settings. Please refresh the page.');
@@ -150,7 +150,7 @@ const Settings = () => {
     fetchSettings();
   }, []);
   
-  // Save settings to API
+
   const saveSettings = async (settingType) => {
     setLoading(true);
     setSuccess('');
@@ -181,13 +181,13 @@ const Settings = () => {
     }
     
     try {
-      // In production, replace with actual API call
-      // const response = await axios.put(
-      //   `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/settings`,
-      //   dataToSave
-      // );
+
+
+
+
+
       
-      // Simulate API call for mock
+
       await new Promise(resolve => setTimeout(resolve, 800));
       
       setSuccess(`${settingType.charAt(0).toUpperCase() + settingType.slice(1)} settings updated successfully!`);
@@ -200,7 +200,7 @@ const Settings = () => {
     }
   };
   
-  // Toggle password/secret visibility
+
   const toggleSecretVisibility = (key) => {
     setShowSecrets(prev => ({
       ...prev,
@@ -208,7 +208,7 @@ const Settings = () => {
     }));
   };
   
-  // Handle form input changes
+
   const handleAuthSettingChange = (field, value) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
@@ -229,7 +229,7 @@ const Settings = () => {
   
   const handleAppPrefChange = (field, value) => {
     if (field.includes('.')) {
-      // Handle nested properties like emailTemplates.bookingConfirmation.subject
+
       const parts = field.split('.');
       if (parts.length === 3) {
         const [parent, child, subChild] = parts;
@@ -336,7 +336,7 @@ const Settings = () => {
     }));
   };
   
-  // Render tab content based on active tab
+
   const renderTabContent = () => {
     switch (activeTab) {
       case 'authentication':
@@ -352,7 +352,7 @@ const Settings = () => {
     }
   };
   
-  // Setting section components
+
   const renderAuthenticationSettings = () => (
     <div className="space-y-6">
       <div className="bg-gray-900 bg-opacity-90 rounded-xl shadow-lg p-6 backdrop-blur-sm">

@@ -9,11 +9,11 @@ async function checkPayments() {
     
     const db = client.db();
     
-    // First check how many payments exist in total
+
     const totalPayments = await db.collection('payments').countDocuments();
     console.log(`Total payments in database: ${totalPayments}`);
     
-    // Then check paid payments
+
     const paidPayments = await db.collection('payments').find({
       status: { $in: ['paid', 'partially_refunded'] }
     }).toArray();

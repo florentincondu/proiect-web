@@ -10,7 +10,7 @@ import { useAuth } from '../context/authContext';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
-// Mock data for payments/invoices
+
 const initialPayments = [
   {
     id: 'INV-2024-1001',
@@ -148,7 +148,7 @@ const initialPayments = [
   }
 ];
 
-// Payment methods for dropdown
+
 const paymentMethods = [
   'All Methods',
   'credit_card',
@@ -158,7 +158,7 @@ const paymentMethods = [
   'other'
 ];
 
-// Payment statuses for dropdown
+
 const paymentStatuses = [
   'All Statuses',
   'pending',
@@ -210,13 +210,13 @@ const PaymentsInvoicesManagement = () => {
     monthlyRevenue: []
   });
 
-  // Fetch payments data from API
+
   useEffect(() => {
     fetchPayments();
     fetchPaymentStats();
   }, [token, currentPage, pageSize, filterStatus, filterMethod, filterDateFrom, filterDateTo, filterAmountMin, filterAmountMax, sortBy, sortOrder]);
 
-  // Function to fetch payments data
+
   const fetchPayments = async () => {
     setIsLoading(true);
     setError(null);
@@ -225,7 +225,7 @@ const PaymentsInvoicesManagement = () => {
       console.log('Fetching payments and bookings data...');
       let url = `${API_BASE_URL}/api/payments?page=${currentPage}&limit=${pageSize}&sort=${sortBy}&order=${sortOrder}`;
       
-      // Add filters to the query
+
       if (filterStatus !== 'All Statuses') url += `&status=${filterStatus}`;
       if (filterMethod !== 'All Methods') url += `&method=${filterMethod}`;
       if (filterDateFrom) url += `&dateFrom=${filterDateFrom}`;
@@ -234,7 +234,7 @@ const PaymentsInvoicesManagement = () => {
       if (filterAmountMax) url += `&maxAmount=${filterAmountMax}`;
       if (searchTerm) url += `&search=${searchTerm}`;
       
-      // Fetch both payments and refunded bookings
+
       const [paymentsResponse, bookingsResponse] = await Promise.all([
         axios.get(url, {
           headers: { Authorization: `Bearer ${token}` }
@@ -249,7 +249,7 @@ const PaymentsInvoicesManagement = () => {
         refundedBookings: bookingsResponse.data 
       });
       
-      // Create a map of refunded bookings by booking ID
+
       const refundedBookingsMap = new Map();
       let localRefundedBookingsCount = 0;
 
@@ -268,11 +268,11 @@ const PaymentsInvoicesManagement = () => {
         });
       }
       
-      // Calculate total refunds
+
       const localTotalRefunds = Array.from(refundedBookingsMap.values())
         .reduce((sum, booking) => sum + booking.amount, 0);
 
-      // Update the state with the new values
+
       setTotalRefunds(localTotalRefunds);
       setRefundedBookingsCount(localRefundedBookingsCount);
 
@@ -338,7 +338,7 @@ const PaymentsInvoicesManagement = () => {
     }
   };
 
-  // Fetch payment statistics
+
   const fetchPaymentStats = async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/payments/stats`, {
@@ -347,42 +347,42 @@ const PaymentsInvoicesManagement = () => {
       
       console.log('Payment stats response:', response.data);
       
-      // The backend returns statistics data directly, not in a stats property
+
       if (response.data) {
-        // Extract payment counts by status from the byStatus array
+
         const paidData = response.data.byStatus.find(item => item._id === 'paid') || { count: 0, revenue: 0 };
         const pendingData = response.data.byStatus.find(item => item._id === 'pending') || { count: 0, revenue: 0 };
         const refundedData = response.data.byStatus.find(item => item._id === 'refunded') || { count: 0, revenue: 0 };
         const partiallyRefundedData = response.data.byStatus.find(item => item._id === 'partially_refunded') || { count: 0, revenue: 0 };
         
-        // Calculate success rate
+
         const totalPayments = response.data.byStatus.reduce((sum, status) => sum + status.count, 0);
         const successRate = totalPayments > 0 ? 
           ((paidData.count + partiallyRefundedData.count) / totalPayments * 100).toFixed(1) : 0;
         
-        // Calculate total refunded amount
+
         const refundedAmount = refundedData.revenue + (partiallyRefundedData.revenue * 0.5); // Estimate for partially refunded
         
-        // Calculate revenue change from monthly data if available
+
         let revenueChange = 0;
         if (response.data.monthlyRevenue && response.data.monthlyRevenue.length >= 2) {
-          // Sort monthly revenue by date to ensure we're comparing correct months
+
           const sortedMonthlyData = [...response.data.monthlyRevenue].sort((a, b) => {
             if (a._id.year !== b._id.year) return b._id.year - a._id.year;
             return b._id.month - a._id.month;
           });
           
-          // Get current month and previous month revenue
+
           const currentMonthRevenue = sortedMonthlyData[0]?.revenue || 0;
           const previousMonthRevenue = sortedMonthlyData[1]?.revenue || 0;
           
-          // Calculate percentage change
+
           if (previousMonthRevenue > 0) {
             revenueChange = ((currentMonthRevenue - previousMonthRevenue) / previousMonthRevenue * 100).toFixed(1);
           }
         }
         
-        // Use real data from API
+
         setPaymentStats({
           totalRevenue: response.data.totals.revenue || 0,
           revenueChange: parseFloat(revenueChange),
@@ -397,7 +397,7 @@ const PaymentsInvoicesManagement = () => {
           monthlyRevenue: response.data.monthlyRevenue || []
         });
       } else {
-        // Fallback to mock data if API doesn't return expected format
+
         setPaymentStats({
           totalRevenue: 4800,
           revenueChange: 12.5,
@@ -427,7 +427,7 @@ const PaymentsInvoicesManagement = () => {
       }
     } catch (err) {
       console.error('Error fetching payment stats:', err);
-      // Fallback to mock data
+
       setPaymentStats({
         totalRevenue: 4800,
         revenueChange: 12.5,
@@ -457,21 +457,21 @@ const PaymentsInvoicesManagement = () => {
     }
   };
 
-  // Filter and sort payments when any filter/sort value changes
+
   useEffect(() => {
     let results = [...payments];
     
-    // Apply status filter
+
     if (filterStatus !== 'All Statuses') {
       results = results.filter(payment => payment.status === filterStatus);
     }
     
-    // Apply payment method filter
+
     if (filterMethod !== 'All Methods') {
       results = results.filter(payment => payment.paymentMethod === filterMethod);
     }
     
-    // Apply date range filter
+
     if (filterDateFrom) {
       results = results.filter(payment => new Date(payment.date) >= new Date(filterDateFrom));
     }
@@ -480,7 +480,7 @@ const PaymentsInvoicesManagement = () => {
       results = results.filter(payment => new Date(payment.date) <= new Date(filterDateTo));
     }
     
-    // Apply amount range filter
+
     if (filterAmountMin) {
       results = results.filter(payment => payment.amount >= parseFloat(filterAmountMin));
     }
@@ -489,7 +489,7 @@ const PaymentsInvoicesManagement = () => {
       results = results.filter(payment => payment.amount <= parseFloat(filterAmountMax));
     }
     
-    // Apply search term
+
     if (searchTerm) {
       results = results.filter(payment => 
         payment.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -499,7 +499,7 @@ const PaymentsInvoicesManagement = () => {
       );
     }
     
-    // Apply sorting
+
     results.sort((a, b) => {
       if (sortBy === 'id') {
         return sortOrder === 'asc' 
@@ -524,7 +524,7 @@ const PaymentsInvoicesManagement = () => {
     setFilteredPayments(results);
   }, [payments, searchTerm, filterStatus, filterMethod, filterDateFrom, filterDateTo, filterAmountMin, filterAmountMax, sortBy, sortOrder]);
 
-  // Reset all filters
+
   const resetFilters = () => {
     setSearchTerm('');
     setFilterStatus('All Statuses');
@@ -536,7 +536,7 @@ const PaymentsInvoicesManagement = () => {
     setCurrentPage(1);
   };
 
-  // Handle sorting change
+
   const handleSortChange = (field) => {
     if (sortBy === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -547,7 +547,7 @@ const PaymentsInvoicesManagement = () => {
     setCurrentPage(1);
   };
 
-  // Format currency for display
+
   const formatCurrency = (amount, currency = 'RON') => {
     return new Intl.NumberFormat('ro-RO', {
       style: 'currency',
@@ -557,7 +557,7 @@ const PaymentsInvoicesManagement = () => {
     }).format(amount);
   };
 
-  // Get class for status display
+
   const getStatusClass = (status) => {
     if (!status) return '';
     
@@ -582,12 +582,12 @@ const PaymentsInvoicesManagement = () => {
     }
   };
 
-  // Get status color class
+
   const getStatusColorClass = (status) => {
     return getStatusClass(status);
   };
 
-  // Format date for display
+
   const formatDate = (dateString) => {
     try {
       return format(new Date(dateString), 'MMM dd, yyyy');
@@ -596,18 +596,18 @@ const PaymentsInvoicesManagement = () => {
     }
   };
 
-  // Handle pagination
+
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setCurrentPage(newPage);
     }
   };
 
-  // Handle refund payment
+
   const handleRefundPayment = () => {
     setIsLoading(true);
     
-    // In a real app, you would make an API call here
+
     setTimeout(() => {
       const isFullRefund = parseFloat(refundAmount) === (selectedPayment?.amount || 0);
       
@@ -632,7 +632,7 @@ const PaymentsInvoicesManagement = () => {
     }, 800);
   };
 
-  // Get payment method icon
+
   const getPaymentMethodIcon = (method) => {
     switch (method) {
       case 'Credit Card':
@@ -646,7 +646,7 @@ const PaymentsInvoicesManagement = () => {
     }
   };
 
-  // Loading state
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-full py-20 bg-gray-900">
@@ -655,7 +655,7 @@ const PaymentsInvoicesManagement = () => {
     );
   }
 
-  // Error state
+
   if (error) {
     return (
       <div className="text-center py-10 bg-gray-900 text-white">
@@ -1077,7 +1077,7 @@ const PaymentsInvoicesManagement = () => {
             </button>
             
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              // Show current page and surrounding pages
+
               let pageNum;
               if (totalPages <= 5) {
                 pageNum = i + 1;

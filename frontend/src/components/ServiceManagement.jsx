@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FaPlus, FaEdit, FaTrash, FaCheck, FaTimes, FaSearch, FaFilter, FaImage, FaClock, FaDollarSign, FaTags } from 'react-icons/fa';
 import axios from 'axios';
 
-// Mock data for services
+
 const initialServices = [
   { 
     id: 1, 
@@ -96,7 +96,7 @@ const initialServices = [
   }
 ];
 
-// Categories for dropdown
+
 const serviceCategories = [
   'Transportation',
   'Accommodation',
@@ -465,7 +465,7 @@ const ServiceManagement = () => {
                 </button>
                 <button
                   onClick={() => {
-                    // Handle form submission
+
                     setIsAddModalOpen(false);
                   }}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"

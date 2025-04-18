@@ -17,37 +17,37 @@ const {
 } = require('../controllers/userActivityController');
 const adminApprovalController = require('../controllers/adminApprovalController');
 
-// Dashboard endpoints
+
 router.get('/dashboard/summary', protect, admin, adminController.getDashboardSummary);
 router.get('/logs/recent', protect, admin, adminController.getRecentLogs);
 router.post('/logs', protect, admin, adminController.createLogEntry);
 
-// Hotel management routes for admin
+
 router.get('/hotels', protect, admin, adminController.getHotelsForAdmin);
 
-// Places API hotel management routes (Google Places integration)
-// These specific routes need to come BEFORE the dynamic :id route
+
+
 router.get('/places/prices', protect, admin, adminController.getPlacesPrices);
 
-// Dynamic route for individual hotels - must come AFTER specific routes
+
 router.get('/hotels/:id', protect, admin, adminController.getHotelById);
 router.put('/hotels/:id/update-price', protect, admin, adminController.updateHotelPrice);
 router.put('/hotels/:id/restrict', protect, admin, adminController.updateHotelRestrictions);
 router.post('/hotels/update-place-price', protect, admin, adminController.updatePlacePrice);
 router.post('/hotels/update-place-restriction', protect, admin, adminController.updatePlaceRestriction);
 
-// USER MANAGEMENT ROUTES
+
 router.route('/users').get(protect, admin, getAllUsers);
 router.route('/users/:id').get(protect, admin, getUserById);
 router.route('/users/:id').put(protect, admin, updateUser);
 router.route('/users/:id').delete(protect, admin, deleteUser);
 
-// USER ACTIVITY ROUTES
+
 router.get('/users/activity/recent', protect, admin, getRecentActiveUsers);
 router.get('/users/:id/activity', protect, admin, getUserActivityDetails);
 router.get('/users/stats/activity', protect, admin, getUserActivityStats);
 
-// Get user statistics (admin only)
+
 router.get('/statistics', protect, admin, async (req, res) => {
   try {
     const totalUsers = await User.countDocuments();

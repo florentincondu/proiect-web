@@ -4,31 +4,31 @@ const Payment = require('../models/Payment');
 const User = require('../models/User');
 const SystemLog = require('../models/SystemLog');
 
-// Helper to parse date ranges
+
 const parseDateRange = (startDate, endDate) => {
   const start = startDate ? new Date(startDate) : new Date(new Date().setMonth(new Date().getMonth() - 1));
   const end = endDate ? new Date(endDate) : new Date();
   
-  // Set time to beginning and end of day
+
   start.setHours(0, 0, 0, 0);
   end.setHours(23, 59, 59, 999);
   
   return { start, end };
 };
 
-// Get booking analytics
+
 exports.getBookingAnalytics = async (req, res) => {
   try {
     console.log('Booking analytics requested');
     
-    // Try to get real booking data from database
+
     let realData = [];
     try {
-      // Get bookings for the last 6 months
+
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
       
-      // Aggregate real booking data if available
+
       realData = await Booking.aggregate([
         { 
           $match: { 
@@ -48,18 +48,18 @@ exports.getBookingAnalytics = async (req, res) => {
       console.log('Found real booking data from database:', realData.length);
     } catch (dbError) {
       console.log('Error fetching real booking data:', dbError);
-      // Continue with mock data if error
+
     }
     
-    // Format month names to Romanian
+
     const getMonthNameInRomanian = (dateString) => {
       const monthIndex = parseInt(dateString.split('-')[1], 10) - 1;
       const months = ['Ian', 'Feb', 'Mar', 'Apr', 'Mai', 'Iun', 'Iul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       return months[monthIndex];
     };
     
-    // Format for frontend response - this format is critical
-    // Whether using real or mock data, ensure this structure:
+
+
     const bookingTrends = realData.length > 0 
       ? realData.map(item => ({
           date: getMonthNameInRomanian(item._id),
@@ -75,11 +75,11 @@ exports.getBookingAnalytics = async (req, res) => {
           { date: 'Iun', bookings: 57, revenue: 50100 }
         ];
     
-    // Calculate totals
+
     const totalBookings = bookingTrends.reduce((sum, item) => sum + item.bookings, 0);
     const totalRevenue = bookingTrends.reduce((sum, item) => sum + item.revenue, 0);
     
-    // Build complete response
+
     const response = {
       currency: 'RON',
       totalBookings: totalBookings,
@@ -104,7 +104,7 @@ exports.getBookingAnalytics = async (req, res) => {
   } catch (error) {
     console.error('Error fetching booking analytics:', error);
     
-    // Return backup format if error occurs
+
     const fallbackData = [
       { date: 'Ian', bookings: 28, revenue: 22500 },
       { date: 'Feb', bookings: 35, revenue: 28750 },
@@ -118,21 +118,21 @@ exports.getBookingAnalytics = async (req, res) => {
   }
 };
 
-// Get revenue analytics
+
 exports.getRevenueAnalytics = async (req, res) => {
   try {
     console.log('Revenue analytics requested');
     
-    // Try to get real payment data from database
+
     let realData = [];
     let totalRevenue = 0;
     
     try {
-      // Get payments for the last 6 months
+
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
       
-      // Aggregate real payment data if available
+
       realData = await Payment.aggregate([
         { 
           $match: { 
@@ -149,7 +149,7 @@ exports.getRevenueAnalytics = async (req, res) => {
         { $sort: { revenue: -1 } }
       ]);
       
-      // Calculate total revenue
+
       if (realData.length > 0) {
         totalRevenue = realData.reduce((sum, item) => sum + item.revenue, 0);
       }
@@ -157,10 +157,10 @@ exports.getRevenueAnalytics = async (req, res) => {
       console.log('Found real payment data from database:', realData.length);
     } catch (dbError) {
       console.log('Error fetching real payment data:', dbError);
-      // Continue with mock data if error
+
     }
     
-    // Format service names properly in Romanian
+
     const getServiceNameInRomanian = (methodId) => {
       switch(methodId) {
         case 'credit_card': return 'Card de credit';
@@ -171,7 +171,7 @@ exports.getRevenueAnalytics = async (req, res) => {
       }
     };
     
-    // Transform the real data or use mock data
+
     const revenueByService = realData.length > 0
       ? realData.map(item => ({
           service: getServiceNameInRomanian(item._id),
@@ -184,7 +184,7 @@ exports.getRevenueAnalytics = async (req, res) => {
           { service: 'Numerar', revenue: 10000 }
         ];
     
-    // Mock revenue analytics data with RON currency
+
     const revenueAnalytics = {
       totalRevenue: totalRevenue || 243500,
       currency: 'RON',
@@ -216,7 +216,7 @@ exports.getRevenueAnalytics = async (req, res) => {
   }
 };
 
-// Get location analytics
+
 exports.getLocationAnalytics = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
@@ -224,7 +224,7 @@ exports.getLocationAnalytics = async (req, res) => {
     
     console.log('Location analytics requested for period:', { start, end });
     
-    // Fetch real booking data and group by location
+
     const locations = await Booking.aggregate([
       { 
         $match: { 
@@ -242,14 +242,14 @@ exports.getLocationAnalytics = async (req, res) => {
       { $limit: 10 } // Get top 10 locations
     ]);
     
-    // Transform the data for the response
+
     const locationData = locations.length > 0 ? 
       locations.map(item => ({
         location: item._id,
         bookings: item.bookings,
         revenue: item.revenue
       })) : 
-      // Fallback data if no real data exists
+
       [
         { location: 'București', bookings: 120, revenue: 48000 },
         { location: 'Cluj-Napoca', bookings: 85, revenue: 34000 },
@@ -264,7 +264,7 @@ exports.getLocationAnalytics = async (req, res) => {
     console.error('Error fetching location analytics:', error);
     SystemLog.logError('Error fetching location analytics', 'analyticsController', { error: error.message });
     
-    // Return fallback data if error
+
     const fallbackData = [
       { location: 'București', bookings: 120, revenue: 48000 },
       { location: 'Cluj-Napoca', bookings: 85, revenue: 34000 },
@@ -277,12 +277,12 @@ exports.getLocationAnalytics = async (req, res) => {
   }
 };
 
-// Get user analytics
+
 exports.getUserAnalytics = async (req, res) => {
   try {
     console.log('User analytics requested');
     
-    // Mock user analytics data
+
     const mockUserAnalytics = {
       totalUsers: 520,
       newUsers: {
@@ -319,26 +319,26 @@ exports.getUserAnalytics = async (req, res) => {
   }
 };
 
-// Get dashboard summary data
+
 exports.getDashboardSummary = async (req, res) => {
   try {
-    // Calculate the start of today
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    // Calculate the start of this week (Sunday)
+
     const thisWeekStart = new Date(today);
     thisWeekStart.setDate(today.getDate() - today.getDay());
     
-    // Calculate the start of this month
+
     const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
     
-    // Get today's bookings
+
     const todayBookings = await Booking.countDocuments({
       createdAt: { $gte: today }
     });
     
-    // Get weekly revenue
+
     const weeklyRevenue = await Payment.aggregate([
       {
         $match: {
@@ -354,12 +354,12 @@ exports.getDashboardSummary = async (req, res) => {
       }
     ]);
     
-    // Get monthly bookings
+
     const monthlyBookings = await Booking.countDocuments({
       createdAt: { $gte: thisMonthStart }
     });
     
-    // Get active users (with activity in the last 30 days)
+
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
@@ -367,14 +367,14 @@ exports.getDashboardSummary = async (req, res) => {
       lastActive: { $gte: thirtyDaysAgo }
     });
     
-    // Get recent bookings
+
     const recentBookings = await Booking.find()
       .sort({ createdAt: -1 })
       .limit(5)
       .populate('user', 'firstName lastName email')
       .lean();
     
-    // Return summary data
+
     res.json({
       todayBookings,
       weeklyRevenue: weeklyRevenue.length > 0 ? weeklyRevenue[0].total : 0,
@@ -389,7 +389,7 @@ exports.getDashboardSummary = async (req, res) => {
   }
 };
 
-// Export analytics data as CSV
+
 exports.exportAnalytics = async (req, res) => {
   try {
     const { type, startDate, endDate, format } = req.query;
@@ -434,8 +434,8 @@ exports.exportAnalytics = async (req, res) => {
         return res.status(400).json({ message: 'Invalid analytics type' });
     }
     
-    // For simplicity, we'll just return the data as JSON
-    // In a real implementation, you would convert to CSV or PDF
+
+
     res.json({ 
       exportedData: data,
       fields,
@@ -453,12 +453,12 @@ exports.exportAnalytics = async (req, res) => {
   }
 };
 
-// Get system performance metrics
+
 exports.getSystemMetrics = async (req, res) => {
   try {
     console.log('System metrics requested');
     
-    // Mock system metrics data
+
     const mockSystemMetrics = {
       serverUptime: '25 days, 14 hours',
       serverLoad: {
@@ -496,13 +496,13 @@ exports.getSystemMetrics = async (req, res) => {
   }
 };
 
-// Get custom report data
+
 exports.getCustomReport = async (req, res) => {
   try {
     const { reportType, dateRange, dimensions } = req.body;
     console.log('Custom report requested:', { reportType, dateRange, dimensions });
     
-    // Mock custom report data
+
     const mockReportData = {
       reportType,
       dateRange,

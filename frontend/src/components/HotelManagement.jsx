@@ -32,23 +32,23 @@ const HotelManagement = () => {
   const [editingRoomId, setEditingRoomId] = useState(null);
   const [roomPrice, setRoomPrice] = useState('');
 
-  // Fetch saved hotel prices from our database
+
   const fetchSavedHotelPrices = async () => {
     try {
       console.log('Fetching saved hotel prices...');
       
-      // Safer API call pattern with better error handling
+
       let pricesMap = {};
       
       try {
-        // Fetch prices with corrected endpoint
+
         const response = await axios.get(`${API_BASE_URL}/api/places/prices`, {
-          // Public endpoint, no auth token needed
+
           timeout: 8000
         });
         
         if (response.data && response.data.prices) {
-          // Convert array to object with placeId as key
+
           response.data.prices.forEach(item => {
             pricesMap[item.placeId] = item.price;
           });
@@ -58,23 +58,23 @@ const HotelManagement = () => {
         }
       } catch (priceError) {
         console.warn('Error fetching hotel prices:', priceError.message);
-        // Continue with empty prices map
+
       }
       
-      // Set the saved prices in state
+
       setSavedPrices(pricesMap);
       
-      // Fetch restrictions with better error handling
+
       let restrictionsMap = {};
       
       try {
         const response = await axios.get(`${API_BASE_URL}/api/places/restrictions`, {
-          // Public endpoint, no auth token needed
+
           timeout: 8000
         });
         
         if (response.data && response.data.restrictions) {
-          // Convert to map for easier lookup
+
           response.data.restrictions.forEach(item => {
             restrictionsMap[item.placeId] = {
               isRestricted: item.isRestricted,
@@ -84,21 +84,21 @@ const HotelManagement = () => {
         }
       } catch (restrictionError) {
         console.warn('Error fetching hotel restrictions:', restrictionError.message);
-        // Continue with empty restrictions map
+
       }
       
-      // Save restrictions for later use
+
       setRestrictions(restrictionsMap);
       
       return pricesMap;
     } catch (err) {
       console.error('Error in fetchSavedHotelPrices:', err);
-      // Don't show error to user, just use empty data
+
       return {};
     }
   };
 
-  // Fetch initial hotels on component mount - using Google Places API
+
   useEffect(() => {
     const fetchInitialHotels = async () => {
       if (!token) {
@@ -111,11 +111,11 @@ const HotelManagement = () => {
       setError(null);
       
       try {
-        // Fetch saved hotel prices from our database
+
         const savedPrices = await fetchSavedHotelPrices();
         
-        // Fetch hotels from Google Places API using search-text endpoint
-        // Default search for hotels in Bucharest
+
+
         const response = await axios.post(
           PLACES_SEARCH_TEXT_URL,
           { textQuery: "hotels in Bucharest Romania" },
@@ -130,12 +130,12 @@ const HotelManagement = () => {
           const placesData = response.data.places;
           console.log('Fetched initial hotels:', placesData.length);
           
-          // Process the places data to match our hotel format
+
           const processedHotels = placesData.map(place => {
-            // Generate price just like the HomePage does
+
             const estimatedPrice = generateHotelPrice(place);
             
-            // Check if we have a restriction for this place
+
             const restriction = restrictions[place.id] || { isRestricted: false, reason: '' };
             
             return {
@@ -175,7 +175,7 @@ const HotelManagement = () => {
     fetchInitialHotels();
   }, [token]);
 
-  // Handle search
+
   const handleSearchChange = (e) => {
     const query = e.target.value;
     setSearchQuery(query);
@@ -189,12 +189,12 @@ const HotelManagement = () => {
         searchHotels(query);
       }, 500);
     } else if (query === '') {
-      // Reset back to initial hotels
+
       setFilteredHotels(hotels);
     }
   };
 
-  // Search hotels using Google Places API search-text
+
   const searchHotels = async (query) => {
     if (!query.trim()) {
       setFilteredHotels(hotels);
@@ -205,14 +205,14 @@ const HotelManagement = () => {
     setError(null);
     
     try {
-      // Construct the search query with "hotels" keyword if not included
+
       const searchText = query.toLowerCase().includes('hotel') 
         ? query 
         : `hotels in ${query}`;
         
       console.log('Searching for:', searchText);
       
-      // Use the Google Places search-text endpoint
+
       const response = await axios.post(
         PLACES_SEARCH_TEXT_URL,
         { textQuery: searchText },
@@ -227,12 +227,12 @@ const HotelManagement = () => {
         const placesData = response.data.places;
         console.log('Search results:', placesData.length);
         
-        // Process the places data to match our hotel format
+
         const processedHotels = placesData.map(place => {
-          // Generate price just like the HomePage does
+
           const estimatedPrice = generateHotelPrice(place);
           
-          // Check if we have a restriction for this place
+
           const restriction = restrictions[place.id] || { isRestricted: false, reason: '' };
           
           return {
@@ -261,27 +261,27 @@ const HotelManagement = () => {
     } catch (err) {
       console.error('Error searching hotels:', err);
       setError('Failed to search hotels. Please try again.');
-      // Don't clear filtered hotels on error to maintain current state
+
     } finally {
       setIsSearching(false);
     }
   };
 
-  // Handle search button click
+
   const handleSearchClick = () => {
     if (searchQuery.trim()) {
       searchHotels(searchQuery);
     }
   };
 
-  // Handle refresh all button click
+
   const handleRefreshClick = async () => {
     setSearchQuery('');
     setIsLoading(true);
     setError(null);
     
     try {
-      // Fetch default hotels for Bucharest
+
       const response = await axios.post(
         PLACES_SEARCH_TEXT_URL,
         { textQuery: "hotels in Bucharest Romania" },
@@ -295,12 +295,12 @@ const HotelManagement = () => {
       if (response.data && response.data.places) {
         const placesData = response.data.places;
         
-        // Process the places data to match our hotel format
+
         const processedHotels = placesData.map(place => {
-          // Generate price just like the HomePage does
+
           const estimatedPrice = generateHotelPrice(place);
           
-          // Check if we have a restriction for this place
+
           const restriction = restrictions[place.id] || { isRestricted: false, reason: '' };
           
           return {
@@ -326,7 +326,7 @@ const HotelManagement = () => {
         setFilteredHotels(processedHotels);
         setSuccessMessage('Hotels refreshed successfully');
         
-        // Clear success message after 3 seconds
+
         setTimeout(() => {
           setSuccessMessage('');
         }, 3000);
@@ -341,35 +341,35 @@ const HotelManagement = () => {
     }
   };
 
-  // Single consolidated price calculation function
+
   const calculatePrice = (hotel, isEditing = false) => {
-    // If the hotel has a stored price that an admin set, prioritize it
+
     if (hotel.price && typeof hotel.price === 'number') {
       return hotel.price;
     }
 
-    // If there's a saved price in our database from previous edits
+
     if (savedPrices[hotel.id] && typeof savedPrices[hotel.id] === 'number') {
       return savedPrices[hotel.id];
     }
 
-    // Use the generateHotelPrice function for new hotels
+
     return generateHotelPrice(hotel);
   };
 
-  // Calculate room price based on occupancy and nights
+
   const calculateRoomPrice = (basePrice, adults, children, nights = 1) => {
-    // Similar to ReservationCard.jsx calculation
+
     return basePrice * nights * (adults + children * 0.5);
   };
 
-  // Update hotel price
+
   const updateHotelPrice = async (hotelId, newPrice, hotelName) => {
     setIsUpdatingPrice(true);
     setError(null);
     
     try {
-      // Validate price
+
       if (isNaN(newPrice) || newPrice <= 0) {
         throw new Error('Price must be a positive number');
       }
@@ -393,7 +393,7 @@ const HotelManagement = () => {
       );
 
       if (response.data && response.data.success) {
-        // Update the price in both hotels and filteredHotels
+
         setHotels(prevHotels => 
           prevHotels.map(hotel => 
             hotel._id === hotelId ? { ...hotel, price: fullPrice } : hotel
@@ -405,7 +405,7 @@ const HotelManagement = () => {
           )
         );
         
-        // Update saved prices
+
         setSavedPrices(prevPrices => ({
           ...prevPrices,
           [hotelId]: fullPrice
@@ -413,7 +413,7 @@ const HotelManagement = () => {
         
         setSuccessMessage('Price updated successfully');
         
-        // Clear success message after 3 seconds
+
         setTimeout(() => {
           setSuccessMessage('');
         }, 3000);
@@ -429,7 +429,7 @@ const HotelManagement = () => {
     }
   };
   
-  // Update room prices
+
   const updateRoomPrices = async (hotelId, rooms) => {
     setIsUpdatingPrice(true);
     setError(null);
@@ -446,7 +446,7 @@ const HotelManagement = () => {
       );
 
       if (response.data && response.data.success) {
-        // Update the hotel in both hotels and filteredHotels
+
         const updatedHotel = response.data.data;
         
         setHotels(prevHotels => 
@@ -461,7 +461,7 @@ const HotelManagement = () => {
         );
         setSuccessMessage('Room prices updated successfully');
         
-        // Clear success message after 3 seconds
+
         setTimeout(() => {
           setSuccessMessage('');
         }, 3000);
@@ -477,30 +477,106 @@ const HotelManagement = () => {
     }
   };
 
-  // Toggle hotel restriction
+
   const toggleHotelRestriction = async (hotelId, isRestricted, reason = '') => {
     setIsRestricting(true);
     try {
+      let hotelDbId = hotelId;
+      const hotel = hotels.find(h => h.id === hotelId);
+      
+      if (!hotel) {
+        throw new Error('Hotel not found');
+      }
+      if (!hotel.mongoId) {
+        try {
+          console.log('Creating new hotel:', hotel);
+          const photoUrls = hotel.photos ? hotel.photos.map(photo => photo.name || '').filter(name => name) : [];
+          
+          const createResponse = await axios.post(
+            HOTELS_API_URL,
+            {
+              name: hotel.name,
+              location: hotel.location,
+              description: hotel.description || '',
+              rating: hotel.rating || 0,
+              price: parseFloat(hotel.price || hotel.estimatedPrice || 100), // Ensure we have a numeric price
+              placeId: hotel.id, // Store the Google Places ID for reference
+              photos: photoUrls, // Send array of photo URLs instead of objects
+              amenities: [],
+              propertyType: 'apartment', // Default property type
+              maxGuests: 2,
+              bedrooms: 1,
+              bathrooms: 1,
+              status: 'active',
+              rooms: [
+                {
+                  type: 'single',
+                  capacity: 1,
+                  price: parseFloat((hotel.price || hotel.estimatedPrice || 100) * 0.7),
+                  count: 2
+                },
+                {
+                  type: 'double',
+                  capacity: 2,
+                  price: parseFloat(hotel.price || hotel.estimatedPrice || 100),
+                  count: 3
+                }
+              ],
+              coordinates: {
+                lat: hotel.coordinates?.lat || 0,
+                lng: hotel.coordinates?.lng || 0
+              },
+              payment: {
+                isPaid: true,
+                paymentDate: new Date(),
+                paymentMethod: 'card',
+                amount: 10,
+                currency: 'EUR'
+              }
+            },
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+          
+          if (createResponse.data && createResponse.data.data) {
+            hotelDbId = createResponse.data.data._id;
+            setHotels(prevHotels =>
+              prevHotels.map(h =>
+                h.id === hotelId ? { ...h, mongoId: hotelDbId } : h
+              )
+            );
+          } else {
+            throw new Error('Failed to create hotel in database: Invalid response');
+          }
+        } catch (createError) {
+          console.error('Error creating hotel:', createError.response?.data || createError);
+          throw new Error(createError.response?.data?.message || 'Failed to create hotel in database');
+        }
+      }
       const response = await axios.put(
-        `${HOTELS_API_URL}/${hotelId}/restrict`,
+        `${HOTELS_API_URL}/${hotelDbId}/restrict`,
         { isRestricted, reason },
         {
           headers: {
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
           }
         }
       );
 
       if (response.data && response.data.success) {
-        // Update the restriction in both hotels and filteredHotels
         setHotels(prevHotels => 
           prevHotels.map(hotel => 
-            hotel._id === hotelId ? { ...hotel, restrictions: { isRestricted, reason } } : hotel
+            hotel.id === hotelId ? { ...hotel, restrictions: { isRestricted, reason } } : hotel
           )
         );
         setFilteredHotels(prevHotels => 
           prevHotels.map(hotel => 
-            hotel._id === hotelId ? { ...hotel, restrictions: { isRestricted, reason } } : hotel
+            hotel.id === hotelId ? { ...hotel, restrictions: { isRestricted, reason } } : hotel
           )
         );
         setSuccessMessage(`Hotel ${isRestricted ? 'restricted' : 'unrestricted'} successfully`);
@@ -509,21 +585,21 @@ const HotelManagement = () => {
       }
     } catch (err) {
       console.error('Error updating restriction:', err);
-      setError('Failed to update restriction. Please try again.');
+      setError(err.message || 'Failed to update restriction. Please try again.');
     } finally {
       setIsRestricting(false);
       setShowRestrictionModal(false);
     }
   };
 
-  // Get photo URL for a hotel
+
   const getPhotoUrl = (photoReference, maxWidth = 400) => {
     if (!photoReference || !photoReference.name) return backgr;
     
-    // Use our backend proxy instead of direct Google API call
+
     let url = `${API_BASE_URL}/api/places/media/${encodeURIComponent(photoReference.name)}?`;
     
-    // Add dimension parameters
+
     if (maxWidth) {
       url += `maxWidthPx=${maxWidth}`;
     }
@@ -531,36 +607,36 @@ const HotelManagement = () => {
     return url;
   };
 
-  // Start editing a hotel's price
+
   const startEditing = (hotel) => {
     const hotelId = hotel._id || hotel.id;
     setEditingHotel(hotelId);
     
-    // Use generateHotelPrice to get the price
+
     setUpdatedPrice(generateHotelPrice(hotel).toString());
   };
 
-  // Cancel editing
+
   const cancelEditing = () => {
     setEditingHotel(null);
     setUpdatedPrice('');
   };
 
-  // Open restriction modal
+
   const openRestrictionModal = (hotel) => {
     setSelectedHotel(hotel);
     setRestrictionReason(hotel.restrictions?.reason || '');
     setShowRestrictionModal(true);
   };
 
-  // Close restriction modal
+
   const closeRestrictionModal = () => {
     setShowRestrictionModal(false);
     setSelectedHotel(null);
     setRestrictionReason('');
   };
 
-  // Handle price editing for a specific room in a hotel
+
   const handleRoomPriceEdit = (hotelId, roomId, newPrice) => {
     if (isNaN(newPrice) || newPrice <= 0) {
       setError('Room price must be a positive number');

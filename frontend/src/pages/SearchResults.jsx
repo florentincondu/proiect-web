@@ -4,7 +4,7 @@ import { Map, Star, Hotel, Clock, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { generateHotelPrice } from '../utils/priceUtils';
 
-// Define API base URL
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 const HotelSearchResults = () => {
@@ -19,16 +19,16 @@ const HotelSearchResults = () => {
   const [sortBy, setSortBy] = useState('relevance');
 
   useEffect(() => {
-    // Check if we already have results in sessionStorage
+
     const storedResults = sessionStorage.getItem('searchResults');
     const storedQuery = sessionStorage.getItem('searchQuery');
     
-    // First check if we have new results from navigation state
+
     if (location.state?.results && location.state?.searchQuery) {
       console.log('Using results from navigation state');
       const processedResults = processSearchResults(location.state.results);
       
-      // Log the photo data for debugging
+
       if (processedResults.length > 0 && processedResults[0].photos) {
         console.log('Sample photo data from first result:', 
           processedResults[0].photos.length > 0 ? 
@@ -36,30 +36,30 @@ const HotelSearchResults = () => {
           'No photos');
       }
       
-      // Store in session storage
+
       sessionStorage.setItem('searchResults', JSON.stringify(processedResults));
       sessionStorage.setItem('searchQuery', location.state.searchQuery);
       
-      // Update state
+
       setSearchQuery(location.state.searchQuery);
       setResults(processedResults);
       setLoading(false);
     } 
-    // If no navigation state but we have stored results, use those
+
     else if (storedResults && storedQuery) {
       console.log('Using results from session storage');
       setSearchQuery(storedQuery);
       setResults(JSON.parse(storedResults));
       setLoading(false);
     } 
-    // No results anywhere, redirect to home
+
     else {
       console.log('No search results found, redirecting to home');
       navigate('/', { replace: true });
     }
   }, []);
 
-  // Function to process search results
+
   const processSearchResults = (searchResults) => {
     return searchResults.map(result => ({
       ...result,
@@ -74,11 +74,11 @@ const HotelSearchResults = () => {
     }));
   };
 
-  // Clear search results when leaving the page
+
   useEffect(() => {
     return () => {
-      // We don't clear session storage on component unmount
-      // to allow for back/forward navigation
+
+
     };
   }, []);
 
@@ -91,9 +91,9 @@ const HotelSearchResults = () => {
   };
 
   const filteredResults = results.filter(result => {
-    // Apply filters
+
     if (selectedFilters.length > 0) {
-      // Add your filter logic here
+
     }
     return true;
   });
@@ -109,13 +109,13 @@ const HotelSearchResults = () => {
     }
   });
 
-  // Safe function to get photo URL
+
   const getPhotoUrl = (result) => {
     try {
       if (result.photos && result.photos.length > 0 && result.photos[0].name) {
         const photoName = result.photos[0].name;
         console.log(`Creating photo URL for: ${photoName.substring(0, 20)}...`);
-        // Make sure we properly encode the photo name
+
         return `${API_BASE_URL}/api/places/media/${encodeURIComponent(photoName)}?maxWidthPx=400`;
       }
       console.log('No valid photo found, using placeholder');
@@ -126,11 +126,11 @@ const HotelSearchResults = () => {
     }
   };
 
-  // Function to handle errors with fallback UI
+
   const getHotelImage = (result) => {
     try {
       if (result.photos && result.photos.length > 0) {
-        // Get the photo URL
+
         const photoUrl = getPhotoUrl(result);
         
         return (

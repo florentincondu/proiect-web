@@ -10,7 +10,7 @@ import { IoArrowForward } from 'react-icons/io5';
 import { Line, Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 
-// Register Chart.js components
+
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -23,7 +23,7 @@ ChartJS.register(
   Filler
 );
 
-// Import BookingsManagement component
+
 import BookingsManagement from '../components/BookingManagement'
 import UsersManagement from '../components/UserManagment';
 import ServicesManagement from '../components/ServiceManagement';
@@ -42,7 +42,7 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // State for dashboard data
+
   const [dashboardData, setDashboardData] = useState({
     stats: {
       totalUsers: 0,
@@ -58,7 +58,7 @@ const AdminDashboard = () => {
   const [error, setError] = useState(null);
   const [chartType, setChartType] = useState('weekly'); // weekly or monthly
   
-  // Check if user is admin, if not redirect to homepage
+
   useEffect(() => {
     if (!user || user.role !== 'admin') {
       console.log('Non-admin user attempting to access admin dashboard. Redirecting to homepage.');
@@ -136,7 +136,7 @@ const AdminDashboard = () => {
     }
   };
   
-  // Helper function to format time ago
+
   const getTimeAgo = (timestamp) => {
     try {
       const date = new Date(timestamp);
@@ -164,7 +164,7 @@ const AdminDashboard = () => {
     navigate('/login');
   };
   
-  // Function to render the appropriate content based on active sidebar item
+
   const renderContent = () => {
     switch(activeSidebar) {
       case 'dashboard':
@@ -670,22 +670,22 @@ const AdminDashboard = () => {
   );
 };
 
-// Weekly booking chart component based on user registrations data
+
 const WeeklyBookingChart = ({ registrationData = [] }) => {
-  // Format dates for last 7 days
+
   const last7Days = Array(7).fill(0).map((_, i) => {
     const date = new Date();
     date.setDate(date.getDate() - (6 - i));
     return date.toISOString().split('T')[0];
   });
   
-  // Map registration data to last 7 days
+
   const chartData = last7Days.map(date => {
     const matchingDay = registrationData.find(item => item._id === date);
     return matchingDay ? matchingDay.count : 0;
   });
   
-  // Format dates for display (e.g., "Mon", "Tue", etc.)
+
   const labels = last7Days.map(date => {
     const day = new Date(date);
     return day.toLocaleDateString('en-US', { weekday: 'short' });
@@ -745,20 +745,20 @@ const WeeklyBookingChart = ({ registrationData = [] }) => {
   return <Line data={data} options={options} />;
 };
 
-// Monthly booking chart component
+
 const MonthlyBookingChart = ({ bookingData = [] }) => {
-  // Create data for the last 6 months
+
   const last6Months = Array(6).fill(0).map((_, i) => {
     const date = new Date();
     date.setMonth(date.getMonth() - (5 - i));
     return new Date(date.getFullYear(), date.getMonth(), 1);
   });
   
-  // Count bookings by month (in a real app, this would come from your API)
-  // For this example, we'll just generate random data
+
+
   const bookingCounts = last6Months.map(() => Math.floor(Math.random() * 100) + 10);
   
-  // Format month labels
+
   const labels = last6Months.map(date => 
     date.toLocaleDateString('en-US', { month: 'short' })
   );

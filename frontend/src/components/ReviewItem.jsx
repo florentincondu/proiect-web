@@ -18,7 +18,7 @@ const ReviewItem = ({ review, hotelId }) => {
   const [isFetching, setIsFetching] = useState(false);
   const [commentsLoaded, setCommentsLoaded] = useState(false);
 
-  // Fetch reactions and comments
+
   useEffect(() => {
     if (review._id) {
       fetchReactions();
@@ -26,7 +26,7 @@ const ReviewItem = ({ review, hotelId }) => {
     }
   }, [review._id]);
 
-  // Auto-show comments section if there are comments
+
   useEffect(() => {
     if (comments.length > 0 && !showComments) {
       setShowComments(true);
@@ -74,7 +74,7 @@ const ReviewItem = ({ review, hotelId }) => {
   const toggleComments = () => {
     setShowComments(prev => !prev);
     
-    // If toggling on and comments aren't loaded yet, fetch them
+
     if (!showComments && !commentsLoaded && !isFetching) {
       fetchComments();
     }
@@ -98,7 +98,7 @@ const ReviewItem = ({ review, hotelId }) => {
         }
       );
 
-      // Update local state based on response
+
       setReactions(prev => ({
         ...prev,
         [type]: response.data.reactionCount
@@ -142,15 +142,15 @@ const ReviewItem = ({ review, hotelId }) => {
       
       console.log('Comment submit response:', response.data);
       
-      // Add the new comment to the list
+
       if (response.data && response.data.comment) {
         setComments(prev => [response.data.comment, ...prev]);
         setNewComment(''); // Clear input
         
-        // Set flag that comments are loaded
+
         setCommentsLoaded(true);
         
-        // După adăugarea unui comentariu, afișăm automat secțiunea de comentarii
+
         if (!showComments) {
           setShowComments(true);
         }
@@ -182,13 +182,13 @@ const ReviewItem = ({ review, hotelId }) => {
         }
       );
       
-      // Remove the deleted comment from the list
+
       setComments(prev => prev.filter(comment => comment._id !== commentId));
       
-      // Hide comments section if no more comments
+
       if (comments.length <= 1) {
-        // We'll have 0 comments after the filter
-        // setShowComments(false);
+
+
       }
     } catch (error) {
       console.error('Error deleting comment:', error);

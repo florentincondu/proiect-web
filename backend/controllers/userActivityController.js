@@ -2,7 +2,7 @@ const User = require('../models/User');
 const mongoose = require('mongoose');
 const asyncHandler = require('express-async-handler');
 
-// Încărcăm modelele opțional, cu try-catch pentru a preveni erorile
+
 let Booking, Review;
 try {
   Booking = require('../models/Booking');
@@ -16,7 +16,7 @@ try {
   console.log('Review model not found, will use empty data for reviews');
 }
 
-// Helper function for counting documents safely
+
 const safeCountDocuments = async (model, query) => {
   if (!model) return 0;
   try {
@@ -27,7 +27,7 @@ const safeCountDocuments = async (model, query) => {
   }
 };
 
-// Helper function for finding documents safely
+
 const safeFindDocuments = async (model, query, sort, limit, populate) => {
   if (!model) return [];
   try {
@@ -48,8 +48,8 @@ const safeFindDocuments = async (model, query, sort, limit, populate) => {
  * @access  Private/Admin
  */
 const getRecentActiveUsers = asyncHandler(async (req, res) => {
-  // Fetch users with recent activity (limited to 10)
-  // We'll define "active" as having logged in recently or performed actions
+
+
   const recentActiveUsers = await User.find({
     lastLogin: { $exists: true, $ne: null }
   })
@@ -57,7 +57,7 @@ const getRecentActiveUsers = asyncHandler(async (req, res) => {
     .limit(10)
     .select('_id firstName lastName email lastLogin role');
 
-  // Enhance with booking and review counts
+
   const enhancedUsers = await Promise.all(
     recentActiveUsers.map(async (user) => {
       const bookingCount = await safeCountDocuments(Booking, { userId: user._id });
@@ -89,14 +89,14 @@ const getRecentActiveUsers = asyncHandler(async (req, res) => {
 const getUserActivityDetails = asyncHandler(async (req, res) => {
   const userId = req.params.id;
   
-  // Check if user exists
+
   const user = await User.findById(userId);
   if (!user) {
     res.status(404);
     throw new Error('User not found');
   }
   
-  // Get bookings
+
   const bookings = await safeFindDocuments(
     Booking, 
     { userId }, 
@@ -105,7 +105,7 @@ const getUserActivityDetails = asyncHandler(async (req, res) => {
     'hotelId'
   );
   
-  // Get reviews
+
   const reviews = await safeFindDocuments(
     Review, 
     { userId }, 
@@ -114,7 +114,7 @@ const getUserActivityDetails = asyncHandler(async (req, res) => {
     'hotelId'
   );
   
-  // Get activity logs from user
+
   const activityLogs = user.activityLogs || [];
   
   res.json({
@@ -164,25 +164,25 @@ const getUserActivityDetails = asyncHandler(async (req, res) => {
  * @access  Private/Admin
  */
 const getUserActivityStats = asyncHandler(async (req, res) => {
-  // Get current date and date 1 week ago
+
   const now = new Date();
   const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   
-  // Active users (logged in within the last month)
+
   const activeUsersCount = await User.countDocuments({
     lastLogin: { $gte: oneMonthAgo }
   });
   
-  // Total users
+
   const totalUsersCount = await User.countDocuments();
   
-  // New users in the last week
+
   const newUsersCount = await User.countDocuments({
     createdAt: { $gte: oneWeekAgo }
   });
   
-  // Users by role
+
   const usersByRole = await User.aggregate([
     {
       $group: {
@@ -199,7 +199,7 @@ const getUserActivityStats = asyncHandler(async (req, res) => {
     }
   ]);
   
-  // User engagement metrics
+
   const bookingsLastMonth = await safeCountDocuments(Booking, {
     createdAt: { $gte: oneMonthAgo }
   });
@@ -208,7 +208,7 @@ const getUserActivityStats = asyncHandler(async (req, res) => {
     createdAt: { $gte: oneMonthAgo }
   });
   
-  // Get daily new user counts for the last 30 days
+
   const dailyNewUsers = await User.aggregate([
     {
       $match: {
@@ -226,7 +226,7 @@ const getUserActivityStats = asyncHandler(async (req, res) => {
     }
   ]);
   
-  // Generate a complete date series for the last 30 days
+
   const dateMap = {};
   for (let i = 0; i < 30; i++) {
     const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
@@ -234,14 +234,14 @@ const getUserActivityStats = asyncHandler(async (req, res) => {
     dateMap[dateStr] = 0;
   }
   
-  // Fill in actual counts
+
   dailyNewUsers.forEach(day => {
     if (dateMap[day._id] !== undefined) {
       dateMap[day._id] = day.count;
     }
   });
   
-  // Convert to array for response
+
   const dailyNewUsersArray = Object.entries(dateMap).map(([date, count]) => ({
     date,
     count

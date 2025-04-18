@@ -24,7 +24,7 @@ const analyticsSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Compound index for efficient querying
+
 analyticsSchema.index({ type: 1, date: 1 });
 
 const Analytics = mongoose.model('Analytics', analyticsSchema);

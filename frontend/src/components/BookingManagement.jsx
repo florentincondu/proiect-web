@@ -20,12 +20,12 @@ const BookingsManagement = () => {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Fetch bookings on component mount and whenever filters change
+
   useEffect(() => {
     fetchBookings();
   }, [filters, sortField, sortDirection]);
   
-  // Effect pentru debugging nume utilizatori
+
   useEffect(() => {
     if (bookings.length > 0) {
       console.log('=== DEBUGGING USER NAMES ===');
@@ -52,36 +52,36 @@ const BookingsManagement = () => {
     try {
       const data = await getAllBookings(filters);
       
-      // Debug pentru a verifica datele utilizatorilor
+
       console.log('Bookings data received:', data);
       if (data.length > 0 && data[0].user) {
         console.log('Sample user data:', data[0].user);
       }
       
-      // Apply sorting
+
       const sortedData = [...data].sort((a, b) => {
         let aValue = a[sortField];
         let bValue = b[sortField];
         
-        // Handle nested properties
+
         if (sortField === 'user.name' && a.user && b.user) {
           aValue = a.user.name;
           bValue = b.user.name;
         }
         
-        // Handle date comparison
+
         if (aValue instanceof Date && bValue instanceof Date) {
           return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
         }
         
-        // Handle string comparison
+
         if (typeof aValue === 'string' && typeof bValue === 'string') {
           return sortDirection === 'asc' 
             ? aValue.localeCompare(bValue) 
             : bValue.localeCompare(aValue);
         }
         
-        // Default comparison
+
         return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
       });
       
@@ -94,13 +94,13 @@ const BookingsManagement = () => {
     }
   };
   
-  // Returns the appropriate payment status based on booking status
+
   const getMatchingPaymentStatus = (bookingStatus) => {
-    switch (bookingStatus) {
+    switch(bookingStatus) {
       case 'confirmed':
         return 'paid';
       case 'completed':
-        return 'paid';
+        return 'completed';
       case 'cancelled':
         return 'refunded';
       case 'pending':
@@ -113,16 +113,16 @@ const BookingsManagement = () => {
     setUpdateLoading(true);
     
     try {
-      // Get the corresponding payment status for this booking status
+
       const newPaymentStatus = getMatchingPaymentStatus(newStatus);
       
-      // Update both booking status and payment status
+
       await updateBookingStatus(bookingId, { 
         status: newStatus,
         paymentStatus: newPaymentStatus 
       });
       
-      // Update local state with both updated statuses
+
       setBookings(bookings.map(booking => 
         booking._id === bookingId
           ? { 
@@ -148,7 +148,7 @@ const BookingsManagement = () => {
     try {
       await deleteBooking(bookingId);
       
-      // Remove from local state
+
       setBookings(bookings.filter(booking => booking._id !== bookingId));
       setShowDeleteModal(false);
     } catch (err) {
@@ -161,10 +161,10 @@ const BookingsManagement = () => {
   
   const handleSort = (field) => {
     if (sortField === field) {
-      // Toggle direction if same field
+
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
-      // New field, set to default direction (desc)
+
       setSortField(field);
       setSortDirection('desc');
     }
@@ -197,13 +197,13 @@ const BookingsManagement = () => {
     });
   };
   
-  // Filter bookings based on search term
+
   const filteredBookings = bookings.filter(booking => {
     if (!searchTerm) return true;
     
     const searchLower = searchTerm.toLowerCase();
     
-    // Search in multiple fields
+
     return (
       (booking.user?.name && booking.user.name.toLowerCase().includes(searchLower)) ||
       (booking.user?.email && booking.user.email.toLowerCase().includes(searchLower)) ||

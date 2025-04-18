@@ -95,7 +95,7 @@ const HomePage = () => {
           const hotelsWithPrices = response.data.places.map(hotel => ({
             ...hotel,
             estimatedPrice: generateHotelPrice(hotel),
-            // Add random amenities for demo purposes
+
             amenities: {
               pool: Math.random() > 0.5,
               pets: Math.random() > 0.7,
@@ -105,14 +105,14 @@ const HomePage = () => {
             }
           }));
           
-          // Check for mock hotels in localStorage and add them to the results
+
           const mockHotels = JSON.parse(localStorage.getItem('mockHotels') || '[]');
           console.log("Found mock hotels in localStorage:", mockHotels.length);
           
-          // Only include approved hotels with status 'approved'
+
           const approvedMockHotels = mockHotels.filter(hotel => hotel.status === 'approved');
           
-          // Process mock hotels to have the same structure as API results
+
           const processedMockHotels = approvedMockHotels.map(hotel => ({
             id: hotel.id,
             displayName: {
@@ -133,11 +133,11 @@ const HomePage = () => {
             coordinates: hotel.coordinates
           }));
           
-          // Combine API results with mock hotels
+
           const combinedHotels = [...hotelsWithPrices, ...processedMockHotels];
           setPopularHotels(combinedHotels);
           
-          // Initialize current image index for each hotel
+
           const initialIndexes = {};
           combinedHotels.forEach((hotel) => {
             initialIndexes[hotel.id] = 0;
@@ -150,17 +150,17 @@ const HomePage = () => {
       } catch (error) {
         console.error('Error fetching hotels:', error);
         
-        // If API call fails, try to use mock hotels from localStorage
+
         try {
           const mockHotels = JSON.parse(localStorage.getItem('mockHotels') || '[]');
           
           if (mockHotels.length > 0) {
             console.log("API call failed. Using mock hotels from localStorage:", mockHotels.length);
             
-            // Only include approved hotels with status 'approved'
+
             const approvedMockHotels = mockHotels.filter(hotel => hotel.status === 'approved');
             
-            // Process mock hotels to have the same structure as API results
+
             const processedMockHotels = approvedMockHotels.map(hotel => ({
               id: hotel.id,
               displayName: {
@@ -183,14 +183,14 @@ const HomePage = () => {
             
             setPopularHotels(processedMockHotels);
             
-            // Initialize current image index for each hotel
+
             const initialIndexes = {};
             processedMockHotels.forEach((hotel) => {
               initialIndexes[hotel.id] = 0;
             });
             setCurrentImageIndexes(initialIndexes);
             
-            // Clear error since we have fallback data
+
             setError(null);
           } else {
             setError('Failed to fetch popular hotels. Please try again later.');
@@ -206,7 +206,7 @@ const HomePage = () => {
 
     fetchPopularHotels();
     
-    // Scroll to search on page load with animation
+
     setTimeout(() => {
       if (searchRef.current) {
         window.scrollTo({
@@ -218,21 +218,21 @@ const HomePage = () => {
   }, []);
 
   useEffect(() => {
-    // If user is admin, redirect to dashboard
+
     if (user && user.role === 'admin') {
       console.log('Admin user detected on homepage. Redirecting to dashboard.');
       navigate('/dashboard', { replace: true });
     }
   }, [user, navigate]);
 
-  // Function to generate Google Places photo URL
+
   const getPhotoUrl = (photoReference, maxWidth = 400, maxHeight = null) => {
-    // Check if this is a direct URL (from mock hotels)
+
     if (photoReference && typeof photoReference === 'string') {
       return photoReference;
     }
     
-    // For mock hotel photos with different structure
+
     if (photoReference && typeof photoReference.name === 'string' && 
         (photoReference.name.startsWith('http://') || photoReference.name.startsWith('https://'))) {
       return photoReference.name;
@@ -240,10 +240,10 @@ const HomePage = () => {
     
     if (!photoReference || !photoReference.name) return backgr;
     
-    // Use our backend proxy instead of direct Google API call
+
     let url = `http://localhost:5000/api/places/media/${encodeURIComponent(photoReference.name)}?`;
     
-    // Add dimension parameters
+
     if (maxWidth) {
       url += `maxWidthPx=${maxWidth}`;
     }
@@ -255,7 +255,7 @@ const HomePage = () => {
     return url;
   };
 
-  // Function to navigate through hotel images
+
   const navigateImage = (hotelId, direction, event) => {
     if (event) {
     event.stopPropagation(); // Prevent triggering hotel click
@@ -283,27 +283,27 @@ const HomePage = () => {
     e.preventDefault();
     const query = searchQuery.trim();
     
-    // Form validation
+
     if (!query) {
       setError('Please enter a location to search');
           return;
         }
 
-    // Clear previous errors and show loading
+
     setError(null);
     setLoading(true);
     
     try {
       console.log(`Starting search for: "${query}"`);
       
-      // Construct a better search query
+
       const formattedQuery = query.toLowerCase().includes('hotel') 
         ? query  // If query already contains "hotel", use it as-is
         : `hotels in ${query}`; // Otherwise, add "hotels in" prefix
       
       console.log(`Using formatted query: "${formattedQuery}"`);
       
-      // Search for places using the Google Places searchText API
+
       const response = await axios.post(
           `${API_BASE_URL}/api/places/search-text`,
           {
@@ -320,7 +320,7 @@ const HomePage = () => {
       console.log(`Search complete. Found ${response.data.places?.length || 0} results`);
 
       if (response.data.places && response.data.places.length > 0) {
-        // Process the hotels data
+
         const processedHotels = response.data.places.map(hotel => ({
           ...hotel,
           estimatedPrice: generateHotelPrice(hotel),
@@ -333,16 +333,16 @@ const HomePage = () => {
           }
         }));
 
-        // Store results in sessionStorage
+
         sessionStorage.setItem('searchResults', JSON.stringify(processedHotels));
         sessionStorage.setItem('searchQuery', query);
         
         console.log(`Stored ${processedHotels.length} hotels in sessionStorage`);
         
-        // Clear search query to prevent re-renders on homepage
+
         setSearchQuery('');
         
-        // Then navigate to the results page
+
           navigate('/search-results', {
             state: {
               searchQuery: query,
@@ -422,7 +422,7 @@ const HomePage = () => {
     }
     
     if (!isAuthenticated) {
-      // Redirect to login page with return URL if user is not authenticated
+
       navigate('/login', { 
         state: { 
           returnUrl: `/reserve/${hotelId}`,
@@ -432,18 +432,18 @@ const HomePage = () => {
       return;
     }
     
-    // If authenticated, navigate to reservation page
+
     navigate(`/reserve/${hotelId}`);
   };
 
   const filteredHotels = popularHotels
     .filter(hotel => {
-      // Filter by minimum rating
+
       if (selectedRating > 0 && (!hotel.rating || hotel.rating < selectedRating)) {
         return false;
       }
       
-      // Filter by amenities
+
       if (activeFilters.length > 0) {
         return activeFilters.every(filter => hotel.amenities && hotel.amenities[filter]);
       }
@@ -451,11 +451,11 @@ const HomePage = () => {
       return true;
     })
     .filter(hotel => {
-      // Filter by price range
+
       return hotel.estimatedPrice >= priceRange[0] && hotel.estimatedPrice <= priceRange[1];
     });
 
-  // Prepare animation variants
+
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },

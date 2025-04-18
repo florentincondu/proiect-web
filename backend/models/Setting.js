@@ -31,7 +31,7 @@ const settingSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Static methods for common operations
+
 settingSchema.statics.getSetting = async function(key, defaultValue = null) {
   const setting = await this.findOne({ key });
   return setting ? setting.value : defaultValue;
@@ -62,7 +62,7 @@ settingSchema.statics.getPublicSettings = async function() {
   return this.find({ isPublic: true });
 };
 
-// Method to get all settings (admin only)
+
 settingSchema.statics.getAllSettings = async function() {
   const settings = await this.find();
   return settings.reduce((acc, setting) => {

@@ -13,7 +13,7 @@ exports.generateInvoice = async (payment) => {
     throw new Error('Payment data is required to generate invoice');
   }
   
-  // Format payment data for invoice
+
   const formattedInvoice = {
     invoiceNumber: payment.invoiceNumber,
     transactionId: payment.transactionId || 'N/A',
@@ -40,7 +40,7 @@ exports.generateInvoice = async (payment) => {
     notes: payment.notes || ''
   };
   
-  // Add booking information if available
+
   if (payment.booking) {
     formattedInvoice.booking = {
       id: payment.booking._id,
@@ -62,11 +62,11 @@ exports.generateInvoice = async (payment) => {
  * @returns {Buffer} PDF buffer data
  */
 exports.generateInvoicePdf = async (payment) => {
-  // In a real implementation, this would use a PDF library like PDFKit
-  // For now, just return a placeholder message
+
+
   console.log(`Invoice PDF generation would happen here for payment ${payment._id}`);
   
-  // Return a placeholder
+
   return {
     success: true,
     message: 'Invoice PDF generation functionality will be implemented in the future',

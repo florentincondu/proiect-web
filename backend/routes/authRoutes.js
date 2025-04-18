@@ -16,7 +16,7 @@ const {
 const { protect, admin } = require('../middleware/authMiddleware');
 const profileRoutes = require('./profileRoutes');
 
-// Auth routes
+
 router.post('/register', register);
 router.post('/login', login);
 router.get('/verify-admin', verifyAdmin);
@@ -27,15 +27,15 @@ router.post('/forgot-password', forgotPassword);
 router.post('/reset-password-with-token', resetPasswordWithToken);
 router.post('/change-password', protect, changePassword);
 
-// Test route - only for development
+
 if (process.env.NODE_ENV !== 'production') {
   router.post('/test-email', testEmail);
 }
 
-// Use profile routes
+
 router.use('/', profileRoutes);
 
-// Protected routes
+
 router.get('/profile', protect, getProfile);
 
 module.exports = router;

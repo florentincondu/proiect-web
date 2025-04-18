@@ -2,7 +2,6 @@ const User = require('../models/User');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 
-// Configure email transporter
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST || 'smtp.gmail.com',
   port: process.env.EMAIL_PORT || 587,
@@ -16,11 +15,8 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Store pending admin verifications with their codes (in-memory for simplicity)
-// In production, consider using a database collection for this
 const pendingAdminVerifications = new Map();
 
-// Function to send email
 const sendEmail = async (mailOptions) => {
   try {
     return await transporter.sendMail(mailOptions);
@@ -30,21 +26,21 @@ const sendEmail = async (mailOptions) => {
   }
 };
 
-// Request admin access
+
 exports.requestAdminAccess = async (req, res) => {
   try {
-    // Allow registration with either userId or direct user registration data
+
     const { userId, email } = req.body;
     let user;
 
     if (userId) {
-      // Find existing user by ID
+
       user = await User.findById(userId);
       if (!user) {
         return res.status(404).json({ message: 'User not found' });
       }
     } else if (email) {
-      // Find user by email - this handles the case of a user registering as admin
+
       user = await User.findOne({ email });
       if (!user) {
         return res.status(404).json({ message: 'User not found with this email' });
@@ -55,10 +51,10 @@ exports.requestAdminAccess = async (req, res) => {
 
     console.log(`Processing admin request for user: ${user.email}`);
 
-    // Generate request token
+
     const requestToken = crypto.randomBytes(32).toString('hex');
     
-    // Update user
+
     user.adminRequested = true;
     user.adminVerificationToken = requestToken;
     user.adminVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
@@ -66,7 +62,7 @@ exports.requestAdminAccess = async (req, res) => {
     await user.save();
     console.log(`Updated user with admin request token: ${requestToken}`);
 
-    // Send notification to admin email
+
     const approveUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/approve?token=${requestToken}`;
     const rejectUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/reject?token=${requestToken}`;
     
@@ -94,7 +90,7 @@ exports.requestAdminAccess = async (req, res) => {
       console.log(`Sent admin request notification to condurflorentin@gmail.com`);
     } catch (emailError) {
       console.error('Failed to send admin notification email:', emailError);
-      // Continue with the process even if email fails
+
     }
 
     res.status(200).json({ 
@@ -109,16 +105,16 @@ exports.requestAdminAccess = async (req, res) => {
   }
 };
 
-// Approve admin request
+
 exports.approveAdminRequest = async (req, res) => {
   try {
-    // Support both token and email parameters
+
     const token = req.query.token;
     const email = req.query.email;
     
     console.log(`Processing admin approval request with token: ${token}, email: ${email}`);
 
-    // Find user by verification token or email
+
     let user;
     
     if (token) {
@@ -128,7 +124,7 @@ exports.approveAdminRequest = async (req, res) => {
       });
     } 
     
-    // If no user found by token but email is provided, try to find by email
+
     if (!user && email) {
       user = await User.findOne({ 
         email: email,
@@ -143,11 +139,11 @@ exports.approveAdminRequest = async (req, res) => {
 
     console.log(`Found user for approval: ${user.email}`);
 
-    // Generate verification code
+
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     console.log(`Generated verification code: ${verificationCode} for user: ${user.email}`);
     
-    // Store verification code - use user's token if we found them by email
+
     const userToken = token || user.adminVerificationToken;
     
     pendingAdminVerifications.set(userToken, {
@@ -159,12 +155,12 @@ exports.approveAdminRequest = async (req, res) => {
 
     console.log(`Stored verification details in memory for token: ${userToken}`);
     
-    // Mark user as approved
+
     user.adminApproved = true;
     await user.save();
     console.log(`User ${user.email} marked as approved`);
 
-    // Send verification code to user
+
     try {
       const emailResult = await sendEmail({
         from: process.env.EMAIL_USER,
@@ -187,10 +183,10 @@ exports.approveAdminRequest = async (req, res) => {
       console.log(`Verification email sent to ${user.email}`, emailResult);
     } catch (emailError) {
       console.error('Failed to send verification email:', emailError);
-      // Continue with the response even if email fails
+
     }
 
-    // Return JSON response with the necessary data for the confirmation page
+
     res.status(200).json({
       success: true,
       message: `Admin access approved for ${user.email}. A verification code has been sent to the user.`,
@@ -203,16 +199,16 @@ exports.approveAdminRequest = async (req, res) => {
   }
 };
 
-// Reject admin request
+
 exports.rejectAdminRequest = async (req, res) => {
   try {
-    // Support both token and email parameters
+
     const token = req.query.token;
     const email = req.query.email;
     
     console.log(`Processing admin rejection request with token: ${token}, email: ${email}`);
 
-    // Find user by verification token or email
+
     let user;
     
     if (token) {
@@ -222,7 +218,7 @@ exports.rejectAdminRequest = async (req, res) => {
       });
     } 
     
-    // If no user found by token but email is provided, try to find by email
+
     if (!user && email) {
       user = await User.findOne({ 
         email: email,
@@ -237,7 +233,7 @@ exports.rejectAdminRequest = async (req, res) => {
 
     console.log(`Found user for rejection: ${user.email}`);
 
-    // Update user
+
     user.adminRequested = false;
     user.adminApproved = false;
     user.adminVerificationToken = undefined;
@@ -246,7 +242,7 @@ exports.rejectAdminRequest = async (req, res) => {
     await user.save();
     console.log(`User ${user.email} rejected for admin access`);
 
-    // Send rejection email to user
+
     try {
       const emailResult = await sendEmail({
         from: process.env.EMAIL_USER,
@@ -263,10 +259,10 @@ exports.rejectAdminRequest = async (req, res) => {
       console.log(`Rejection email sent to ${user.email}`, emailResult);
     } catch (emailError) {
       console.error('Failed to send rejection email:', emailError);
-      // Continue with the response even if email fails
+
     }
 
-    // Return JSON response with the necessary data for the confirmation page
+
     res.status(200).json({
       success: true,
       message: `Admin access rejected for ${user.email}. A notification has been sent to the user.`,
@@ -279,21 +275,21 @@ exports.rejectAdminRequest = async (req, res) => {
   }
 };
 
-// Verify admin code
+
 exports.verifyAdminCode = async (req, res) => {
   try {
     const { token, code, email } = req.body;
     console.log(`Verifying admin code: ${code} for token: ${token}, email: ${email || 'not provided'}`);
 
-    // Check if verification exists for the token
+
     let verification = null;
     let user = null;
     
-    // First try to find by token
+
     if (token) {
       verification = pendingAdminVerifications.get(token);
       
-      // If no verification found but we have token, try to find user by token
+
       if (!verification) {
         user = await User.findOne({ 
           adminVerificationToken: token,
@@ -302,11 +298,11 @@ exports.verifyAdminCode = async (req, res) => {
       }
     }
     
-    // If no verification found by token but email is provided, try to find by email
+
     if (!verification && email) {
       console.log(`No verification found for token: ${token}, trying to find by email: ${email}`);
       
-      // Find user by email if not already found
+
       if (!user) {
         user = await User.findOne({ 
           email: email, 
@@ -316,16 +312,16 @@ exports.verifyAdminCode = async (req, res) => {
       
       if (user && user.adminVerificationToken) {
         console.log(`Found user with email: ${email}, checking for verification with token: ${user.adminVerificationToken}`);
-        // Try to get verification with the user's token
+
         verification = pendingAdminVerifications.get(user.adminVerificationToken);
       }
     }
     
     console.log('Verification data:', verification);
     
-    // If no verification found, try to find any pending verification for this user
+
     if (!verification && user) {
-      // Search through all pending verifications for this user's email
+
       for (const [verifToken, verifData] of pendingAdminVerifications.entries()) {
         if (verifData.email === user.email) {
           verification = verifData;
@@ -335,13 +331,13 @@ exports.verifyAdminCode = async (req, res) => {
       }
     }
     
-    // Check if verification exists and is valid
+
     if (!verification || verification.expiresAt < new Date()) {
       console.log('Invalid or expired verification');
       return res.status(400).json({ message: 'Invalid or expired verification code. Please request a new code.' });
     }
 
-    // Check if code matches
+
     if (verification.code !== code) {
       console.log(`Code mismatch. Expected: ${verification.code}, Received: ${code}`);
       return res.status(400).json({ message: 'Invalid verification code. Please try again.' });
@@ -349,7 +345,7 @@ exports.verifyAdminCode = async (req, res) => {
 
     console.log('Verification code matched successfully');
 
-    // Find user if not already found
+
     if (!user) {
       user = await User.findById(verification.userId);
     }
@@ -361,7 +357,7 @@ exports.verifyAdminCode = async (req, res) => {
 
     console.log(`Updating user ${user.email} to admin role`);
 
-    // Update user as admin
+
     user.role = 'admin';
     user.adminRequested = false;
     user.adminVerified = true;
@@ -372,7 +368,7 @@ exports.verifyAdminCode = async (req, res) => {
     await user.save();
     console.log(`User ${user.email} updated successfully as admin`);
 
-    // Remove verification from map for both token and user token if different
+
     if (token) {
       pendingAdminVerifications.delete(token);
     }
@@ -381,7 +377,7 @@ exports.verifyAdminCode = async (req, res) => {
     }
     console.log(`Removed verification for token: ${token}`);
 
-    // Generate JWT token for login
+
     const jwt = require('jsonwebtoken');
     const authToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
     console.log('Generated new auth token for user');
@@ -405,12 +401,12 @@ exports.verifyAdminCode = async (req, res) => {
   }
 };
 
-// Get admin verification status
+
 exports.getAdminVerificationStatus = async (req, res) => {
   try {
     const { token } = req.query;
 
-    // Find user by verification token
+
     const user = await User.findOne({ 
       adminVerificationToken: token
     });
@@ -419,7 +415,7 @@ exports.getAdminVerificationStatus = async (req, res) => {
       return res.status(404).json({ message: 'Invalid token or user not found' });
     }
 
-    // Check if verification code exists
+
     const verificationExists = pendingAdminVerifications.has(token);
 
     res.status(200).json({
@@ -435,17 +431,17 @@ exports.getAdminVerificationStatus = async (req, res) => {
   }
 };
 
-// Resend verification code
+
 exports.resendVerificationCode = async (req, res) => {
   try {
     const { token, email } = req.body;
     
-    // Must have either token or email
+
     if (!token && !email) {
       return res.status(400).json({ message: 'Either token or email is required' });
     }
     
-    // Find user by token or email
+
     let user;
     if (token) {
       user = await User.findOne({
@@ -463,31 +459,31 @@ exports.resendVerificationCode = async (req, res) => {
       return res.status(404).json({ message: 'User not found or verification expired' });
     }
     
-    // Check if there's already a verification code for this user
+
     let existingVerification = null;
     if (user.adminVerificationToken) {
       existingVerification = pendingAdminVerifications.get(user.adminVerificationToken);
     }
     
-    // If there's a valid existing code, just resend the same code
+
     let verificationCode;
     if (existingVerification && existingVerification.expiresAt > new Date()) {
       verificationCode = existingVerification.code;
       console.log(`Reusing existing verification code: ${verificationCode} for user: ${user.email}`);
     } else {
-      // Generate a new verification code
+
       verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
       console.log(`Generated new verification code: ${verificationCode} for user: ${user.email}`);
     }
     
-    // Ensure user has a verification token
+
     if (!user.adminVerificationToken) {
       user.adminVerificationToken = crypto.randomBytes(32).toString('hex');
       user.adminVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
       await user.save();
     }
     
-    // Store or update verification code
+
     pendingAdminVerifications.set(user.adminVerificationToken, {
       userId: user._id,
       email: user.email,
@@ -497,7 +493,7 @@ exports.resendVerificationCode = async (req, res) => {
     
     console.log(`Stored verification code for token: ${user.adminVerificationToken}`);
     
-    // Send verification code to user
+
     try {
       const emailResult = await sendEmail({
         from: process.env.EMAIL_USER,

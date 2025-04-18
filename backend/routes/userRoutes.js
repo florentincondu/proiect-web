@@ -4,7 +4,7 @@ const User = require('../models/User');
 const { protect, admin } = require('../middleware/authMiddleware');
 const Booking = require('../models/Booking');
 
-// Get user profile (enhanced with more details)
+
 router.get('/profile', protect, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
@@ -36,7 +36,7 @@ router.get('/profile', protect, async (req, res) => {
   }
 });
 
-// Update user profile
+
 router.put('/profile', protect, async (req, res) => {
   try {
     const {
@@ -50,7 +50,7 @@ router.put('/profile', protect, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Update fields if provided
+
     user.name = name || user.name;
     user.email = email || user.email;
     user.phone = phone || user.phone;
@@ -71,7 +71,7 @@ router.put('/profile', protect, async (req, res) => {
   }
 });
 
-// Get available subscription plans
+
 router.get('/subscriptions/plans', async (req, res) => {
   try {
     const plans = {
@@ -117,7 +117,7 @@ router.get('/subscriptions/plans', async (req, res) => {
   }
 });
 
-// Change subscription
+
 router.post('/subscriptions/change', protect, async (req, res) => {
   try {
     const { subscription, duration } = req.body;
@@ -210,7 +210,7 @@ router.post('/subscriptions/change', protect, async (req, res) => {
   }
 });
 
-// Update security settings
+
 router.put('/security', protect, async (req, res) => {
   try {
     const { twoFactorEnabled, emailNotifications } = req.body;
@@ -230,25 +230,25 @@ router.put('/security', protect, async (req, res) => {
   }
 });
 
-// Endpoint for admin to get user bookings
+
 router.get('/admin/users/:id/bookings', protect, admin, async (req, res) => {
   try {
     const userId = req.params.id;
     
-    // Find the user
+
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
     
-    // Find all bookings for this user
+
     const bookings = await Booking.find({ user: userId })
       .populate('hotel', 'name location images')
       .populate('room', 'name type price')
       .sort({ createdAt: -1 })
       .lean();
     
-    // Format bookings for display
+
     const formattedBookings = bookings.map(booking => ({
       id: booking._id,
       service: booking.hotel ? `${booking.hotel.name} - ${booking.room.type}` : 'Hotel Booking',

@@ -8,12 +8,12 @@ const asyncHandler = require('express-async-handler');
  */
 const getUserNotifications = asyncHandler(async (req, res) => {
   try {
-    // Get user id from authenticated user
+
     const userId = req.user._id;
     
     console.log(`Fetching notifications for user: ${userId}`);
     
-    // Get all notifications for this user, newest first
+
     const notifications = await Notification.find({ userId })
       .sort({ createdAt: -1 })
       .limit(50); // Limit to 50 most recent
@@ -36,14 +36,14 @@ const createNotification = asyncHandler(async (req, res) => {
   try {
     const { userId, type, title, message, referenceId, referenceModel } = req.body;
     
-    // Validate required fields
+
     if (!userId || !title || !message) {
       return res.status(400).json({ message: 'Missing required fields (userId, title, message)' });
     }
     
     console.log(`Creating notification for user: ${userId}, type: ${type}`);
     
-    // Create notification
+
     const notification = await Notification.createNotification({
       userId,
       type,
@@ -74,7 +74,7 @@ const markAsRead = asyncHandler(async (req, res) => {
     
     console.log(`Marking notification ${id} as read for user: ${userId}`);
     
-    // Find the notification and ensure it belongs to the current user
+
     const notification = await Notification.findOne({ _id: id, userId });
     
     if (!notification) {
@@ -82,7 +82,7 @@ const markAsRead = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: 'Notification not found' });
     }
     
-    // Mark as read
+
     notification.read = true;
     await notification.save();
     
@@ -106,7 +106,7 @@ const markAllAsRead = asyncHandler(async (req, res) => {
     
     console.log(`Marking all notifications as read for user: ${userId}`);
     
-    // Mark all unread notifications as read
+
     const result = await Notification.markAllAsRead(userId);
     
     console.log(`Marked ${result.modifiedCount} notifications as read for user: ${userId}`);
@@ -133,7 +133,7 @@ const deleteNotification = asyncHandler(async (req, res) => {
     
     console.log(`Deleting notification ${id} for user: ${userId}`);
     
-    // Find and delete the notification, ensuring it belongs to the current user
+
     const notification = await Notification.findOneAndDelete({ _id: id, userId });
     
     if (!notification) {
@@ -166,10 +166,10 @@ const createBookingNotification = async (booking, user, action = 'confirmed') =>
       return false;
     }
     
-    // Extract hotel name from the booking
+
     const hotelName = booking.hotel?.name || booking.hotelName || 'Hotel';
     
-    // Create different messages based on action
+
     let title, message;
     
     switch (action) {
@@ -221,7 +221,7 @@ const createSupportResponseNotification = async (ticket, user) => {
   try {
     console.log(`Creating support response notification for user: ${user._id}, ticket: ${ticket._id}`);
     
-    // Extract subject from ticket or use default
+
     const subject = ticket.subject || 'your support request';
     
     const notification = await Notification.createNotification({
@@ -253,13 +253,13 @@ const generateTestNotification = asyncHandler(async (req, res) => {
     
     console.log(`Generating test notification for user: ${userId}, type: ${type}`);
     
-    // Check if Notification model is available
+
     if (!Notification) {
       console.error('Notification model not available');
       return res.status(500).json({ message: 'Notification model not available' });
     }
     
-    // Create a test notification based on the type
+
     let title, message;
     if (type === 'booking') {
       title = 'Test Booking Notification';
@@ -272,7 +272,7 @@ const generateTestNotification = asyncHandler(async (req, res) => {
       message = 'This is a test system notification.';
     }
     
-    // Create notification
+
     const notification = new Notification({
       userId,
       type,

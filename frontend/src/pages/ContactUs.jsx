@@ -1,4 +1,4 @@
-// src/components/ContactUs.js
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -22,18 +22,18 @@ import '../styles/ContactUs.css';
 
 const ContactUs = () => {
   const navigate = useNavigate();
-  // State pentru a gestiona secțiunea FAQ activă
+
   const [activeSection, setActiveSection] = useState('bookings');
-  // State pentru a gestiona FAQ-urile expandate
+
   const [expandedFaq, setExpandedFaq] = useState(null);
 
-  // Funcție pentru a schimba secțiunea activă
+
   const changeSection = (section) => {
     setActiveSection(section);
     setExpandedFaq(null); // Reset expanded FAQ when changing section
   };
 
-  // Funcție pentru a gestiona expandarea/colapsarea FAQ-urilor
+
   const toggleFaq = (index) => {
     if (expandedFaq === index) {
       setExpandedFaq(null);
@@ -42,12 +42,12 @@ const ContactUs = () => {
     }
   };
 
-  // Funcție pentru a naviga înapoi la pagina principală
+
   const goBackToHome = () => {
     navigate('/');
   };
 
-  // FAQ-uri organizate pe secțiuni
+
   const faqSections = {
     bookings: {
       icon: <FaCalendarAlt className="text-blue-400" />,

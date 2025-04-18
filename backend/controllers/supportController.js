@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { createSupportResponseNotification } = require('./notificationController');
 
-// Mock support tickets data
+
 const supportTickets = [
   {
     _id: '1',
@@ -58,14 +58,14 @@ const supportTickets = [
   }
 ];
 
-// Get all support tickets (admin only)
+
 exports.getAllTickets = async (req, res) => {
   try {
     const { status, priority, category, page = 1, limit = 10 } = req.query;
     
     console.log('Support tickets requested with filters:', { status, priority, category, page, limit });
     
-    // Build query for filtering
+
     const query = {};
     
     if (status && status !== 'all') {
@@ -80,10 +80,10 @@ exports.getAllTickets = async (req, res) => {
       query.category = category;
     }
     
-    // Calculate pagination values
+
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
-    // Fetch tickets from database with filtering and pagination
+
     const tickets = await SupportTicket.find(query)
       .populate('userId', 'firstName lastName email')
       .sort({ updatedAt: -1 })
@@ -91,12 +91,12 @@ exports.getAllTickets = async (req, res) => {
       .limit(parseInt(limit))
       .lean();
     
-    // Get total count for pagination
+
     const total = await SupportTicket.countDocuments(query);
     
     console.log('Found tickets in database:', tickets.length);
     
-    // If no tickets found in the database, return an empty array
+
     if (tickets.length === 0) {
       return res.json({
         tickets: [],
@@ -109,7 +109,7 @@ exports.getAllTickets = async (req, res) => {
       });
     }
     
-    // Format tickets for response
+
     const formattedTickets = tickets.map(ticket => ({
       _id: ticket._id,
       subject: ticket.title || ticket.subject,
@@ -130,7 +130,7 @@ exports.getAllTickets = async (req, res) => {
     
     console.log('Returning real support tickets, count:', formattedTickets.length);
     
-    // Return real tickets with pagination
+
     res.json({
       tickets: formattedTickets,
       pagination: {
@@ -146,7 +146,7 @@ exports.getAllTickets = async (req, res) => {
   }
 };
 
-// Get all user tickets
+
 exports.getUserTickets = async (req, res) => {
   try {
     const { page = 1, limit = 10, status } = req.query;
@@ -154,29 +154,29 @@ exports.getUserTickets = async (req, res) => {
     
     console.log('User tickets requested for user ID:', userId);
     
-    // Build query for filtering
+
     const query = { userId };
     
     if (status && status !== 'all') {
       query.status = status;
     }
     
-    // Calculate pagination values
+
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
-    // Fetch tickets from database
+
     const tickets = await SupportTicket.find(query)
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
       .lean();
     
-    // Get total count for pagination
+
     const total = await SupportTicket.countDocuments(query);
     
     console.log('Found user tickets in database:', tickets.length);
     
-    // Format tickets for response
+
     const formattedTickets = tickets.map(ticket => ({
       _id: ticket._id,
       subject: ticket.title,
@@ -209,14 +209,14 @@ exports.getUserTickets = async (req, res) => {
   }
 };
 
-// Get ticket by ID
+
 exports.getTicketById = async (req, res) => {
   try {
     const { id } = req.params;
     
     console.log('Support ticket requested by ID:', id);
     
-    // Fetch ticket from database 
+
     const ticket = await SupportTicket.findById(id)
       .populate('userId', 'firstName lastName email')
       .populate('assignedTo', 'firstName lastName email role')
@@ -226,7 +226,7 @@ exports.getTicketById = async (req, res) => {
       return res.status(404).json({ message: 'Ticket not found' });
     }
     
-    // Check if user is authorized to view this ticket
+
     if (!req.user.isAdmin && ticket.userId._id.toString() !== req.user._id.toString()) {
       SystemLog.logWarning('Unauthorized ticket access attempt', 'supportController', {
         ticketId: id,
@@ -235,7 +235,7 @@ exports.getTicketById = async (req, res) => {
       return res.status(403).json({ message: 'You are not authorized to view this ticket' });
     }
     
-    // Format ticket for response
+
     const formattedTicket = {
       _id: ticket._id,
       subject: ticket.title,
@@ -276,19 +276,19 @@ exports.getTicketById = async (req, res) => {
   }
 };
 
-// Create a new support ticket
+
 exports.createTicket = async (req, res) => {
   try {
     const { subject, description, category, priority = 'medium', attachments = [] } = req.body;
     
-    // Check for required fields
+
     if (!subject || !description || !category) {
       return res.status(400).json({ message: 'Subject, description, and category are required' });
     }
     
     console.log('Support ticket creation requested:', { subject, category, priority });
     
-    // Create initial message from description
+
     const initialMessage = {
       sender: req.user._id,
       senderRole: 'user',
@@ -296,7 +296,7 @@ exports.createTicket = async (req, res) => {
       readBy: [req.user._id]
     };
     
-    // Create new ticket in database
+
     const newTicket = await SupportTicket.create({
       title: subject,
       description,
@@ -308,7 +308,7 @@ exports.createTicket = async (req, res) => {
       attachments
     });
     
-    // Log ticket creation
+
     SystemLog.logInfo('Support ticket created', 'supportController', {
       ticketId: newTicket._id,
       userId: req.user._id,
@@ -318,7 +318,7 @@ exports.createTicket = async (req, res) => {
     
     console.log('Created new support ticket with ID:', newTicket._id);
     
-    // Format ticket for response
+
     const formattedTicket = {
       _id: newTicket._id,
       subject: newTicket.title,
@@ -347,7 +347,7 @@ exports.createTicket = async (req, res) => {
   }
 };
 
-// Update ticket status (admin only)
+
 exports.updateTicketStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -359,30 +359,30 @@ exports.updateTicketStatus = async (req, res) => {
     
     console.log('Support ticket status update requested for ID:', id, 'New status:', status);
     
-    // Find the ticket in database
+
     const ticket = await SupportTicket.findById(id);
     
     if (!ticket) {
       return res.status(404).json({ message: 'Ticket not found' });
     }
     
-    // Update ticket status
+
     ticket.status = status;
     
-    // Add system message about status change
+
     ticket.messages.push({
       sender: req.user._id,
       senderRole: 'system',
       content: `Ticket status changed to ${status} by ${req.user.firstName} ${req.user.lastName}`
     });
     
-    // Update assignedTo if provided
+
     if (assignedTo) {
-      // If assigning to a different admin
+
       if (!ticket.assignedTo || ticket.assignedTo.toString() !== assignedTo) {
         ticket.assignedTo = assignedTo;
         
-        // Add system message about assignment
+
         ticket.messages.push({
           sender: req.user._id,
           senderRole: 'system',
@@ -391,10 +391,10 @@ exports.updateTicketStatus = async (req, res) => {
       }
     }
     
-    // Save the updated ticket
+
     await ticket.save();
     
-    // Log ticket status update
+
     SystemLog.logInfo(`Support ticket status updated to ${status}`, 'supportController', {
       ticketId: ticket._id,
       previousStatus: ticket.status,
@@ -422,7 +422,7 @@ exports.updateTicketStatus = async (req, res) => {
   }
 };
 
-// Archive ticket
+
 exports.archiveTicket = async (req, res) => {
   try {
     const ticket = await SupportTicket.findById(req.params.id);
@@ -433,7 +433,7 @@ exports.archiveTicket = async (req, res) => {
     ticket.isArchived = true;
     await ticket.save();
     
-    // Log ticket archival
+
     SystemLog.logInfo('Support ticket archived', 'supportController', {
       ticketId: ticket._id,
       archivedBy: req.user._id
@@ -450,36 +450,36 @@ exports.archiveTicket = async (req, res) => {
   }
 };
 
-// Get ticket statistics (admin only)
+
 exports.getTicketStats = async (req, res) => {
   try {
     console.log('Ticket statistics requested');
     
-    // Get tickets by status
+
     const byStatus = await SupportTicket.aggregate([
       { $group: { _id: '$status', count: { $sum: 1 } } },
       { $sort: { _id: 1 } }
     ]);
     
-    // Get tickets by priority
+
     const byPriority = await SupportTicket.aggregate([
       { $group: { _id: '$priority', count: { $sum: 1 } } },
       { $sort: { _id: 1 } }
     ]);
     
-    // Get tickets by category
+
     const byCategory = await SupportTicket.aggregate([
       { $group: { _id: '$category', count: { $sum: 1 } } },
       { $sort: { _id: 1 } }
     ]);
     
-    // Calculate response times
+
     const responseTimeStats = await SupportTicket.aggregate([
-      // Filter only tickets with messages
+
       { $match: { 'messages.1': { $exists: true } } },
-      // Unwind the messages array
+
       { $unwind: '$messages' },
-      // Group by ticket ID
+
       {
         $group: {
           _id: '$_id',
@@ -491,9 +491,9 @@ exports.getTicketStats = async (req, res) => {
           ] } }
         }
       },
-      // Filter only tickets with admin responses
+
       { $match: { responseTime: { $ne: null } } },
-      // Calculate response time in hours
+
       {
         $project: {
           responseTimeHours: {
@@ -504,7 +504,7 @@ exports.getTicketStats = async (req, res) => {
           }
         }
       },
-      // Calculate statistics
+
       {
         $group: {
           _id: null,
@@ -515,11 +515,11 @@ exports.getTicketStats = async (req, res) => {
       }
     ]);
     
-    // Get tickets created/closed over time (last 6 months)
+
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     
-    // Group tickets by month
+
     const ticketsOverTime = await SupportTicket.aggregate([
       {
         $match: {
@@ -564,7 +564,7 @@ exports.getTicketStats = async (req, res) => {
       { $sort: { date: 1 } }
     ]);
     
-    // Calculate additional metrics
+
     const totalTickets = await SupportTicket.countDocuments();
     const resolvedTickets = await SupportTicket.countDocuments({ status: 'resolved' });
     const closedTickets = await SupportTicket.countDocuments({ status: 'closed' });
@@ -576,7 +576,7 @@ exports.getTicketStats = async (req, res) => {
       slowest: 0
     };
     
-    // Compile statistics
+
     const stats = {
       byStatus,
       byPriority,
@@ -604,14 +604,14 @@ exports.getTicketStats = async (req, res) => {
   }
 };
 
-// Get system logs (admin only)
+
 exports.getSystemLogs = async (req, res) => {
   try {
     const { level, module, startDate, endDate, page = 1, limit = 20 } = req.query;
     
     console.log('System logs requested with filters:', { level, module, startDate, endDate, page, limit });
     
-    // Mock logs data
+
     const mockLogs = Array.from({ length: 50 }, (_, i) => ({
       _id: (50 - i).toString(),
       level: ['info', 'warning', 'error'][Math.floor(Math.random() * 3)],
@@ -621,7 +621,7 @@ exports.getSystemLogs = async (req, res) => {
       details: { ip: '192.168.1.1', browser: 'Chrome', os: 'Windows' }
     }));
     
-    // Apply filters (simple mock filtering)
+
     let filteredLogs = [...mockLogs];
     
     if (level) {
@@ -640,14 +640,14 @@ exports.getSystemLogs = async (req, res) => {
       );
     }
     
-    // Mock pagination
+
     const startIndex = (parseInt(page) - 1) * parseInt(limit);
     const endIndex = startIndex + parseInt(limit);
     const paginatedLogs = filteredLogs.slice(startIndex, endIndex);
     
     console.log('Returning mock system logs, count:', paginatedLogs.length);
     
-    // Return mock paginated results
+
     res.json({
       logs: paginatedLogs,
       pagination: {
@@ -663,12 +663,12 @@ exports.getSystemLogs = async (req, res) => {
   }
 };
 
-// Check system maintenance status
+
 exports.getMaintenanceStatus = async (req, res) => {
   try {
     console.log('Maintenance status requested');
     
-    // Try to get maintenance mode setting from database
+
     let maintenanceMode = false;
     
     try {
@@ -678,10 +678,10 @@ exports.getMaintenanceStatus = async (req, res) => {
       }
     } catch (dbError) {
       console.error('Error fetching maintenance mode from database:', dbError);
-      // Continue with default false value
+
     }
     
-    // Simple response format matching what frontend expects
+
     const maintenanceStatus = {
       maintenanceMode: maintenanceMode
     };
@@ -694,12 +694,12 @@ exports.getMaintenanceStatus = async (req, res) => {
   }
 };
 
-// Toggle maintenance mode
+
 exports.toggleMaintenanceMode = async (req, res) => {
   try {
     const { enabled } = req.body;
     
-    // Update maintenance mode setting
+
     await Setting.setSetting('system.maintenanceMode', enabled, {
       group: 'system',
       description: 'Maintenance mode status',
@@ -707,7 +707,7 @@ exports.toggleMaintenanceMode = async (req, res) => {
       lastUpdatedBy: req.user._id
     });
     
-    // Log maintenance mode change
+
     SystemLog.logInfo(`Maintenance mode ${enabled ? 'enabled' : 'disabled'}`, 'supportController', {
       userId: req.user._id
     });
@@ -723,7 +723,7 @@ exports.toggleMaintenanceMode = async (req, res) => {
   }
 };
 
-// Add message to ticket
+
 exports.addMessageToTicket = async (req, res) => {
   try {
     const { id } = req.params;
@@ -735,14 +735,14 @@ exports.addMessageToTicket = async (req, res) => {
     
     console.log('Message being added to ticket ID:', id);
     
-    // Find the ticket
+
     const ticket = await SupportTicket.findById(id);
     
     if (!ticket) {
       return res.status(404).json({ message: 'Ticket not found' });
     }
     
-    // Check authorization - only ticket owner or admin can add messages
+
     if (!req.user.isAdmin && ticket.userId.toString() !== req.user._id.toString()) {
       SystemLog.logWarning('Unauthorized message add attempt', 'supportController', {
         ticketId: id,
@@ -751,7 +751,7 @@ exports.addMessageToTicket = async (req, res) => {
       return res.status(403).json({ message: 'You are not authorized to add messages to this ticket' });
     }
     
-    // Create the new message
+
     const newMessage = {
       sender: req.user._id,
       senderRole: req.user.isAdmin ? 'admin' : 'user',
@@ -759,14 +759,14 @@ exports.addMessageToTicket = async (req, res) => {
       attachments
     };
     
-    // Add message to ticket
+
     ticket.messages.push(newMessage);
     
-    // If ticket was closed and user adds a message, reopen it
+
     if (ticket.status === 'closed' && !req.user.isAdmin) {
       ticket.status = 'open';
       
-      // Add system message
+
       ticket.messages.push({
         sender: req.user._id,
         senderRole: 'system',
@@ -774,35 +774,35 @@ exports.addMessageToTicket = async (req, res) => {
       });
     }
     
-    // Update lastActivity
+
     ticket.lastActivity = Date.now();
     
-    // Save the ticket with new message
+
     await ticket.save();
     
     console.log('Added message to ticket ID:', id);
     
-    // For message formatters and notifications
+
     const messageIndex = ticket.messages.length - 1;
     const addedMessage = ticket.messages[messageIndex];
     
-    // If message is from admin to user, create notification for the user
+
     if (req.user.isAdmin || req.user.role === 'admin') {
       try {
-        // Get the user who owns the ticket
+
         const ticketUser = await User.findById(ticket.userId);
         if (ticketUser) {
-          // Create notification
+
           await createSupportResponseNotification(ticket, ticketUser);
           console.log('Support response notification created for user:', ticketUser._id);
         }
       } catch (notifError) {
         console.error('Failed to create notification:', notifError);
-        // Continue even if notification creation fails
+
       }
     }
     
-    // If message is from user to admin, update status to in_progress if it's open
+
     if (!req.user.isAdmin && ticket.status === 'open' && ticket.assignedTo) {
       ticket.status = 'in_progress';
       await ticket.save();

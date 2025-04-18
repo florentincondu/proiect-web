@@ -10,15 +10,15 @@ async function fixDashboardRevenue() {
     const db = client.db();
     const payments = db.collection('payments');
     
-    // Check if we have any payments
+
     const totalPayments = await payments.countDocuments();
     console.log(`Total payments in database: ${totalPayments}`);
     
-    // If we don't have any payments, create a test one
+
     if (totalPayments === 0) {
       console.log('No payments found. Creating a test payment...');
       
-      // Create a test payment with status "paid" and a total of 1000
+
       const result = await payments.insertOne({
         invoiceNumber: "INV-2025-TEST",
         user: "67f64b67f71d66d59f2df0a7", // Admin user ID
@@ -51,7 +51,7 @@ async function fixDashboardRevenue() {
       
       console.log(`Created test payment with ID: ${result.insertedId}`);
     } else {
-      // Make sure at least one payment has status "paid" and a non-zero total
+
       const paidPayments = await payments.countDocuments({ 
         status: { $in: ['paid', 'partially_refunded'] } 
       });
@@ -59,7 +59,7 @@ async function fixDashboardRevenue() {
       if (paidPayments === 0) {
         console.log('No paid payments found. Updating first payment...');
         
-        // Update the first payment to have status "paid"
+
         const firstPayment = await payments.findOne({});
         if (firstPayment) {
           await payments.updateOne(
@@ -75,7 +75,7 @@ async function fixDashboardRevenue() {
           console.log(`Updated payment ${firstPayment._id} to have paid status and total of 1000`);
         }
       } else {
-        // Check if we have any paid payments with zero total
+
         const zeroPaidPayments = await payments.countDocuments({ 
           status: { $in: ['paid', 'partially_refunded'] },
           total: { $eq: 0 }
@@ -84,7 +84,7 @@ async function fixDashboardRevenue() {
         if (zeroPaidPayments > 0) {
           console.log(`Found ${zeroPaidPayments} paid payments with zero total. Updating...`);
           
-          // Update all paid payments with zero total to have a value of 1000
+
           await payments.updateMany(
             { 
               status: { $in: ['paid', 'partially_refunded'] },
@@ -100,7 +100,7 @@ async function fixDashboardRevenue() {
       }
     }
     
-    // Verify the result
+
     const paidPayments = await payments.find({ 
       status: { $in: ['paid', 'partially_refunded'] } 
     }).toArray();

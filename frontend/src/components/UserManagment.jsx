@@ -34,15 +34,15 @@ const UserManagement = () => {
         }
       });
       
-      // Transform the response data to match our UI needs
-      // The API returns an object with users array, not directly an array
+
+
       const userData = response.data.users || response.data;
       const transformedUsers = userData.map(user => ({
         ...user,
         status: user.status || 'active', // Default status if not provided
         role: user.role || 'client', // Default role if not provided
         name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim(), // Combine first and last name if needed
-        // Calculate additional metrics
+
         bookingCount: countUserBookings(user),
         reviewCount: countUserReviews(user),
         loginCount: user.loginCount || 0
@@ -58,19 +58,19 @@ const UserManagement = () => {
     }
   };
 
-  // Helper function to count bookings
+
   const countUserBookings = (user) => {
-    // Check if user has a properties array with booking counts
+
     if (user.properties && Array.isArray(user.properties)) {
       return user.properties.reduce((sum, property) => sum + (property.bookings || 0), 0);
     }
     
-    // Check if user has bookings directly
+
     if (user.bookings && typeof user.bookings === 'number') {
       return user.bookings;
     }
     
-    // Check activity logs for booking actions
+
     if (user.activityLogs && Array.isArray(user.activityLogs)) {
       return user.activityLogs.filter(log => 
         log.action === 'booking_created' || 
@@ -81,14 +81,14 @@ const UserManagement = () => {
     return 0;
   };
   
-  // Helper function to count reviews
+
   const countUserReviews = (user) => {
-    // Check if user has reviews directly
+
     if (user.reviews && typeof user.reviews === 'number') {
       return user.reviews;
     }
     
-    // Check activity logs for review actions
+
     if (user.activityLogs && Array.isArray(user.activityLogs)) {
       return user.activityLogs.filter(log => 
         log.action === 'review_created' || 
@@ -141,7 +141,7 @@ const UserManagement = () => {
         }
       );
       
-      // Update the users list with the new data
+
       setUsers(users.map(user => 
         user._id === currentUser._id ? {
           ...user,
@@ -185,7 +185,7 @@ const UserManagement = () => {
   
   const handleUpdateUser = async (updatedUser) => {
     try {
-      // Prepare the data to send to the API
+
       const userData = {
         name: updatedUser.name,
         email: updatedUser.email,
@@ -203,7 +203,7 @@ const UserManagement = () => {
         }
       );
       
-      // Update the users list with the new data
+
       setUsers(users.map(user => 
         user._id === updatedUser._id ? {
           ...user,
@@ -236,7 +236,7 @@ const UserManagement = () => {
         }
       );
       
-      // Remove user from the list
+
       setUsers(users.filter(user => user._id !== userId));
       setError(null);
     } catch (err) {

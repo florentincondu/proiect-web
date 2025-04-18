@@ -20,7 +20,7 @@ const createReview = asyncHandler(async (req, res) => {
       });
     }
 
-    // Check if user has already reviewed this hotel
+
     const existingReview = await Review.findOne({
       userId: req.user._id,
       hotelId
@@ -84,10 +84,10 @@ const getHotelReviews = asyncHandler(async (req, res) => {
       });
     }
 
-    // Log that we're about to query for reviews
+
     console.log('Querying for reviews with hotelId:', hotelId);
 
-    // Find reviews for this hotel
+
     const reviews = await Review.find({ 
       hotelId, 
       status: 'approved' 
@@ -97,17 +97,17 @@ const getHotelReviews = asyncHandler(async (req, res) => {
 
     console.log(`Found ${reviews.length} reviews`);
 
-    // Get average rating 
+
     console.log('Getting average rating for hotelId:', hotelId);
     const ratingData = await Review.getAverageRating(hotelId);
     console.log('Rating data:', ratingData);
 
-    // Format reviews with safe access to properties
+
     const formattedReviews = [];
     
     for (const review of reviews) {
       try {
-        // Handle the case where userId might be null or undefined
+
         let user = { 
           _id: 'anonymous',
           name: 'Anonymous User',
@@ -135,7 +135,7 @@ const getHotelReviews = asyncHandler(async (req, res) => {
         });
       } catch (err) {
         console.error('Error processing review:', err);
-        // Skip problematic reviews
+
       }
     }
 
@@ -197,7 +197,7 @@ const updateReview = asyncHandler(async (req, res) => {
     throw new Error('Review not found');
   }
 
-  // Check if the review belongs to the user
+
   if (review.userId.toString() !== req.user._id.toString()) {
     res.status(403);
     throw new Error('Not authorized to update this review');
@@ -234,7 +234,7 @@ const deleteReview = asyncHandler(async (req, res) => {
       throw new Error('Review not found');
     }
 
-    // Check if the review belongs to the user or user is admin
+
     if (review.userId.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
       res.status(403);
       throw new Error('Not authorized to delete this review');
@@ -319,7 +319,7 @@ const addReaction = asyncHandler(async (req, res) => {
       throw new Error('Review not found');
     }
 
-    // Initialize reactions object if it doesn't exist
+
     if (!review.reactions) {
       review.reactions = {
         likes: { count: 0, users: [] },
@@ -327,13 +327,13 @@ const addReaction = asyncHandler(async (req, res) => {
       };
     }
 
-    // Check if user already reacted with this type
+
     const hasReacted = review.reactions[type].users.some(user => 
       user.toString() === userId.toString()
     );
 
     if (hasReacted) {
-      // Remove reaction if already exists (toggle)
+
       review.reactions[type].users = review.reactions[type].users
         .filter(user => user.toString() !== userId.toString());
       review.reactions[type].count = review.reactions[type].users.length;
@@ -347,7 +347,7 @@ const addReaction = asyncHandler(async (req, res) => {
         hasReacted: false
       });
     } else {
-      // Add new reaction
+
       review.reactions[type].users.push(userId);
       review.reactions[type].count = review.reactions[type].users.length;
       
@@ -384,7 +384,7 @@ const getReactions = asyncHandler(async (req, res) => {
       throw new Error('Review not found');
     }
     
-    // Check if the user has reacted
+
     let userReactions = { likes: false, hearts: false };
     
     if (req.user) {
@@ -452,13 +452,13 @@ const addComment = asyncHandler(async (req, res) => {
     
     console.log('Review found:', review._id);
     
-    // Initialize comments array if it doesn't exist
+
     if (!review.comments) {
       console.log('Initializing comments array');
       review.comments = [];
     }
     
-    // Add new comment
+
     const newComment = {
       userId,
       text,
@@ -470,7 +470,7 @@ const addComment = asyncHandler(async (req, res) => {
     await review.save();
     console.log('Review saved with new comment');
     
-    // Return the new comment with user info
+
     const populatedReview = await Review.findById(id).populate({
       path: 'comments.userId',
       select: 'firstName lastName profileImage'
@@ -583,7 +583,7 @@ const deleteComment = asyncHandler(async (req, res) => {
       throw new Error('Review not found');
     }
     
-    // Find the comment index
+
     const commentIndex = review.comments.findIndex(
       comment => comment._id.toString() === commentId
     );
@@ -593,7 +593,7 @@ const deleteComment = asyncHandler(async (req, res) => {
       throw new Error('Comment not found');
     }
     
-    // Check if user is the comment owner or admin
+
     const isCommentOwner = review.comments[commentIndex].userId.toString() === userId.toString();
     const isAdmin = req.user.role === 'admin';
     
@@ -602,7 +602,7 @@ const deleteComment = asyncHandler(async (req, res) => {
       throw new Error('Not authorized to delete this comment');
     }
     
-    // Remove the comment
+
     review.comments.splice(commentIndex, 1);
     await review.save();
     

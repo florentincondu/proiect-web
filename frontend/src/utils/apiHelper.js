@@ -3,8 +3,6 @@ import axios from 'axios';
 /**
  * Helper utility for API requests with fallbacks and error handling
  */
-
-// Base API URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 /**
@@ -14,7 +12,6 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000
  */
 export const isEndpointAvailable = async (endpoint) => {
   try {
-    // Use OPTIONS request to check endpoint availability
     await axios.options(`${API_BASE_URL}${endpoint}`);
     return true;
   } catch (error) {
@@ -44,8 +41,6 @@ export const safeFetch = async (endpoint, fallbackData = { success: true, data: 
  */
 export const getPlacePrices = async () => {
   const response = await safeFetch('/api/places/prices', { success: true, prices: [] });
-  
-  // Process the prices into a dictionary for easier lookup
   if (response.success && response.prices) {
     return response.prices.reduce((acc, item) => {
       acc[item.placeId] = item.price;
@@ -61,8 +56,6 @@ export const getPlacePrices = async () => {
  */
 export const getPlaceRestrictions = async () => {
   const response = await safeFetch('/api/places/restrictions', { success: true, restrictions: [] });
-  
-  // Process the restrictions into a dictionary for easier lookup
   if (response.success && response.restrictions) {
     return response.restrictions.reduce((acc, item) => {
       acc[item.placeId] = {

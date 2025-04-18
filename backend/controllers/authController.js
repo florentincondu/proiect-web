@@ -15,7 +15,7 @@ const generateToken = (id) => {
   );
 };
 
-// Configure email transporter
+
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST || 'smtp.gmail.com',
   port: process.env.EMAIL_PORT || 587,
@@ -34,15 +34,15 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Test the email configuration on startup
+
 let emailFunctional = false;
 let fallbackTransporter = null;
 
-// Function to initialize a fallback transporter if Gmail fails
+
 const initializeFallbackTransporter = () => {
   console.log('Initializing alternative Gmail configuration');
   try {
-    // Try an alternative Gmail configuration
+
     fallbackTransporter = nodemailer.createTransport({
       service: 'gmail',  // Use the service name instead of host/port
       auth: {
@@ -64,18 +64,18 @@ const initializeFallbackTransporter = () => {
   }
 };
 
-// Add a direct notification method for critical messages when email transport fails
+
 const logCriticalMessage = (subject, message) => {
-  // Log the message to console at minimum
+
   console.log(`CRITICAL NOTIFICATION: ${subject}`);
   console.log(message);
   
-  // Could implement other notification methods here:
-  // - Writing to a special log file
-  // - Using an alternative API service
-  // - Sending an SMS via a third-party service
+
+
+
+
   
-  // For now, we'll just log to stdout and create a log file
+
   try {
     const logEntry = `
 -------------------------------------------
@@ -85,7 +85,7 @@ ${message}
 -------------------------------------------
 `;
     
-    // Try to append to a critical messages log file
+
     const criticalLogsPath = path.join(__dirname, '..', 'logs', 'critical_messages.log');
     fs.appendFileSync(criticalLogsPath, logEntry);
   } catch (error) {
@@ -93,9 +93,9 @@ ${message}
   }
 };
 
-// Function to send email with retry using fallback
+
 const sendEmailWithRetry = async (mailOptions) => {
-  // Set a flag to track if we've logged this message as critical
+
   let criticalLogged = false;
   
   if (emailFunctional) {
@@ -104,7 +104,7 @@ const sendEmailWithRetry = async (mailOptions) => {
     } catch (error) {
       console.error('Primary email transport failed:', error);
       
-      // Try fallback if available
+
       if (fallbackTransporter) {
         try {
           console.log('Attempting to send via fallback transport');
@@ -112,7 +112,7 @@ const sendEmailWithRetry = async (mailOptions) => {
         } catch (fallbackError) {
           console.error('Fallback email transport also failed:', fallbackError);
           
-          // Log critical message since both transports failed
+
           logCriticalMessage(
             `Failed Email: ${mailOptions.subject}`, 
             `To: ${mailOptions.to}\n\nContent: ${mailOptions.html || mailOptions.text}`
@@ -122,7 +122,7 @@ const sendEmailWithRetry = async (mailOptions) => {
           throw fallbackError;
         }
       } else {
-        // Log critical message since primary failed and no fallback exists
+
         if (!criticalLogged) {
           logCriticalMessage(
             `Failed Email: ${mailOptions.subject}`, 
@@ -133,13 +133,13 @@ const sendEmailWithRetry = async (mailOptions) => {
       }
     }
   } else if (fallbackTransporter) {
-    // If primary email is known to be non-functional, try fallback directly
+
     try {
       return await fallbackTransporter.sendMail(mailOptions);
     } catch (error) {
       console.error('Fallback email transport failed:', error);
       
-      // Log critical message
+
       if (!criticalLogged) {
         logCriticalMessage(
           `Failed Email: ${mailOptions.subject}`, 
@@ -150,7 +150,7 @@ const sendEmailWithRetry = async (mailOptions) => {
       throw error;
     }
   } else {
-    // No transport available at all, just log the message
+
     logCriticalMessage(
       `Unsent Email: ${mailOptions.subject}`, 
       `To: ${mailOptions.to}\n\nContent: ${mailOptions.html || mailOptions.text}`
@@ -170,7 +170,7 @@ const sendEmailWithRetry = async (mailOptions) => {
     console.error('Email configuration error:', error);
     console.warn('Email functionality will not work. Please check your EMAIL_USER and EMAIL_PASS settings.');
     
-    // Initialize fallback transport
+
     const fallbackInitialized = initializeFallbackTransporter();
     if (!fallbackInitialized) {
       console.error('Could not initialize any email transport. Email functionality will be completely disabled.');
@@ -178,7 +178,7 @@ const sendEmailWithRetry = async (mailOptions) => {
   }
 })();
 
-// Function to send admin verification email
+
 const sendAdminVerificationEmail = async (user, verificationToken) => {
   try {
     const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-admin?token=${verificationToken}&email=${user.email}`;
@@ -208,10 +208,10 @@ const sendAdminVerificationEmail = async (user, verificationToken) => {
   }
 };
 
-// Function to send admin request notification to the admin email
+
 const sendAdminRequestNotification = async (user) => {
   try {
-    // Create approval and rejection URLs with user information
+
     const approveUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/approve-admin-request?email=${user.email}&token=${user.adminVerificationToken}`;
     const rejectUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/reject-admin-request?email=${user.email}&token=${user.adminVerificationToken}`;
     
@@ -243,7 +243,7 @@ const sendAdminRequestNotification = async (user) => {
   }
 };
 
-// Function to send verification code to user after admin approval
+
 const sendAdminVerificationCode = async (user, verificationCode) => {
   try {
     const mailOptions = {
@@ -271,30 +271,30 @@ const sendAdminVerificationCode = async (user, verificationCode) => {
   }
 };
 
-// Generate a random 6-digit verification code
+
 const generateVerificationCode = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Register user
+
 const register = async (req, res) => {
   try {
     const { firstName, lastName, email, password, role, subscriptionType } = req.body;
 
-    // Check if user already exists
+
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // If user is requesting admin role
+
     if (role === 'admin') {
       console.log(`Admin registration request for: ${email}`);
       
-      // Generate verification token
+
       const verificationToken = crypto.randomBytes(32).toString('hex');
       
-      // Create user with admin role but not verified yet
+
       const user = new User({
         firstName,
         lastName,
@@ -310,13 +310,13 @@ const register = async (req, res) => {
       await user.save();
       console.log(`Admin request created with verification token: ${user._id}`);
       
-      // Send notification to admin email for approval
+
       try {
         await sendAdminRequestNotification(user);
         console.log(`Admin request notification sent to condurflorentin@gmail.com`);
       } catch (emailError) {
         console.error('Error sending admin request notification:', emailError);
-        // Continue with registration even if email fails
+
       }
       
       return res.status(200).json({
@@ -327,7 +327,7 @@ const register = async (req, res) => {
       });
     }
 
-    // For non-admin registrations, save user directly
+
     const user = new User({
       firstName,
       lastName,
@@ -342,10 +342,10 @@ const register = async (req, res) => {
     await user.save();
     console.log(`User registered successfully: ${user._id}, role: ${user.role}`);
 
-    // Generate token
+
     const token = generateToken(user._id);
 
-    // Send welcome email to client
+
     try {
       await sendEmailWithRetry({
         from: process.env.EMAIL_USER,
@@ -359,7 +359,7 @@ const register = async (req, res) => {
       });
     } catch (emailError) {
       console.error('Error sending welcome email:', emailError);
-      // Continue with registration even if email fails
+
     }
 
     res.status(201).json({
@@ -383,7 +383,7 @@ const register = async (req, res) => {
   }
 };
 
-// Approve admin request
+
 const approveAdminRequest = async (req, res) => {
   try {
     const { requestId } = req.params;
@@ -396,11 +396,11 @@ const approveAdminRequest = async (req, res) => {
     
     console.log('Found request:', request);
 
-    // Check if this request has already been approved and has a verification code
+
     if (request.approved && request.verificationCode) {
       console.log('Request already approved, reusing existing verification code');
       
-      // Resend the verification email with the existing code
+
       await sendEmailWithRetry({
         from: process.env.EMAIL_USER,
         to: request.userData.email,
@@ -424,21 +424,21 @@ const approveAdminRequest = async (req, res) => {
       });
     }
 
-    // Generate verification code
+
     const verificationCode = crypto.randomInt(100000, 999999).toString();
     console.log('Generated verification code:', verificationCode);
 
-    // Update request with verification code and approval
+
     request.verificationCode = verificationCode;
     request.approved = true;
     request.approvedAt = Date.now();
     
-    // Update the Map with the modified request
+
     pendingAdminRequests.set(requestId, request);
     
     console.log('Updated request:', pendingAdminRequests.get(requestId));
 
-    // Send verification code to user
+
     await sendEmailWithRetry({
       from: process.env.EMAIL_USER,
       to: request.userData.email,
@@ -469,7 +469,7 @@ const approveAdminRequest = async (req, res) => {
   }
 };
 
-// Reject admin request
+
 const rejectAdminRequest = async (req, res) => {
   try {
     const { requestId } = req.params;
@@ -479,7 +479,7 @@ const rejectAdminRequest = async (req, res) => {
       return res.status(400).json({ message: 'Invalid or expired request' });
     }
 
-    // Send rejection email to user
+
     await sendEmailWithRetry({
       from: process.env.EMAIL_USER,
       to: request.userData.email,
@@ -491,7 +491,7 @@ const rejectAdminRequest = async (req, res) => {
       `
     });
 
-    // Remove request
+
     pendingAdminRequests.delete(requestId);
 
     res.json({ message: 'Admin request rejected successfully' });
@@ -501,7 +501,7 @@ const rejectAdminRequest = async (req, res) => {
   }
 };
 
-// Verify admin
+
 const verifyAdmin = async (req, res) => {
   try {
     const { token, email } = req.query;
@@ -510,7 +510,7 @@ const verifyAdmin = async (req, res) => {
       return res.status(400).json({ message: 'Missing verification parameters' });
     }
     
-    // Find user by email and verification token
+
     const user = await User.findOne({ 
       email: email,
       adminVerificationToken: token,
@@ -521,7 +521,7 @@ const verifyAdmin = async (req, res) => {
       return res.status(400).json({ message: 'Invalid or expired verification token' });
     }
     
-    // Check if already verified
+
     if (user.adminVerified) {
       return res.status(200).json({ 
         message: 'Your admin account is already verified. You can log in now.',
@@ -529,7 +529,7 @@ const verifyAdmin = async (req, res) => {
       });
     }
     
-    // Update user as verified admin
+
     user.role = 'admin';
     user.adminVerified = true;
     user.adminVerificationToken = undefined;
@@ -537,7 +537,7 @@ const verifyAdmin = async (req, res) => {
     
     await user.save();
     
-    // Generate auth token for automatic login
+
     const authToken = generateToken(user._id);
     
     res.status(200).json({ 
@@ -558,12 +558,12 @@ const verifyAdmin = async (req, res) => {
   }
 };
 
-// Login user
+
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Find user by email with all fields except password
+
     const user = await User.findOne({ email })
       .select('-password')
       .lean();
@@ -572,7 +572,7 @@ const login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
-    // Check if user is blocked
+
     if (user.blockInfo && user.blockInfo.isBlocked) {
       const now = new Date();
       const blockedUntil = new Date(user.blockInfo.blockedUntil);
@@ -585,7 +585,7 @@ const login = async (req, res) => {
         });
       }
       
-      // If block period has expired, unblock user
+
       if (now >= blockedUntil) {
         await User.findByIdAndUpdate(user._id, {
           $set: {
@@ -599,7 +599,7 @@ const login = async (req, res) => {
       }
     }
 
-    // Get the full user document for password comparison
+
     const userDoc = await User.findById(user._id);
     const isMatch = await userDoc.comparePassword(password);
     
@@ -607,7 +607,7 @@ const login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
-    // Update login stats and get updated user data
+
     const updatedUser = await User.findByIdAndUpdate(
       user._id,
       {
@@ -623,10 +623,10 @@ const login = async (req, res) => {
       }
     );
 
-    // Generate JWT token
+
     const token = generateToken(updatedUser._id);
 
-    // Return the exact structure expected by the frontend
+
     res.json({
       token,
       user: {
@@ -664,7 +664,7 @@ const login = async (req, res) => {
   }
 };
 
-// Get user profile
+
 const getProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
@@ -678,7 +678,7 @@ const getProfile = async (req, res) => {
   }
 };
 
-// Change subscription
+
 const changeSubscription = async (req, res) => {
   try {
     const { subscription } = req.body;
@@ -698,7 +698,7 @@ const changeSubscription = async (req, res) => {
   }
 };
 
-// Test email
+
 const testEmail = async (req, res) => {
   try {
     await sendEmailWithRetry({
@@ -715,7 +715,7 @@ const testEmail = async (req, res) => {
   }
 };
 
-// Resend admin verification
+
 const resendAdminVerification = async (req, res) => {
   try {
     const { email } = req.body;
@@ -743,7 +743,7 @@ const resendAdminVerification = async (req, res) => {
   }
 };
 
-// Create a test user
+
 const createTestUser = async (req, res) => {
   try {
     const testUser = {
@@ -754,18 +754,18 @@ const createTestUser = async (req, res) => {
       role: 'client'
     };
     
-    // Check if user already exists
+
     const userExists = await User.findOne({ email: testUser.email });
     if (userExists) {
       await User.findOneAndDelete({ email: testUser.email });
       console.log('Existing test user deleted');
     }
     
-    // Create new user
+
     console.log('Creating new test user with password:', testUser.password);
     const user = new User(testUser);
     
-    // Save user to DB
+
     await user.save();
     console.log('Test user created with ID:', user._id);
     
@@ -787,21 +787,21 @@ const createTestUser = async (req, res) => {
   }
 };
 
-// Reset user password (for debugging/testing only)
+
 const resetPassword = async (req, res) => {
   try {
     const { email, newPassword } = req.body;
     
-    // Find user
+
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
     
-    // Set new password
+
     user.password = newPassword;
     
-    // Save user (password will be hashed by pre-save hook)
+
     await user.save();
     
     res.status(200).json({
@@ -814,29 +814,29 @@ const resetPassword = async (req, res) => {
   }
 };
 
-// Generate password reset token and send email
+
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
     
-    // Check if user exists
+
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ message: 'No user found with that email address' });
     }
     
-    // Generate token
+
     const resetToken = crypto.randomBytes(32).toString('hex');
     
-    // Set token and expiry on user model
+
     user.resetPasswordToken = resetToken;
     user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
     await user.save();
     
-    // Create reset URL
+
     const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}&email=${email}`;
     
-    // Send email
+
     await sendEmailWithRetry({
       from: process.env.EMAIL_USER,
       to: user.email,
@@ -864,12 +864,12 @@ const forgotPassword = async (req, res) => {
   }
 };
 
-// Reset password with token validation
+
 const resetPasswordWithToken = async (req, res) => {
   try {
     const { token, email, password } = req.body;
     
-    // Find user by email and valid token
+
     const user = await User.findOne({
       email,
       resetPasswordToken: token,
@@ -880,17 +880,17 @@ const resetPasswordWithToken = async (req, res) => {
       return res.status(400).json({ message: 'Password reset token is invalid or has expired' });
     }
     
-    // Update password
+
     user.password = password;
     
-    // Clear reset token fields
+
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
     
-    // Save user
+
     await user.save();
     
-    // Send confirmation email
+
     await sendEmailWithRetry({
       from: process.env.EMAIL_USER,
       to: user.email,
@@ -915,29 +915,29 @@ const resetPasswordWithToken = async (req, res) => {
   }
 };
 
-// Change password for authenticated user
+
 const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     const userId = req.user.id;
 
-    // Find user by ID
+
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Check if current password matches
+
     const isMatch = await bcrypt.compare(currentPassword, user.password);
     if (!isMatch) {
       return res.status(400).json({ message: 'Current password is incorrect' });
     }
 
-    // Update password
+
     user.password = newPassword;
     await user.save();
 
-    // Send confirmation email
+
     await sendEmailWithRetry({
       from: process.env.EMAIL_USER,
       to: user.email,

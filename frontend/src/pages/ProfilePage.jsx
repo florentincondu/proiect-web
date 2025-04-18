@@ -42,7 +42,7 @@ const ProfilePage = () => {
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
-  // State pentru formularul de cazare
+
   const [accommodation, setAccommodation] = useState({
     title: '',
     description: '',
@@ -78,37 +78,37 @@ const ProfilePage = () => {
     monthlyDiscount: false,
   });
   
-  // State for credit card data
+
   const [cardDetails, setCardDetails] = useState({
     cardNumber: '',
     expiryDate: '',
     cvc: ''
   });
   
-  // Format credit card number with spaces
+
   const formatCardNumber = (value) => {
     if (!value) return '';
-    // Remove all non-digit characters
+
     const digitsOnly = value.replace(/\D/g, '');
-    // Format with spaces every 4 digits
+
     const formatted = digitsOnly.replace(/(\d{4})(?=\d)/g, '$1 ');
-    // Return maximum 19 characters (16 digits + 3 spaces)
+
     return formatted.slice(0, 19);
   };
   
-  // Format expiry date as MM/YY
+
   const formatExpiryDate = (value) => {
     if (!value) return '';
-    // Remove all non-digit characters
+
     const digitsOnly = value.replace(/\D/g, '');
-    // Add slash after 2nd digit if it's there
+
     if (digitsOnly.length >= 2) {
       return `${digitsOnly.slice(0, 2)}/${digitsOnly.slice(2, 4)}`;
     }
     return digitsOnly;
   };
   
-  // Handle card detail changes
+
   const handleCardChange = (e) => {
     const { name, value } = e.target;
     
@@ -123,7 +123,7 @@ const ProfilePage = () => {
         [name]: formatExpiryDate(value)
       }));
     } else if (name === 'cvc') {
-      // Only allow up to 4 digits for CVC
+
       const cvcValue = value.replace(/\D/g, '').slice(0, 4);
       setCardDetails(prev => ({ 
         ...prev, 
@@ -145,7 +145,7 @@ const ProfilePage = () => {
   const photoInputRef = useRef(null);
 
   useEffect(() => {
-    // Logica existentă pentru încărcarea profilului - neschimbată
+
     const fetchProfile = async () => {
       try {
         if (user) {
@@ -161,7 +161,7 @@ const ProfilePage = () => {
     fetchProfile();
   }, [user]);
 
-  // Adăugăm un effect nou pentru încărcarea cazărilor utilizatorului când tab-ul este activ
+
   useEffect(() => {
     const fetchUserHotels = async () => {
       if (activeTab === 'myaccommodations' && user) {
@@ -169,7 +169,7 @@ const ProfilePage = () => {
           setHotelsLoading(true);
           const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
           
-          // Try catch for each API call with better error handling
+
           try {
             const response = await axios.get(
               `${API_BASE_URL}/api/hotels/user/my-hotels`,
@@ -186,18 +186,18 @@ const ProfilePage = () => {
           } catch (apiError) {
             console.error('Error fetching user hotels:', apiError);
             
-            // Check if it's a 404 error (endpoint not found)
+
             if (apiError.response && apiError.response.status === 404) {
               console.log('Using mock data from localStorage since API endpoint is not available');
               
-              // Get mock accommodations from localStorage (saved during form submission)
+
               const savedAccommodations = JSON.parse(localStorage.getItem('userAccommodations') || '[]');
               
-              // If we have saved mock accommodations, use them
+
               if (savedAccommodations.length > 0) {
                 setUserHotels(savedAccommodations);
               } else {
-                // Otherwise create some mock data
+
                 const mockAccommodations = [
                   {
                     id: 'mock-1',
@@ -215,12 +215,12 @@ const ProfilePage = () => {
                   }
                 ];
                 
-                // Save to localStorage for future use
+
                 localStorage.setItem('userAccommodations', JSON.stringify(mockAccommodations));
                 setUserHotels(mockAccommodations);
               }
             } else {
-              // For other errors, just set empty array
+
               setUserHotels([]);
             }
           }
@@ -244,7 +244,7 @@ const ProfilePage = () => {
   }, []);
 
   const handleUpdateProfile = async (e) => {
-    // Logica existentă - neschimbată
+
     e.preventDefault();
     try {
       const updatedProfile = await updateProfile(profile);
@@ -338,7 +338,7 @@ const ProfilePage = () => {
   };
 
   const handleProfileImageChange = async (e) => {
-    // Logica existentă - neschimbată
+
     const file = e.target.files[0];
     if (!file) return;
     const fileType = file.type.split('/')[0];
@@ -355,7 +355,7 @@ const ProfilePage = () => {
   };
 
   const handleProfileImageUpload = async (file) => {
-    // Logica existentă - neschimbată
+
     try {
       setUploadingProfile(true);
       const result = await uploadProfileImage(file);
@@ -383,7 +383,7 @@ const ProfilePage = () => {
   };
 
   const handleCoverImageChange = async (e) => {
-    // Logica existentă - neschimbată
+
     const file = e.target.files[0];
     if (!file) return;
     const fileType = file.type.split('/')[0];
@@ -400,7 +400,7 @@ const ProfilePage = () => {
   };
 
   const handleCoverImageUpload = async (file) => {
-    // Logica existentă - neschimbată
+
     try {
       setUploadingCover(true);
       const result = await uploadCoverImage(file);
@@ -433,13 +433,13 @@ const ProfilePage = () => {
   };
 
   const getImageUrl = (imagePath) => {
-    // If no image path is provided, return placeholder
+
     if (!imagePath) return 'https://placehold.co/400x300/172a45/ffffff?text=No+Image';
     
-    // Handle blob URLs by providing a fallback if they cause errors
+
     if (imagePath.startsWith('blob:')) {
       try {
-        // Check if the blob URL is valid by fetching it
+
         fetch(imagePath).catch(() => {
           console.warn('Invalid blob URL:', imagePath);
           return 'https://placehold.co/400x300/172a45/ffffff?text=Image+Not+Available';
@@ -451,7 +451,7 @@ const ProfilePage = () => {
       }
     }
     
-    // Handle direct paths on the server
+
     if (imagePath.includes('/Users/condu/Desktop')) {
       const filename = imagePath.split('/').pop();
       let type = 'profile';
@@ -461,41 +461,41 @@ const ProfilePage = () => {
       return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/uploads/${type}/${filename.split('?')[0]}`;
     }
     
-    // Handle absolute URLs
+
     if (imagePath.startsWith('http')) {
       return imagePath;
     }
     
-    // Handle relative paths
+
     if (imagePath.startsWith('/uploads')) {
       return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${imagePath}`;
     }
     
-    // Handle other paths
+
     const normalizedPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
     return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${normalizedPath}`;
   };
 
-  // Funcționalitate pentru formularul de cazare
+
   const handleAccommodationChange = (e) => {
     const { name, value, type, checked } = e.target;
     if (type === 'checkbox') {
       if (name.includes('.')) {
-        // Gestionăm cazul pentru amenities nested
+
         const [parent, child] = name.split('.');
         setAccommodation(prev => ({
           ...prev,
           [parent]: { ...prev[parent], [child]: checked }
         }));
       } else {
-        // Gestionăm amenities direct
+
         setAccommodation(prev => ({
           ...prev,
           amenities: { ...prev.amenities, [name]: checked },
         }));
       }
     } else if (name === 'latitude' || name === 'longitude') {
-      // Update both the individual field and the coordinates object
+
       const updatedValue = value === '' ? '' : parseFloat(value);
       const coordKey = name === 'latitude' ? 'lat' : 'lng';
       
@@ -540,24 +540,24 @@ const ProfilePage = () => {
   };
 
   const uploadPhotos = async (photos) => {
-    // Aceasta este o funcție mock pentru încărcarea fotografiilor
-    // În realitate, aici ar trebui să folosiți API-ul real pentru încărcarea imaginilor
+
+
     
     try {
       const uploadedUrls = [];
       
-      // Simulăm încărcarea imaginilor
+
       for (let i = 0; i < photos.length; i++) {
         const photo = photos[i];
         
         if (photo.file) {
           try {
-            // Încearcă să încarce fișierul către server
+
             const formData = new FormData();
             formData.append('image', photo.file);
             
             try {
-              // Încearcă să facă apelul către API
+
               const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
               const response = await axios.post(
                 `${API_BASE_URL}/api/upload/accommodation`, 
@@ -576,33 +576,33 @@ const ProfilePage = () => {
               }
             } catch (apiError) {
               console.error('API upload error:', apiError);
-              // Continua cu fallback
+
             }
             
-            // Dacă API-ul nu funcționează, folosim URL-ul placeholder
-            // Convertim blob URL la un URL placeholder pentru a evita problemele cu blob-urile
+
+
             if (photo.url && photo.url.startsWith('blob:')) {
-              // Creăm un placeholder cu numărul imaginii
+
               uploadedUrls.push(`https://placehold.co/800x600/172a45/ffffff?text=Accommodation+Image+${i+1}`);
             } else {
               uploadedUrls.push(photo.url);
             }
           } catch (uploadError) {
             console.error('Error uploading file:', uploadError);
-            // Folosim un placeholder în caz de eroare
+
             uploadedUrls.push(`https://placehold.co/800x600/172a45/ffffff?text=Upload+Failed+${i+1}`);
           }
         } else if (photo.url) {
-          // Dacă avem doar un URL
+
           if (photo.url.startsWith('blob:')) {
-            // Înlocuim blob URL-urile cu placeholder-uri pentru a evita erorile
+
             uploadedUrls.push(`https://placehold.co/800x600/172a45/ffffff?text=Accommodation+Image+${i+1}`);
           } else {
-            // Altfel folosim URL-ul existent
+
             uploadedUrls.push(photo.url);
           }
         } else {
-          // Fallback pentru cazuri necunoscute
+
           uploadedUrls.push(`https://placehold.co/800x600/172a45/ffffff?text=Image+${i+1}`);
         }
       }
@@ -611,7 +611,7 @@ const ProfilePage = () => {
     } catch (error) {
       console.error('Error uploading photos:', error);
       
-      // În caz de eșec, returnăm placeholdere pentru toate imaginile
+
       return photos.map((_, index) => 
         `https://placehold.co/800x600/172a45/ffffff?text=Fallback+Image+${index+1}`
       );
@@ -620,8 +620,8 @@ const ProfilePage = () => {
 
   const processPayment = async (method) => {
     try {
-      // Use a mock payment in case the API endpoint is not available
-      // This allows development to continue without the backend API ready
+
+
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
       
       try {
@@ -640,8 +640,8 @@ const ProfilePage = () => {
       } catch (apiError) {
         console.error('Payment API error:', apiError);
         
-        // Return a mock payment token for development purposes
-        // This prevents the application from breaking when the API is not available
+
+
         console.log('Using mock payment token since API failed');
         return `mock-payment-${Date.now()}`;
       }
@@ -654,17 +654,17 @@ const ProfilePage = () => {
   const handleAccommodationSubmit = async (e) => {
     e.preventDefault();
     
-    // Validare simplă
+
     if (!accommodation.title || !accommodation.description || !accommodation.address || !accommodation.price) {
       showNotification('Completați toate câmpurile obligatorii', 'error');
       return;
     }
     
     try {
-      // Setăm starea de încărcare
+
       setLoading(true);
       
-      // 1. Procesăm plata
+
       showNotification('Procesăm plata...', 'info');
       let paymentToken;
       try {
@@ -675,7 +675,7 @@ const ProfilePage = () => {
         paymentToken = 'mock-payment-token';
       }
       
-      // 2. Încărcăm fotografiile
+
       showNotification('Încărcăm fotografiile...', 'info');
       let photoUrls;
       try {
@@ -686,10 +686,10 @@ const ProfilePage = () => {
         photoUrls = [];
       }
       
-      // 3. Trimitem datele către server
+
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
       
-      // Include card details in the submission
+
       const paymentData = {
         paymentMethod: accommodation.paymentMethod,
         paymentToken: paymentToken,
@@ -720,9 +720,9 @@ const ProfilePage = () => {
         coordinates: accommodation.coordinates || { lat: 0, lng: 0 },
         photos: photoUrls,
         payment: paymentData,
-        // Add status field to make sure it gets displayed to clients after approval
+
         status: 'pending',
-        // Add fields to ensure it works as a hotel listing
+
         isHotel: true,
         rating: 0,
         reviews: [],
@@ -733,7 +733,7 @@ const ProfilePage = () => {
       try {
         console.log('Sending data to API:', accommodationData);
         
-        // Try to submit to the real API endpoint
+
         const response = await axios.post(
           `${API_BASE_URL}/api/hotels/user-hotel`,
           accommodationData,
@@ -745,10 +745,10 @@ const ProfilePage = () => {
           }
         );
         
-        // 4. Afișăm mesajul de succes
+
         showNotification('Cazarea a fost adăugată cu succes și este în așteptare pentru aprobare!', 'success');
         
-        // Refresh user hotels list
+
         if (response.data && response.data.success) {
           try {
             const hotelsResponse = await axios.get(
@@ -770,31 +770,31 @@ const ProfilePage = () => {
       } catch (submitError) {
         console.error('Error submitting accommodation:', submitError);
         
-        // Handle 404 error with mock success response for testing
+
         if (submitError.response) {
           console.error('Server response:', submitError.response.status, submitError.response.data);
           
           if (submitError.response.status === 404) {
             console.log('Using mock response since API endpoint is not available');
-            // Show success message even though it's a mock response
+
             showNotification('Cazarea a fost adăugată cu succes și este în așteptare pentru aprobare! (Simulare)', 'success');
             
-            // Log the data that would have been submitted
+
             console.log('Accommodation data that would be submitted:', accommodationData);
             
-            // For development purposes, store in localStorage
-            // Include payment data in the mock storage 
+
+
             const savedAccommodations = JSON.parse(localStorage.getItem('userAccommodations') || '[]');
             savedAccommodations.push({
               ...accommodationData,
               id: `mock-${Date.now()}`,
               createdAt: new Date().toISOString(),
-              // Set status to approved for testing to ensure it shows up for clients
+
               status: 'approved'
             });
             localStorage.setItem('userAccommodations', JSON.stringify(savedAccommodations));
             
-            // Also add to mockHotels for client viewing
+
             const mockHotels = JSON.parse(localStorage.getItem('mockHotels') || '[]');
             mockHotels.push({
               ...accommodationData,
@@ -804,19 +804,19 @@ const ProfilePage = () => {
             });
             localStorage.setItem('mockHotels', JSON.stringify(mockHotels));
             
-            // Update userHotels state
+
             setUserHotels(savedAccommodations);
           } else {
-            // For other errors, show error message
+
             showNotification(`Eroare la trimiterea datelor către server (${submitError.response.status}): ${submitError.response.data.message || 'Vă rugăm să încercați din nou.'}`, 'error');
           }
         } else {
-          // For network errors or other issues
+
           showNotification('Eroare de rețea la trimiterea datelor. Verificați conexiunea și încercați din nou.', 'error');
         }
       }
       
-      // 5. Resetăm formularul regardless of success or failure
+
       setAccommodation({
         title: '',
         description: '',
@@ -852,7 +852,7 @@ const ProfilePage = () => {
         monthlyDiscount: false,
       });
       
-      // Also reset card details
+
       setCardDetails({
         cardNumber: '',
         expiryDate: '',
@@ -867,7 +867,7 @@ const ProfilePage = () => {
     }
   };
 
-  // Function to get address from coordinates using reverse geocoding
+
   const getAddressFromCoordinates = async (lat, lng) => {
     try {
       console.log("getAddressFromCoordinates called with:", { lat, lng });
@@ -876,14 +876,14 @@ const ProfilePage = () => {
         return;
       }
       
-      // Use OpenStreetMap's Nominatim service for reverse geocoding (no API key required)
+
       const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
       const data = await response.json();
       
       if (data && data.display_name) {
         console.log('Reverse geocoding result:', data);
         
-        // Extract the formatted address
+
         const address = data.display_name;
         
         setAccommodation(prev => ({
@@ -900,28 +900,28 @@ const ProfilePage = () => {
     }
   };
 
-  // Update coordinates when latitude or longitude changes
+
   useEffect(() => {
-    // Only proceed if both latitude and longitude are valid numbers
+
     if (accommodation.latitude && accommodation.longitude) {
       const lat = parseFloat(accommodation.latitude);
       const lng = parseFloat(accommodation.longitude);
       
       if (!isNaN(lat) && !isNaN(lng)) {
-        // Get address from coordinates
+
         getAddressFromCoordinates(lat, lng);
       }
     }
   }, [accommodation.latitude, accommodation.longitude]);
 
-  // Add this function to handle image errors
+
   const handleImageError = (e) => {
     console.warn('Image failed to load:', e.target.src);
     e.target.onerror = null; // Prevent infinite error loop
     e.target.src = 'https://placehold.co/400x300/172a45/ffffff?text=Image+Not+Available';
   };
 
-  // Adaugă funcții pentru gestionarea formularului de parolă
+
   const handlePasswordChange = (e) => {
     const { name, value } = e.target;
     setPasswordForm(prev => ({
@@ -929,7 +929,7 @@ const ProfilePage = () => {
       [name]: value
     }));
     
-    // Resetează mesajele de eroare când utilizatorul începe să tasteze
+
     setPasswordError(null);
     setPasswordSuccess(false);
   };
@@ -939,7 +939,7 @@ const ProfilePage = () => {
     
     const { currentPassword, newPassword, confirmPassword } = passwordForm;
     
-    // Validări
+
     if (!currentPassword || !newPassword || !confirmPassword) {
       setPasswordError('Toate câmpurile sunt obligatorii.');
       return;
@@ -955,7 +955,7 @@ const ProfilePage = () => {
       return;
     }
     
-    // Verifică dacă parola conține cel puțin un număr și un caracter special
+
     const hasNumber = /\d/.test(newPassword);
     const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(newPassword);
     
@@ -968,7 +968,7 @@ const ProfilePage = () => {
       setIsChangingPassword(true);
       await changePassword(currentPassword, newPassword);
       
-      // Resetează formularul și afișează un mesaj de succes
+
       setPasswordForm({
         currentPassword: '',
         newPassword: '',
@@ -1782,10 +1782,10 @@ const ProfilePage = () => {
                   return;
                 }
                 
-                // Get the real address from coordinates
+
                 getAddressFromCoordinates(lat, lng);
                 
-                // Update accommodation state with coordinates
+
                 setAccommodation(prev => ({
                   ...prev,
                   coordinates: { lat, lng }

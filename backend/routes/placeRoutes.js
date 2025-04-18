@@ -7,7 +7,7 @@ const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
 
-// Endpoint search-nearby
+
 router.post('/search-nearby', async (req, res) => {
   try {
     console.log('Received search-nearby request with body:', JSON.stringify(req.body));
@@ -31,7 +31,7 @@ router.post('/search-nearby', async (req, res) => {
   }
 });
 
-// Endpoint search-text
+
 router.post('/search-text', async (req, res) => {
   try {
     const { textQuery } = req.body;
@@ -64,7 +64,7 @@ router.post('/search-text', async (req, res) => {
   } catch (error) {
     console.error('Error searching places:', error.message);
     
-    // Better error response with details
+
     if (error.response) {
       console.error('Google API error details:', error.response.data);
       return res.status(error.response.status).json({
@@ -77,15 +77,15 @@ router.post('/search-text', async (req, res) => {
   }
 });
 
-// Endpoint media
+
 router.get('/media/:photoName', async (req, res) => {
   try {
-    // Get the full photo name from the request
+
     const photoName = decodeURIComponent(req.params.photoName);
     
     console.log('Requesting photo:', photoName);
     
-    // Validate the photo name format to make sure it looks like a valid Places photo ID
+
     if (!photoName || !photoName.includes('/photos/')) {
       console.error('Invalid photo name format:', photoName);
       return res.redirect('https://placehold.co/400x300/172a45/ffffff?text=Invalid+Photo+ID');
@@ -103,16 +103,16 @@ router.get('/media/:photoName', async (req, res) => {
       }
     );
     
-    // Forward content type and other relevant headers
+
     res.set('Content-Type', response.headers['content-type']);
     
-    // Pipe the image data directly to the response
+
     response.data.pipe(res);
   } catch (error) {
     console.error('Error proxying to Google Places photo API:', error.response?.data || error.message);
     console.error('Photo request failed for:', req.params.photoName);
     
-    // Send a placeholder image instead of an error
+
     res.redirect('https://placehold.co/400x300/172a45/ffffff?text=Image+Not+Found');
   }
 });

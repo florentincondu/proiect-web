@@ -1,7 +1,7 @@
 const Service = require('../models/Service');
 const { protect, admin } = require('../middleware/authMiddleware');
 
-// Get all services (admin only)
+
 exports.getServices = async (req, res) => {
   try {
     const services = await Service.find().sort({ createdAt: -1 });
@@ -12,7 +12,7 @@ exports.getServices = async (req, res) => {
   }
 };
 
-// Get service by ID (admin only)
+
 exports.getServiceById = async (req, res) => {
   try {
     const service = await Service.findById(req.params.id);
@@ -28,7 +28,7 @@ exports.getServiceById = async (req, res) => {
   }
 };
 
-// Create service (admin only)
+
 exports.createService = async (req, res) => {
   try {
     const { name, description, price, duration, category, images } = req.body;
@@ -50,7 +50,7 @@ exports.createService = async (req, res) => {
   }
 };
 
-// Update service (admin only)
+
 exports.updateService = async (req, res) => {
   try {
     const { name, description, price, duration, category, images, isActive } = req.body;
@@ -76,7 +76,7 @@ exports.updateService = async (req, res) => {
   }
 };
 
-// Delete service (admin only)
+
 exports.deleteService = async (req, res) => {
   try {
     const service = await Service.findById(req.params.id);

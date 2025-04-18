@@ -36,7 +36,7 @@ const VerifyAdmin = () => {
         setStatus('success');
         setMessage(response.data.message || 'Your admin account has been successfully verified. You can now log in.');
         
-        // Automatically redirect to login page after 3 seconds
+
         setTimeout(() => {
           navigate('/login');
         }, 3000);
@@ -58,7 +58,7 @@ const VerifyAdmin = () => {
   };
 
   const handleResendVerification = async () => {
-    // If we have the email from the URL, use it
+
     const emailToUse = email || resendEmail;
     
     if (!emailToUse) {

@@ -10,11 +10,11 @@ const BookingFlow = () => {
   const location = useLocation();
   const { isAuthenticated, user } = useAuth();
   
-  // Get hotel data from location state if available
+
   const hotelData = location.state?.hotel || null;
   
   const [currentStep, setCurrentStep] = useState(1);
-  // Initialize selectedRoom with the room passed from HotelDetailPage if available
+
   const [selectedRoom, setSelectedRoom] = useState(location.state?.selectedRoom || null);
   const [selectedExtras, setSelectedExtras] = useState([]);
   const [bookingDetails, setBookingDetails] = useState({
@@ -28,21 +28,21 @@ const BookingFlow = () => {
   const [error, setError] = useState(null);
   
   useEffect(() => {
-    // If no hotel data was passed and we're not already in a booking flow, redirect to home
+
     if (!hotelData && !selectedRoom) {
       navigate('/');
     }
     
-    // If hotel data exists, initialize booking with its data
+
     if (hotelData) {
       console.log('Initializing booking with hotel data:', hotelData);
       
-      // Check if the hotel data has the room price
+
       if (hotelData.price) {
         console.log('Hotel price from data:', hotelData.price);
       }
       
-      // Populate initial data from hotel
+
       setBookingDetails(prev => ({
         ...prev,
         hotelId: hotelData.id,
@@ -52,7 +52,7 @@ const BookingFlow = () => {
       }));
     }
     
-    // If selectedRoom was passed, update the state
+
     if (location.state?.selectedRoom && !selectedRoom) {
       console.log('Selected room data received:', location.state.selectedRoom);
       console.log('Room price from selected room:', location.state.selectedRoom.price);
@@ -61,7 +61,7 @@ const BookingFlow = () => {
   }, [hotelData, navigate, selectedRoom, location.state]);
   
   useEffect(() => {
-    // Calculate total price for booking
+
     let total = 0;
     
     if (selectedRoom) {
@@ -69,7 +69,7 @@ const BookingFlow = () => {
       total = selectedRoom.price * days;
     }
     
-    // Add costs for any extras
+
     if (selectedExtras.length > 0) {
       const days = getDaysDifference(bookingDetails.checkIn, bookingDetails.checkOut);
       const extrasCost = selectedExtras.reduce((sum, extra) => {
@@ -86,7 +86,7 @@ const BookingFlow = () => {
       total += extrasCost;
     }
     
-    // Adăugare taxă de 12%
+
     const subtotal = total;
     const tax = subtotal * 0.12; // 12% tax
     total = subtotal + tax;
@@ -136,7 +136,7 @@ const BookingFlow = () => {
     }));
   };
   
-  // Submit booking to backend
+
   const handleSubmitBooking = async (paymentDetails) => {
     if (!isAuthenticated) {
       setError('You must be logged in to complete a booking');
@@ -147,7 +147,7 @@ const BookingFlow = () => {
     setError(null);
     
     try {
-      // Prepare booking data
+
       const bookingData = {
         hotel: {
           id: hotelData.id,
@@ -174,18 +174,18 @@ const BookingFlow = () => {
         taxRate: 12, // 12% tax rate
         extras: selectedExtras,
         notes: bookingDetails.notes || '',
-        // Payment details would normally be processed separately
-        // through a payment processor like Stripe
+
+
       };
       
       console.log('Submitting booking with hotel data:', bookingData.hotel);
       console.log('Price details: Subtotal:', bookingDetails.subtotal, 'Tax:', bookingDetails.tax, 'Total:', bookingDetails.totalPrice);
       
-      // Submit booking to backend
+
       const response = await createHotelBooking(bookingData);
       console.log('Booking created:', response);
       
-      // Move to confirmation step
+
       setCurrentStep(4);
     } catch (err) {
       console.error('Booking error:', err);
@@ -195,7 +195,7 @@ const BookingFlow = () => {
     }
   };
   
-  // Steps in the booking process
+
   const steps = [
     { id: 1, title: 'Dates & Rooms', icon: <FaCalendarAlt /> },
     { id: 2, title: 'Extras', icon: <FaListAlt /> },
@@ -203,7 +203,7 @@ const BookingFlow = () => {
     { id: 4, title: 'Confirmation', icon: <FaCheckCircle /> }
   ];
   
-  // Content for each step
+
   const renderStepContent = () => {
     switch(currentStep) {
       case 1:
@@ -244,7 +244,7 @@ const BookingFlow = () => {
     }
   };
 
-  // Animation variants for page transitions
+
   const pageVariants = {
     initial: {
       opacity: 0,
@@ -346,14 +346,14 @@ const BookingFlow = () => {
   );
 };
 
-// Step 1: Dates & Rooms - improved responsiveness
+
 const DatesAndRoomsStep = ({ onNext, bookingDetails, onInputChange, selectedRoom, onRoomSelect, hotelData }) => {
   const [showRoomDetails, setShowRoomDetails] = useState(null);
   
-  // Use rooms from hotelData if available, otherwise fallback to sample rooms
+
   const roomsFromHotel = hotelData?.rooms || [];
 
-  // Sample rooms only used as fallback if no rooms data was passed
+
   const sampleRooms = [
     { 
       id: 1,
@@ -387,10 +387,10 @@ const DatesAndRoomsStep = ({ onNext, bookingDetails, onInputChange, selectedRoom
     }
   ];
   
-  // Use real rooms if available, otherwise use sample rooms
+
   const rooms = roomsFromHotel.length > 0 ? roomsFromHotel : sampleRooms;
   
-  // Check if the selected dates are valid
+
   const isDateValid = () => {
     if (!bookingDetails.checkIn || !bookingDetails.checkOut) return false;
     
@@ -420,7 +420,7 @@ const DatesAndRoomsStep = ({ onNext, bookingDetails, onInputChange, selectedRoom
       );
     }
     
-    // Fallback background color with room name
+
     return (
       <div className="w-full h-full bg-gray-600 rounded-md flex items-center justify-center text-center p-4">
         <span className="text-white">{room.name}</span>
@@ -661,7 +661,7 @@ const DatesAndRoomsStep = ({ onNext, bookingDetails, onInputChange, selectedRoom
   );
 };
 
-// Step 2: Extras - improved responsiveness
+
 const ExtrasStep = ({ onNext, onBack, selectedExtras, onExtraToggle }) => {
   const extras = [
     {
@@ -787,7 +787,7 @@ const ExtrasStep = ({ onNext, onBack, selectedExtras, onExtraToggle }) => {
   );
 };
 
-// Step 3: Payment - improved responsiveness
+
 const PaymentStep = ({ onNext, onBack, bookingDetails, selectedRoom, selectedExtras, nights, isLoading, error }) => {
   const [cardDetails, setCardDetails] = useState({
     cardNumber: '',
@@ -813,7 +813,7 @@ const PaymentStep = ({ onNext, onBack, bookingDetails, selectedRoom, selectedExt
     return true;
   };
   
-  // Format credit card number with spaces
+
   const formatCardNumber = (value) => {
     if (!value) return '';
     return value
@@ -823,9 +823,9 @@ const PaymentStep = ({ onNext, onBack, bookingDetails, selectedRoom, selectedExt
       .substr(0, 19) || '';
   };
   
-  // Calculate tax and totals
+
   const calculateSummary = () => {
-    // Folosim valorile deja calculate și stocate în bookingDetails
+
     if (bookingDetails.subtotal && bookingDetails.tax) {
       return {
         roomTotal: selectedRoom.price * nights,
@@ -836,7 +836,7 @@ const PaymentStep = ({ onNext, onBack, bookingDetails, selectedRoom, selectedExt
       };
     }
     
-    // Alternativa în caz că valorile nu sunt încă disponibile
+
     const roomTotal = selectedRoom.price * nights;
     
     let extrasTotal = 0;
@@ -1111,7 +1111,7 @@ const PaymentStep = ({ onNext, onBack, bookingDetails, selectedRoom, selectedExt
   );
 };
 
-// Step 4: Confirmation - fully responsive
+
 const ConfirmationStep = ({ onFinish, bookingDetails, selectedRoom }) => {
   const bookingReference = `TZ-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
   

@@ -34,7 +34,7 @@ const SignUpPage = () => {
     setVerificationLink('');
 
     try {
-      // If admin role is selected, show a notification first
+
       if (formData.role === 'admin') {
         setSuccess('Registering admin account. Your request will be sent to condurflorentin@gmail.com for approval.');
       }
@@ -48,16 +48,16 @@ const SignUpPage = () => {
         formData.subscriptionType
       );
 
-      // If admin registration
+
       if (data.requiresVerification) {
         setSuccess(data.message);
-        // Show a clear message
+
         setSuccess('Admin registration request submitted. You will receive an email with a verification code when your request is approved by the administrator.');
         
-        // Store user email for verification
+
         const userEmail = formData.email;
         
-        // Clear form
+
         setFormData({ 
           firstName: '', 
           lastName: '', 
@@ -67,7 +67,7 @@ const SignUpPage = () => {
           subscriptionType: 'free'
         });
         
-        // Redirect to the verification page after a short delay
+
         setTimeout(() => {
           navigate('/admin-verification', { 
             state: { email: userEmail }
@@ -77,12 +77,12 @@ const SignUpPage = () => {
         return;
       }
 
-      // For non-admin registrations
+
       if (data.token) {
         login(data.user, data.token);
         setSuccess('Registration successful!');
         
-        // Clear form
+
         setFormData({ 
           firstName: '', 
           lastName: '', 
@@ -92,7 +92,7 @@ const SignUpPage = () => {
           subscriptionType: 'free'
         });
         
-        // Redirect normal users to homepage after 2 seconds
+
         setTimeout(() => navigate('/homepage'), 2000);
       }
     } catch (error) {

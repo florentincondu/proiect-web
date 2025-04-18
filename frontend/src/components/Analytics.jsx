@@ -32,7 +32,7 @@ import {
 import axios from 'axios';
 
 const Analytics = () => {
-  // State management
+
   const [analyticsData, setAnalyticsData] = useState({
     bookingTrends: [],
     revenueData: [],
@@ -47,7 +47,7 @@ const Analytics = () => {
   const [error, setError] = useState('');
   const [exportLoading, setExportLoading] = useState({ csv: false, pdf: false });
 
-  // Colors based on the Login component theme
+
   const colors = {
     primary: '#3b82f6', // blue-500
     secondary: '#60a5fa', // blue-400
@@ -58,14 +58,14 @@ const Analytics = () => {
     pieColors: ['#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe', '#dbeafe', '#2563eb', '#1d4ed8', '#1e40af', '#1e3a8a']
   };
   
-  // Fetch analytics data
+
   useEffect(() => {
     const fetchAnalytics = async () => {
       setIsLoading(true);
       setError('');
       
       try {
-        // In production, replace with actual API endpoints
+
         const bookingResponse = await axios.get(
           `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/analytics/bookings`, 
           { params: { startDate: dateRange.start, endDate: dateRange.end } }
@@ -81,26 +81,26 @@ const Analytics = () => {
           { params: { startDate: dateRange.start, endDate: dateRange.end } }
         );
         
-        // Ensure bookingTrends is an array before setting state
+
         const bookingTrends = Array.isArray(bookingResponse.data) ? bookingResponse.data : [];
         
-        // Process revenue data properly
+
         let revenueData;
         if (revenueResponse.data && typeof revenueResponse.data === 'object') {
           if (Array.isArray(revenueResponse.data)) {
-            // If it's already an array, use it directly
+
             revenueData = revenueResponse.data;
           } else if (revenueResponse.data.revenueByPaymentMethod && Array.isArray(revenueResponse.data.revenueByPaymentMethod)) {
-            // If it has revenueByPaymentMethod property, use that for the chart data
+
             revenueData = revenueResponse.data.revenueByPaymentMethod;
-            // Also store the total revenue
+
             revenueData.totalRevenue = revenueResponse.data.totalRevenue || 0;
           } else {
-            // If it's an object without expected structure, make an array from it
+
             revenueData = Object.entries(revenueResponse.data)
               .filter(([key, value]) => typeof value === 'number' && key !== 'totalRevenue')
               .map(([key, value]) => ({ service: key, revenue: value }));
-            // Store total revenue if available
+
             if ('totalRevenue' in revenueResponse.data) {
               revenueData.totalRevenue = revenueResponse.data.totalRevenue;
             }
@@ -109,7 +109,7 @@ const Analytics = () => {
           revenueData = [];
         }
         
-        // Ensure locationData is an array
+
         const locationData = Array.isArray(locationResponse.data) ? locationResponse.data : [];
         
         setAnalyticsData({
@@ -121,7 +121,7 @@ const Analytics = () => {
         console.error('Failed to fetch analytics:', error);
         setError('Failed to load analytics data. Please try again later.');
         
-        // Mock data for development/preview
+
         setAnalyticsData({
           bookingTrends: [
             { date: '2025-01', bookings: 28, revenue: 22500 },
@@ -154,7 +154,7 @@ const Analytics = () => {
     fetchAnalytics();
   }, [dateRange]);
   
-  // Format currency to RON
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('ro-RO', {
       style: 'currency',
@@ -164,24 +164,24 @@ const Analytics = () => {
     }).format(amount);
   };
   
-  // Calculate totals safely ensuring we have arrays
+
   const getTotalBookings = () => {
     if (!Array.isArray(analyticsData.bookingTrends)) return 0;
     return analyticsData.bookingTrends.reduce((acc, item) => acc + (item.bookings || 0), 0);
   };
   
   const getTotalRevenue = () => {
-    // Check if we have revenueData array
+
     if (!Array.isArray(analyticsData.revenueData) || analyticsData.revenueData.length === 0) {
       return formatCurrency(0);
     }
     
-    // If revenueData is an object with totalRevenue property (from backend)
+
     if (analyticsData.revenueData.totalRevenue !== undefined) {
       return formatCurrency(analyticsData.revenueData.totalRevenue);
     }
     
-    // Otherwise calculate from the array items
+
     const total = analyticsData.revenueData.reduce((acc, item) => acc + (Number(item.revenue) || 0), 0);
     return formatCurrency(total);
   };
@@ -189,27 +189,27 @@ const Analytics = () => {
   const getTopLocation = () => {
     if (!Array.isArray(analyticsData.locationData) || analyticsData.locationData.length === 0) return 'N/A';
     
-    // Sort by number of bookings to find the top location
+
     const topLocation = analyticsData.locationData.sort((a, b) => b.bookings - a.bookings)[0];
     if (!topLocation || !topLocation.location) return 'N/A';
     
-    // First try to extract just the city/county name
-    // Try different patterns:
-    // 1. Extract everything before first comma
+
+
+
     const commaPattern = topLocation.location.split(',')[0];
     if (commaPattern) return commaPattern.trim();
     
-    // 2. Extract the first word if it contains at least 3 characters
+
     const firstWord = topLocation.location.split(' ')[0];
     if (firstWord && firstWord.length > 2) return firstWord;
     
-    // 3. If all else fails, return the full location or first 20 chars
+
     return topLocation.location.length > 20 ? 
            topLocation.location.substring(0, 20) + '...' : 
            topLocation.location;
   };
   
-  // Handle date range change
+
   const handleDateChange = (e) => {
     const { name, value } = e.target;
     setDateRange(prev => ({
@@ -218,12 +218,12 @@ const Analytics = () => {
     }));
   };
   
-  // Handle export functions
+
   const handleExport = async (type) => {
     setExportLoading({ ...exportLoading, [type]: true });
     
     try {
-      // In production, replace with actual export API
+
       const response = await axios.get(
         `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/analytics/export`,
         {
@@ -237,7 +237,7 @@ const Analytics = () => {
         }
       );
       
-      // Create download link
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -253,25 +253,25 @@ const Analytics = () => {
     }
   };
   
-  // Extract county/city from full location 
+
   const extractCounty = (fullLocation) => {
     if (!fullLocation) return 'N/A';
     
-    // Extract first part before comma if exists
+
     const commaPattern = fullLocation.split(',')[0];
     if (commaPattern) return commaPattern.trim();
     
-    // Extract first word if long enough
+
     const firstWord = fullLocation.split(' ')[0];
     if (firstWord && firstWord.length > 2) return firstWord;
     
-    // Return original if short, or truncated if long
+
     return fullLocation.length > 20 ? 
       fullLocation.substring(0, 20) + '...' : 
       fullLocation;
   };
   
-  // Custom renderer for pie chart labels
+
   const renderCustomizedLabel = (props) => {
     const { cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, value } = props;
     const RADIAN = Math.PI / 180;
@@ -279,7 +279,7 @@ const Analytics = () => {
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
     
-    // Only show percent if it's significant enough
+
     if (percent < 0.05) return null;
     
     return (
@@ -296,7 +296,7 @@ const Analytics = () => {
     );
   };
   
-  // Process data for pie chart to limit slices
+
   const getPieChartData = () => {
     let data = [];
     
@@ -321,7 +321,7 @@ const Analytics = () => {
     return data;
   };
   
-  // Process data for location chart
+
   const getLocationChartData = () => {
     if (!Array.isArray(analyticsData.locationData)) return [];
     
@@ -334,7 +334,7 @@ const Analytics = () => {
       .slice(0, 6); // Limit to top 6 locations
   };
   
-  // Card component for consistency
+
   const Card = ({ title, icon, children }) => (
     <div className="bg-gray-900 bg-opacity-90 rounded-xl shadow-lg p-5 backdrop-blur-sm">
       <div className="flex items-center mb-4">
@@ -582,7 +582,7 @@ const Analytics = () => {
                                       padding: '8px 12px'
                                     }} 
                                     formatter={(value, name, props) => {
-                                      // Calculate percentage
+
                                       let percent = '';
                                       
                                       try {
@@ -737,7 +737,7 @@ const Analytics = () => {
                         padding: '8px 12px'
                       }} 
                       formatter={(value, name, props) => {
-                        // Calculate percentage
+
                         let percent = '';
                         
                         try {
@@ -848,7 +848,7 @@ const Analytics = () => {
                   let comparisonLabel = '';
                   
                   if (index > 0) {
-                    // Compare with previous period
+
                     prevBookings = arr[index - 1].bookings || 0;
                     comparisonLabel = 'vs prev period';
                     
@@ -858,7 +858,7 @@ const Analytics = () => {
                       growth = 100; // Previous was zero, current has value
                     }
                   } else if (arr.length > 1) {
-                    // For first item, compare with average excluding this item
+
                     const otherBookings = arr.slice(1).reduce((sum, b) => sum + (b.bookings || 0), 0);
                     const avgOtherBookings = otherBookings / (arr.length - 1);
                     comparisonLabel = 'vs avg';
@@ -893,11 +893,11 @@ const Analytics = () => {
                 const totalRevenue = analyticsData.revenueData.reduce((acc, i) => acc + i.revenue, 0);
                 const percentage = (item.revenue / totalRevenue) * 100;
                 
-                // Calculate rank
+
                 const sortedData = [...analyticsData.revenueData].sort((a, b) => b.revenue - a.revenue);
                 const rank = sortedData.findIndex(i => i.service === item.service) + 1;
                 
-                // Calculate comparison with average
+
                 const avgRevenue = totalRevenue / analyticsData.revenueData.length;
                 const vsAvg = ((item.revenue - avgRevenue) / avgRevenue) * 100;
                 
@@ -923,15 +923,15 @@ const Analytics = () => {
               {!isLoading && selectedChart === 'location' && analyticsData.locationData.map((item) => {
                 const revPerBooking = item.revenue / item.bookings;
                 
-                // Calculate total bookings and average revenue per booking
+
                 const totalBookings = analyticsData.locationData.reduce((acc, loc) => acc + loc.bookings, 0);
                 const totalRevenue = analyticsData.locationData.reduce((acc, loc) => acc + loc.revenue, 0);
                 const avgRevPerBooking = totalBookings > 0 ? totalRevenue / totalBookings : 0;
                 
-                // Calculate efficiency compared to average
+
                 const efficiency = avgRevPerBooking > 0 ? ((revPerBooking - avgRevPerBooking) / avgRevPerBooking) * 100 : 0;
                 
-                // Calculate bookings share
+
                 const bookingShare = totalBookings > 0 ? (item.bookings / totalBookings) * 100 : 0;
                 
                 return (

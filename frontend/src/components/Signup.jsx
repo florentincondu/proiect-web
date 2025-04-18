@@ -35,7 +35,7 @@ const Signup = () => {
       console.log('Registration response:', response.data); // Debug log
 
       if (response.data.requiresVerification) {
-        // For admin registration
+
         navigate('/verify-admin', { 
           state: { 
             email: response.data.email,
@@ -44,7 +44,7 @@ const Signup = () => {
           replace: true // This will replace the current entry in the history stack
         });
       } else {
-        // For regular users
+
         navigate('/login', { 
           state: { 
             message: 'Registration successful. Please login.' 

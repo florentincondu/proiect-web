@@ -11,7 +11,7 @@ exports.logToFile = (message, logFile = 'server.log') => {
   try {
     const logsDir = path.join(__dirname, '..', 'logs');
     
-    // Create logs directory if it doesn't exist
+
     if (!fs.existsSync(logsDir)) {
       fs.mkdirSync(logsDir, { recursive: true });
     }

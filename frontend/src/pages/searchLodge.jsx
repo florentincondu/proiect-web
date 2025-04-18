@@ -9,13 +9,13 @@ import { generateHotelPrice } from '../utils/priceUtils';
 import { RESULTS_PER_PAGE, getDefaultHeaders } from '../config/api';
 import { IoArrowForward } from 'react-icons/io5';
 
-// Define API_BASE_URL directly
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
-// Function to get place prices - using direct axios instead of safeFetch
+
 let pricesCache = null;
 const getPlacePrices = async () => {
-  // Use cache if available to prevent multiple calls
+
   if (pricesCache) {
     console.log('Using cached prices');
     return pricesCache;
@@ -25,7 +25,7 @@ const getPlacePrices = async () => {
     console.log('Fetching prices from API - first time only');
     const response = await axios.get(`${API_BASE_URL}/api/places/prices`);
     if (response.data && response.data.success) {
-      // Convert array of price objects to map with placeId as key
+
       pricesCache = response.data.prices.reduce((acc, item) => {
         acc[item.placeId] = item.price;
         return acc;
@@ -41,10 +41,10 @@ const getPlacePrices = async () => {
   }
 };
 
-// Function to get place restrictions - using direct axios instead of safeFetch
+
 let restrictionsCache = null;
 const getPlaceRestrictions = async () => {
-  // Use cache if available to prevent multiple calls
+
   if (restrictionsCache) {
     console.log('Using cached restrictions');
     return restrictionsCache;
@@ -54,7 +54,7 @@ const getPlaceRestrictions = async () => {
     console.log('Fetching restrictions from API - first time only');
     const response = await axios.get(`${API_BASE_URL}/api/places/restrictions`);
     if (response.data && response.data.success) {
-      // Convert array to map with placeId as key
+
       restrictionsCache = response.data.restrictions.reduce((acc, item) => {
         acc[item.placeId] = {
           isRestricted: item.isRestricted,
@@ -77,7 +77,7 @@ const SearchResults = () => {
   const location = useLocation();
   const navigate = useNavigate();
   
-  // Convert from constant to state variable
+
   const [searchQuery, setSearchQuery] = useState(location.state?.searchQuery || '');
   const [searchResultsFromHomePage, setSearchResultsFromHomePage] = useState(location.state?.results || []);
   
@@ -90,10 +90,10 @@ const SearchResults = () => {
   const [currentImageIndexes, setCurrentImageIndexes] = useState({});
   const [dataProcessed, setDataProcessed] = useState(false);
   
-  // Search state
+
   const [newSearchQuery, setNewSearchQuery] = useState(searchQuery);
   
-  // Filter states
+
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
     minRating: 0,
@@ -107,7 +107,7 @@ const SearchResults = () => {
     'Content-Type': 'application/json',
     'X-Goog-FieldMask': 'places.userRatingCount,places.id,places.displayName,places.photos,places.formattedAddress,places.rating,places.types,places.websiteUri,places.priceLevel,places.businessStatus,places.priceRange'
   };
-  // Amenities options
+
   const amenitiesOptions = [
     { id: 'wifi', label: 'Free WiFi' },
     { id: 'parking', label: 'Parking' },
@@ -117,14 +117,14 @@ const SearchResults = () => {
     { id: 'airCon', label: 'Air Conditioning' }
   ];
 
-  // Function to generate random amenities
+
   const generateRandomAmenities = () => {
     const numAmenities = Math.floor(Math.random() * 3) + 2; // Generate 2-4 random amenities
     const shuffled = [...amenitiesOptions].sort(() => 0.5 - Math.random());
     return shuffled.slice(0, numAmenities).map(amenity => amenity.id);
   };
 
-  // Sort options
+
   const sortOptions = [
     { value: 'recommended', label: 'Recommended' },
     { value: 'priceAsc', label: 'Price (Low to High)' },
@@ -133,7 +133,7 @@ const SearchResults = () => {
   ];
   
   useEffect(() => {
-    // Prevent multiple data processing
+
     if (dataProcessed) {
       console.log('Data already processed, skipping');
       return;
@@ -142,11 +142,11 @@ const SearchResults = () => {
     if (searchResultsFromHomePage.length > 0) {
       console.log('Using search results passed from HomePage:', searchResultsFromHomePage.length);
       
-      // Use the results passed from HomePage
+
       const processedHotels = searchResultsFromHomePage.map(hotel => {
         let processedAmenities = [];
         
-        // Convert amenities object to array if needed
+
         if (hotel.amenities && typeof hotel.amenities === 'object' && !Array.isArray(hotel.amenities)) {
           processedAmenities = Object.entries(hotel.amenities)
             .filter(([key, value]) => value === true)
@@ -166,10 +166,10 @@ const SearchResults = () => {
       setHotels(processedHotels);
       setFilteredHotels(processedHotels);
       
-      // Calculate total pages based on results per page
+
       setTotalPages(Math.ceil(processedHotels.length / RESULTS_PER_PAGE));
       
-      // Initialize current image index for each hotel
+
       const initialIndexes = {};
       processedHotels.forEach(hotel => {
         initialIndexes[hotel.id] = 0;
@@ -187,19 +187,19 @@ const SearchResults = () => {
       return;
     }
 
-    // Only call fetchHotelsOnce once - not inside useEffect
+
     fetchHotelsOnce();
     
   }, [searchQuery, searchResultsFromHomePage.length, dataProcessed]); // Only rerun if these values change
 
-  // Separate function to fetch hotels just once
+
   const fetchHotelsOnce = async () => {
-    // Immediately clear all previous results and display loading state
+
     setHotels([]);
     setFilteredHotels([]);
     setCurrentPage(1);
     
-    // Force re-render with loading state
+
       setLoading(true);
     setError(null);
     
@@ -208,20 +208,20 @@ const SearchResults = () => {
       try {
         console.log('Fetching hotels with search query:', searchQuery);
       
-      // Format query to search for hotels in the specified location
+
       const formattedQuery = searchQuery.toLowerCase().includes('hotel') 
         ? searchQuery 
         : `hotels in ${searchQuery}`;
       console.log('Sending search-text request with query:', formattedQuery);
       
-      // Use same headers as HomePage
+
       const headers = {
         'Content-Type': 'application/json',
         'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.photos,places.rating,places.userRatingCount,places.priceLevel,places.id'
       };
       console.log('Using headers:', headers);
       
-      // Call the search-text endpoint
+
       const response = await axios.post(
         `${API_BASE_URL}/api/places/search-text`,
         { textQuery: formattedQuery },
@@ -233,13 +233,13 @@ const SearchResults = () => {
       if (response.data && response.data.places && response.data.places.length > 0) {
         console.log(`Found ${response.data.places.length} hotels from Google Places API`);
         
-        // Process hotels exactly like in HomePage
+
         const placesHotels = response.data.places.map(hotel => {
           return {
             ...hotel,
-            // Explicitly set id to guarantee it's preserved
+
             id: hotel.id,
-            // Generate price and amenities
+
             estimatedPrice: generateHotelPrice(hotel),
             amenities: {
               wifi: Math.random() > 0.2,
@@ -262,32 +262,32 @@ const SearchResults = () => {
         return;
       }
         
-        // Use our helper functions to safely get prices and restrictions
+
         const savedPrices = await getPlacePrices();
         const restrictedHotels = await getPlaceRestrictions();
         
         console.log('Prices retrieved:', Object.keys(savedPrices).length);
         console.log('Restrictions retrieved:', Object.keys(restrictedHotels).length);
         
-        // Process hotels and apply prices/restrictions
+
         const processedHotels = hotelsData
         .filter(hotel => !restrictedHotels[hotel.id]?.isRestricted)
           .map(hotel => ({
             ...hotel,
-          // Use saved price if available, otherwise use the hotel's base price or estimated price
+
           currentPrice: savedPrices[hotel.id] || hotel.price || hotel.estimatedPrice || 0
           }));
         
         console.log(`Processed ${processedHotels.length} hotels after filtering`);
         
-      // Only update state after all processing is complete
+
         setHotels(processedHotels);
         setFilteredHotels(processedHotels);
         
-        // Calculate total pages based on results per page
+
         setTotalPages(Math.ceil(processedHotels.length / RESULTS_PER_PAGE));
         
-        // Initialize current image index for each hotel
+
         const initialIndexes = {};
         processedHotels.forEach(hotel => {
         initialIndexes[hotel.id] = 0;
@@ -302,37 +302,37 @@ const SearchResults = () => {
       }
     };
 
-  // Apply filters and sorting
+
   useEffect(() => {
     if (hotels.length === 0) return;
 
     let results = [...hotels];
 
-    // Filter by rating
+
     results = results.filter(hotel => 
       !hotel.rating || hotel.rating >= filters.minRating
     );
 
-    // Filter by price
+
     results = results.filter(hotel => {
       const price = hotel.currentPrice || hotel.estimatedPrice || 0;
       return price >= filters.minPrice && price <= filters.maxPrice;
     });
 
-    // Filter by amenities
+
     if (filters.amenities.length > 0) {
       results = results.filter(hotel => {
-        // Skip hotels without amenities
+
         if (!hotel.amenities || !hotel.amenities.length) return false;
         
-        // Check if all selected amenities are present in the hotel's amenities
+
         return filters.amenities.every(amenity => 
           hotel.amenities.includes(amenity)
         );
       });
     }
 
-    // Apply sorting
+
     switch (filters.sortBy) {
       case 'priceAsc':
         results.sort((a, b) => {
@@ -352,7 +352,7 @@ const SearchResults = () => {
         results.sort((a, b) => (b.rating || 0) - (a.rating || 0));
         break;
       default:
-        // Default "recommended" sort combines rating and price factors
+
         results.sort((a, b) => {
           const priceA = a.currentPrice || a.estimatedPrice || 0;
           const priceB = b.currentPrice || b.estimatedPrice || 0;
@@ -363,42 +363,42 @@ const SearchResults = () => {
     }
 
     setFilteredHotels(results);
-    // Reset to first page when filters change
+
     setCurrentPage(1);
-    // Update total pages based on filtered results
+
     setTotalPages(Math.ceil(results.length / RESULTS_PER_PAGE));
   }, [hotels, filters]);
   
-  // Function to get photo URL from either a Google Places photo reference or a local database URL
+
   const getPhotoUrl = (photo, maxWidth = 400) => {
-    // For debugging
+
     console.log('Getting photo URL for:', photo);
     
-    // Case 1: If photo is a string, treat it as a direct URL from our database
+
     if (typeof photo === 'string') {
       return photo;
     }
     
-    // Case 2: If photo is an object with a name property, it's a Google Places photo reference
+
     if (photo && photo.name) {
       const url = `${API_BASE_URL}/api/places/media/${encodeURIComponent(photo.name)}?maxWidthPx=${maxWidth}`;
       console.log('Generated photo URL:', url);
       return url;
     }
     
-    // Case 3: If photo has a 'photo_reference' property (older Google Places API format)
+
     if (photo && photo.photo_reference) {
       const url = `${API_BASE_URL}/api/places/photo?photo_reference=${encodeURIComponent(photo.photo_reference)}&maxwidth=${maxWidth}`;
       console.log('Generated photo URL from photo_reference:', url);
       return url;
     }
     
-    // Default case: use the fallback image
+
     console.log('Using fallback image');
     return backgr;
   };
   
-  // Function to navigate through hotel images
+
   const navigateImage = (hotelId, direction, event) => {
     if (event) {
       event.stopPropagation(); // Prevent triggering hotel click
@@ -406,7 +406,7 @@ const SearchResults = () => {
     
     console.log('Navigating image for hotel ID:', hotelId, 'Direction:', direction);
     
-    // Find the specific hotel by ID, try hotel.id first, then hotel._id
+
     const hotel = hotels.find(h => h.id === hotelId || h._id === hotelId);
     
     if (!hotel) {
@@ -419,7 +419,7 @@ const SearchResults = () => {
       return;
     }
     
-    // Get current index for this specific hotel
+
     const currentIndex = currentImageIndexes[hotelId] || 0;
       let newIndex;
       
@@ -431,14 +431,14 @@ const SearchResults = () => {
       
     console.log('Changing image index from', currentIndex, 'to', newIndex);
     
-    // Update only this hotel's image index
+
     setCurrentImageIndexes(prev => ({
       ...prev,
       [hotelId]: newIndex
     }));
   };
   
-  // Function to handle hotel click
+
   const handleHotelClick = (hotelId) => {
     if (!hotelId) {
       console.error('No hotel ID provided');
@@ -448,22 +448,22 @@ const SearchResults = () => {
     console.log('Navigating to hotel details page for ID:', hotelId);
     
     try {
-      // Navigate to hotel details page using the correct URL format
-      // This matches how HomePage.jsx handles navigation to hotel details
+
+
     navigate(`/hotel/${hotelId}`);
     } catch (error) {
       console.error('Error navigating to hotel details:', error);
     }
   };
   
-  // Function to handle pagination
+
   const handlePageChange = (page) => {
     setCurrentPage(page);
-    // Scroll to top when changing page
+
     window.scrollTo(0, 0);
   };
 
-  // Handle new search submission
+
   const handleNewSearch = (e) => {
     e.preventDefault();
     
@@ -471,27 +471,27 @@ const SearchResults = () => {
       return;
     }
     
-    // Immediately clear all previous results and display loading state
+
     setHotels([]);
     setFilteredHotels([]);
     setCurrentPage(1);
     
-    // Force re-render with loading state
+
     setLoading(true);
     setError(null);
     
-    // Reset all caches
+
     pricesCache = null;
     restrictionsCache = null;
     setDataProcessed(false);
     
-    // Format query to search for hotels in the specified location
+
     const formattedQuery = newSearchQuery.toLowerCase().includes('hotel') 
       ? newSearchQuery.trim()
       : `hotels in ${newSearchQuery.trim()}`;
     console.log('Searching for:', formattedQuery);
     
-    // Use search-text API endpoint
+
     axios.post(`${API_BASE_URL}/api/places/search-text`, {
       textQuery: formattedQuery
     }, {
@@ -503,19 +503,19 @@ const SearchResults = () => {
         
         const hotelsWithPrices = response.data.places.map(hotel => ({
           ...hotel,
-          // Ensure we retain the Google Places ID
+
           id: hotel.id,
           estimatedPrice: generateHotelPrice(hotel),
           amenities: generateRandomAmenities()
         }));
         
-        // Only update state after all processing is complete
+
         setSearchQuery(newSearchQuery.trim());
         setHotels(hotelsWithPrices);
         setFilteredHotels(hotelsWithPrices);
         setTotalPages(Math.ceil(hotelsWithPrices.length / RESULTS_PER_PAGE));
         
-        // Initialize image indexes
+
         const initialIndexes = {};
         hotelsWithPrices.forEach(hotel => {
           initialIndexes[hotel.id] = 0;
@@ -538,37 +538,37 @@ const SearchResults = () => {
     });
   };
 
-  // Helper function to search in our database
+
   const searchInDatabase = async (query) => {
     try {
-      // Immediately clear all previous results and display loading state
+
       setHotels([]);
       setFilteredHotels([]);
       setCurrentPage(1);
       
-      // Force re-render with loading state
+
       setLoading(true);
       setError(null);
       
-      // Reset all caches
+
       pricesCache = null;
       restrictionsCache = null;
       setDataProcessed(false);
       
-      // Format query to search for hotels in the specified location
+
       const formattedQuery = query.toLowerCase().includes('hotel') 
         ? query.trim()
         : `hotels in ${query.trim()}`;
       console.log('Searching with query:', formattedQuery);
       
-      // Use the same headers as in HomePage
+
       const headers = {
         'Content-Type': 'application/json',
         'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.photos,places.rating,places.userRatingCount,places.priceLevel,places.id'
       };
       console.log('Using search headers:', headers);
       
-      // Use direct axios.post to the search-text endpoint
+
       const response = await axios.post(
         `${API_BASE_URL}/api/places/search-text`,
         {
@@ -584,7 +584,7 @@ const SearchResults = () => {
         console.log('First hotel sample:', JSON.stringify(response.data.places[0]));
         console.log('First place ID example:', response.data.places[0].id);
         
-        // Process hotels exactly like HomePage does it
+
         const hotelsWithPrices = response.data.places.map(hotel => {
           console.log(`Processing hotel with ID: ${hotel.id}`);
           return {
@@ -605,14 +605,14 @@ const SearchResults = () => {
         console.log('First processed hotel:', hotelsWithPrices[0]);
         console.log('IDs of processed hotels:', hotelsWithPrices.map(h => h.id));
         
-        // Only update state after all processing is complete
+
         setSearchQuery(query.trim());
         setNewSearchQuery(query.trim());
         setHotels(hotelsWithPrices);
         setFilteredHotels(hotelsWithPrices);
         setTotalPages(Math.ceil(hotelsWithPrices.length / RESULTS_PER_PAGE));
         
-        // Initialize image indexes
+
         const initialIndexes = {};
         hotelsWithPrices.forEach(hotel => {
           initialIndexes[hotel.id] = 0;
@@ -634,7 +634,7 @@ const SearchResults = () => {
     }
   };
 
-  // Handle filter changes
+
   const handleFilterChange = (key, value) => {
     setFilters(prevFilters => ({
       ...prevFilters,
@@ -642,7 +642,7 @@ const SearchResults = () => {
     }));
   };
 
-  // Toggle amenity selection
+
   const toggleAmenity = (amenityId) => {
     setFilters(prevFilters => {
       const amenities = [...prevFilters.amenities];
@@ -661,7 +661,7 @@ const SearchResults = () => {
     });
   };
 
-  // Reset all filters
+
   const resetFilters = () => {
     setFilters({
       minRating: 0,
@@ -672,32 +672,32 @@ const SearchResults = () => {
     });
   };
   
-  // Get current page hotels
+
   const getCurrentPageHotels = () => {
     const startIndex = (currentPage - 1) * RESULTS_PER_PAGE;
     const endIndex = startIndex + RESULTS_PER_PAGE;
     return filteredHotels.slice(startIndex, endIndex);
   };
   
-  // Generate pagination numbers
+
   const generatePaginationNumbers = () => {
     const pagesToShow = [];
     const maxVisiblePages = 5;
     
     if (totalPages <= maxVisiblePages) {
-      // Show all page numbers if total pages is less than or equal to max visible pages
+
       for (let i = 1; i <= totalPages; i++) {
         pagesToShow.push(i);
       }
     } else {
-      // Always show first page
+
       pagesToShow.push(1);
       
       if (currentPage > 3) {
         pagesToShow.push('...');
       }
       
-      // Show current page and adjacent pages
+
       const start = Math.max(2, currentPage - 1);
       const end = Math.min(totalPages - 1, currentPage + 1);
       
@@ -709,7 +709,7 @@ const SearchResults = () => {
         pagesToShow.push('...');
       }
       
-      // Always show last page
+
       if (totalPages > 1) {
         pagesToShow.push(totalPages);
       }
@@ -718,45 +718,45 @@ const SearchResults = () => {
     return pagesToShow;
   };
   
-  // Function to render a single hotel card
+
   const HotelCard = ({ hotel, index, handleClick }) => {
-    // Process amenities correctly based on their source format
+
     let displayAmenities = [];
     
     if (hotel.amenities) {
-      // Case 1: If amenities is an object (from HomePage)
+
       if (typeof hotel.amenities === 'object' && !Array.isArray(hotel.amenities)) {
         displayAmenities = Object.entries(hotel.amenities)
           .filter(([key, value]) => value === true)
           .map(([key]) => key);
       }
-      // Case 2: If amenities is already an array (from backend)
+
       else if (Array.isArray(hotel.amenities)) {
         displayAmenities = hotel.amenities;
       }
     } else {
-      // Generate random amenities if none exist
+
       displayAmenities = generateRandomAmenities();
     }
     
-    // Ensure we have the correct ID format - prioritize the id formats in order of preference
-    // Print the entire hotel object for debugging
+
+
     console.log('Hotel object in HotelCard:', hotel);
     
-    // Determine the ID to use (Google Places id for Places API or MongoDB _id for database)
+
     const hotelId = hotel.id || hotel._id || null;
     console.log('Extracted hotel ID:', hotelId);
     
-    // Determine hotel name based on source
+
     const hotelName = hotel.name || (hotel.displayName?.text || 'Unnamed Hotel');
     
-    // Determine hotel location based on source
+
     const location = hotel.location || hotel.formattedAddress || 'Location not available';
     
-    // Determine price based on source
+
     const price = hotel.currentPrice || hotel.estimatedPrice || 'Price not available';
     
-    // Get the current image index or default to 0
+
     const currentImageIndex = currentImageIndexes[hotelId] || 0;
     
     return (
@@ -859,13 +859,13 @@ const SearchResults = () => {
     );
   };
   
-  // Reset function to handle navigating back home or to another page
+
   const resetSearchState = () => {
-    // Clear session storage data to prevent loops
+
     sessionStorage.removeItem('searchResults');
     sessionStorage.removeItem('searchQuery');
     
-    // Reset all internal state
+
     setDataProcessed(false);
     setHotels([]);
     setFilteredHotels([]);
@@ -876,18 +876,18 @@ const SearchResults = () => {
     setError(null);
   };
   
-  // Cleanup on component unmount
+
   useEffect(() => {
     return () => {
-      // Clear session storage when component unmounts
+
       sessionStorage.removeItem('searchResults');
       sessionStorage.removeItem('searchQuery');
     };
   }, []);
 
-  // Update the useEffect to syncronize searchQuery and newSearchQuery
+
   useEffect(() => {
-    // When the component mounts or searchQuery changes, update newSearchQuery to match
+
     setNewSearchQuery(searchQuery);
   }, [searchQuery]);
   
@@ -1219,7 +1219,7 @@ const SearchResults = () => {
         {!loading && !error && filteredHotels.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {getCurrentPageHotels().map((hotel) => {
-              // Prioritize hotel.id (Google Places) over hotel._id (MongoDB)
+
               const hotelId = hotel.id || hotel._id;
               console.log('Rendering hotel card for hotel:', hotel);
               console.log('Using hotel ID:', hotelId);

@@ -118,3 +118,173 @@
     IP: ::1
     User: 67fcac48151e6d0157e5eb1a
   
+[2025-04-18T19:26:34.294Z] 
+    Error: Error updating hotel restriction status
+    Stack: Error: Error updating hotel restriction status
+    at C:\Users\condu\Desktop\proiect-web\backend\controllers\hotelController.js:586:17
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    URL: /api/hotels/ChIJXUZKrnr_sUARIOuw_E6Ngg8/restrict
+    Method: PUT
+    IP: ::1
+    User: 67ff8d897b1707da1253e263
+  
+[2025-04-18T19:30:02.207Z] 
+    Error: Hotel validation failed: photos.0: Cast to [string] failed for value "[\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcJ0aBqzcjTUhW0BMq9eG_ZwSllWfKuaeWB1R2DXdtPv2qsFkQrWqMNplKkpWzkdllYbVZXKUwCLQ9j4qf-FmGF8124bVTmnebKzEdxCg_qtTRZv3JLVWz0tOwo791_sQqwsPWzA6dy98wXyQJRzhEN4A3-kujj7_M85_W1KxBwXXZhWzAzBnMQApDm9qYFgdmXJbbIr4DCtzahAzRFmgrqR1pRbF15mXhOm5iBMwhl_w_i-CNq1CVTneOGqcaOIrJ--qi5s_reO-rMJMJUvDjjUeBqpCN9SRv2SWjMpZcw'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcKpaldJWEs5Y-D0CwC9wO7heBUvps8TZHTn4fE-aCht2VS1ebqP3rC2HzWtIIDo6GnEzl0aXsUwvjE092mOsmXz3oKRqOtb3X_HSgZqN6otP-3WdNfHZRaoZ62XfIKzl4ClW20K3a-bb9OQW8QiNP2laOYKPWNGjpBMw-oxuMWu8L9tuXHP0haUxNvrUDXmKsqIDJNf57kUtecDOZjXKTUS5K_TnNplxxLcFU0pRp_ijMZ8SG3s03ZFDYXin0s46K8Y1qHnhjGHr2tCawOGt9gy_AHC1CtdWG8itz87Wb4'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcJClpMM2-OesEx32F7N5SSTr0R1ODL-__58QAoLm5ia8pwaXrM_QXay_aGClHQMaeO-Rq-I0GFFMUW52UMd7UxP4kp_cGyF3kPozQjc9hMRNa3gye69LcQpcWCJPQpctXZhg5nfgy2MF9o9Vpo9KfMR9OulytUIigwVW_pT7-GJwEJ3_bzcZSUHHcT__v5VjWnKOokt8CzPABUKUuRYhq4nqH6Pcg9kLUtDFiHbTw1F6mWsNAxNUKwn7eKOrllk6k887NQZU5A6ERFMcUK4SLXfX9hO5vRub8c2T0A_l5s-bKwdSzExa50UhaH90pAG7zBR1IxNcLhYk2rw-_J1D0aCqBRhWbJqnEX9soiktU_DAewE-PN3RAUME0IQDvJz-jZUgS_vDDoMZK6Kd_hj1vxOGGSUSnu3qp6A1yiz3eI'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcIPBLyOfkURnyV3eK_7bxN1eAEFEczrMcjAzBerE3OcqzrPNiMG0u6drQ3OcGixxlFObn5CG2HSEUnhZED11-e2vKPK3YgRzyu24pNShXc8htnGqTrqtXt1E1FD0_pjTd86jI7bwS5fPCvcR-P4B-6K_y_M_ZOg1Tmby6mFdeJzj1NthJVy0014PdW12s0I4KjGqR3ndTpcuhY5-EmSq2jcd0mlJczLZadF4zvLfZornBw8VRgilzhYLeqFGw65_RCV590AEN_jE7l9HYoeBoa_GepEZKsstXwX0QZaAeg'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcJAHIjfQvP1tZbFvm9VfyxrLSnZa9iFdrMITDLKG7LFbNfmScMyvs4M9Q6704mYQFrppiCiBEsxCh4bAAIkXklRqot5YVOTyOJmNJmIo4CPaXdZml89lVMWBqSq7vTSVRuzH5Xyeus1JxJdBdFCP38zUJZpA7LVTcJWKzcXNEzC_lcpyN6eDyq4OjAacNXP1zerHnUdMpZl2TR3SjiGzsef3AI5A4lerWeGHI4kszI0jQagfPRtWmwMH1ydzqPIFnOwE_AWV1stYzT3MraaNdai6za4ldPLrwBSgrf4Iw8'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcLjyOQPDsW4p6D3ZVp6cq_AZoBylsRUtbpWzkCb2-ZxhYjY6qPswqMIJGoqsNs6twpPF7qnnIHVMXoKUwvm109bhLm0Mx19PoE5RTz7sMU8cDvaUfwuWmMzM-LVA_CNxKHOgNzUGUpJMh12RDtthIUXFP5U4GCHMBEMrxxsnnpy_mPaGstevl2WHWr9mWjk8TmzvkwFNZ1nVBzZQtxsqOmrCRvsGPdOmY822FD1pYuqNR3lpB-DH8fRS0Ci28Xz0S2bZIael-Jsfk4RjcjZj80uDzkO27Pog0JBhCsIktg'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcLTOwYlimDvf8LlVErdiv9g3FhdddCeo8zrzfY6YTSnYZ4f40G7PE1ovdpbw7VabknzZfxMujn7y58NtQIPpEn_idXpGn4yrWUGz12hdO-PG1IEu0J1BsD8vyekeudB_-Ci7itT4gdCJd90XgrsRBnUCjJuNTabRlFi8MO6k5Zju7EqtOpvYWv-ByZjFh79qsVRlRLaogv473Ok78kqahjd1yTqaSVXRhPDMfsfmSaEEbNno1jKkIDKZHUX1KmZGtiyhmwcYHGgf9VJmPvUhWZeKiqH2oxoyZWrRc7-8OI'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcJCC0t-G18n0PgOBjrLegy8348hZjsKLkQEepP-yUFH8c75ac_SA-9vqMxfiF9zFGdWetRRcYzso9PBqGE1fzZrVU1EpnH6tJ9SyxJQWRL8NEzIQ8r3BJ4zrBUbBOjfrLLckr8Qmm0DaHxZ2rEi4DK6pv4qtutPaxl1vRNEAWD4ZCOltG9XNYemokzGpkVBFUxgQGx2Oz4LK_lfSgZvKJVjfcndgZT3F4H91Yjc62-ZnUSxP-Xsg9LVuxiWPXNn0vMb9TPR1iDKFPI2D9fxmxjU_LSV_AzSiGs91DFZFKA'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcKEvHxYhkOeTiTRFLwDbK8ebsDTRKn31VTAGwnGXS9kMmI4YhpokIx0mLZ1qK0d3pd-vNDQ68Rn8QVMid6vyg8btoHRMZghpBSBeZQZ0DGtdBpR5BS2yt5Kc1B6K7CLcRs8859o36tOGifR51i657PU84Fc65wmjp6j_MhwVWyIQ3FIU55KkcG7xI1cAAkDWscQniFeGKw-yL-pBnXILTiSnwpjG119lBRlqpATtYrscHo6mFUAXoHluwVaLt9SelJB6oljOTpFXIFDm_djDF-PLZI4SlX-EB9g8lVg168'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcLbk7K8_hzRi6A9M6yjGArGJWrtaYc9Br2iwOxIqojD9ABCr9NfmR8BFwGLt9JcE8W2peRisQuztfI7HuGg_M1L75frb9dkPmk4KdfAqUnFmR7lOvhDCiN2EGmENUS0VJ1LmXnMiEy6dSb-XswxBoXLqiPMbXj-ZQdV5mNp8y3txHSGm6fbrnp9JZY-G3ejtE4_dHS9_NSj-igkbEp7ggEtaIGWNRqM-OZA1qyszckpo38s4l5y5zNDcFBs9r3AfRRQBF_2TKmpnc3ie8D96DWBt5enojiNlgmTrA3tpLE'\n" +
+  '  }\n' +
+  ']" (type string) at path "photos.0" because of "CastError"
+    Stack: ValidationError: Hotel validation failed: photos.0: Cast to [string] failed for value "[\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcJ0aBqzcjTUhW0BMq9eG_ZwSllWfKuaeWB1R2DXdtPv2qsFkQrWqMNplKkpWzkdllYbVZXKUwCLQ9j4qf-FmGF8124bVTmnebKzEdxCg_qtTRZv3JLVWz0tOwo791_sQqwsPWzA6dy98wXyQJRzhEN4A3-kujj7_M85_W1KxBwXXZhWzAzBnMQApDm9qYFgdmXJbbIr4DCtzahAzRFmgrqR1pRbF15mXhOm5iBMwhl_w_i-CNq1CVTneOGqcaOIrJ--qi5s_reO-rMJMJUvDjjUeBqpCN9SRv2SWjMpZcw'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcKpaldJWEs5Y-D0CwC9wO7heBUvps8TZHTn4fE-aCht2VS1ebqP3rC2HzWtIIDo6GnEzl0aXsUwvjE092mOsmXz3oKRqOtb3X_HSgZqN6otP-3WdNfHZRaoZ62XfIKzl4ClW20K3a-bb9OQW8QiNP2laOYKPWNGjpBMw-oxuMWu8L9tuXHP0haUxNvrUDXmKsqIDJNf57kUtecDOZjXKTUS5K_TnNplxxLcFU0pRp_ijMZ8SG3s03ZFDYXin0s46K8Y1qHnhjGHr2tCawOGt9gy_AHC1CtdWG8itz87Wb4'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcJClpMM2-OesEx32F7N5SSTr0R1ODL-__58QAoLm5ia8pwaXrM_QXay_aGClHQMaeO-Rq-I0GFFMUW52UMd7UxP4kp_cGyF3kPozQjc9hMRNa3gye69LcQpcWCJPQpctXZhg5nfgy2MF9o9Vpo9KfMR9OulytUIigwVW_pT7-GJwEJ3_bzcZSUHHcT__v5VjWnKOokt8CzPABUKUuRYhq4nqH6Pcg9kLUtDFiHbTw1F6mWsNAxNUKwn7eKOrllk6k887NQZU5A6ERFMcUK4SLXfX9hO5vRub8c2T0A_l5s-bKwdSzExa50UhaH90pAG7zBR1IxNcLhYk2rw-_J1D0aCqBRhWbJqnEX9soiktU_DAewE-PN3RAUME0IQDvJz-jZUgS_vDDoMZK6Kd_hj1vxOGGSUSnu3qp6A1yiz3eI'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcIPBLyOfkURnyV3eK_7bxN1eAEFEczrMcjAzBerE3OcqzrPNiMG0u6drQ3OcGixxlFObn5CG2HSEUnhZED11-e2vKPK3YgRzyu24pNShXc8htnGqTrqtXt1E1FD0_pjTd86jI7bwS5fPCvcR-P4B-6K_y_M_ZOg1Tmby6mFdeJzj1NthJVy0014PdW12s0I4KjGqR3ndTpcuhY5-EmSq2jcd0mlJczLZadF4zvLfZornBw8VRgilzhYLeqFGw65_RCV590AEN_jE7l9HYoeBoa_GepEZKsstXwX0QZaAeg'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcJAHIjfQvP1tZbFvm9VfyxrLSnZa9iFdrMITDLKG7LFbNfmScMyvs4M9Q6704mYQFrppiCiBEsxCh4bAAIkXklRqot5YVOTyOJmNJmIo4CPaXdZml89lVMWBqSq7vTSVRuzH5Xyeus1JxJdBdFCP38zUJZpA7LVTcJWKzcXNEzC_lcpyN6eDyq4OjAacNXP1zerHnUdMpZl2TR3SjiGzsef3AI5A4lerWeGHI4kszI0jQagfPRtWmwMH1ydzqPIFnOwE_AWV1stYzT3MraaNdai6za4ldPLrwBSgrf4Iw8'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcLjyOQPDsW4p6D3ZVp6cq_AZoBylsRUtbpWzkCb2-ZxhYjY6qPswqMIJGoqsNs6twpPF7qnnIHVMXoKUwvm109bhLm0Mx19PoE5RTz7sMU8cDvaUfwuWmMzM-LVA_CNxKHOgNzUGUpJMh12RDtthIUXFP5U4GCHMBEMrxxsnnpy_mPaGstevl2WHWr9mWjk8TmzvkwFNZ1nVBzZQtxsqOmrCRvsGPdOmY822FD1pYuqNR3lpB-DH8fRS0Ci28Xz0S2bZIael-Jsfk4RjcjZj80uDzkO27Pog0JBhCsIktg'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcLTOwYlimDvf8LlVErdiv9g3FhdddCeo8zrzfY6YTSnYZ4f40G7PE1ovdpbw7VabknzZfxMujn7y58NtQIPpEn_idXpGn4yrWUGz12hdO-PG1IEu0J1BsD8vyekeudB_-Ci7itT4gdCJd90XgrsRBnUCjJuNTabRlFi8MO6k5Zju7EqtOpvYWv-ByZjFh79qsVRlRLaogv473Ok78kqahjd1yTqaSVXRhPDMfsfmSaEEbNno1jKkIDKZHUX1KmZGtiyhmwcYHGgf9VJmPvUhWZeKiqH2oxoyZWrRc7-8OI'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcJCC0t-G18n0PgOBjrLegy8348hZjsKLkQEepP-yUFH8c75ac_SA-9vqMxfiF9zFGdWetRRcYzso9PBqGE1fzZrVU1EpnH6tJ9SyxJQWRL8NEzIQ8r3BJ4zrBUbBOjfrLLckr8Qmm0DaHxZ2rEi4DK6pv4qtutPaxl1vRNEAWD4ZCOltG9XNYemokzGpkVBFUxgQGx2Oz4LK_lfSgZvKJVjfcndgZT3F4H91Yjc62-ZnUSxP-Xsg9LVuxiWPXNn0vMb9TPR1iDKFPI2D9fxmxjU_LSV_AzSiGs91DFZFKA'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcKEvHxYhkOeTiTRFLwDbK8ebsDTRKn31VTAGwnGXS9kMmI4YhpokIx0mLZ1qK0d3pd-vNDQ68Rn8QVMid6vyg8btoHRMZghpBSBeZQZ0DGtdBpR5BS2yt5Kc1B6K7CLcRs8859o36tOGifR51i657PU84Fc65wmjp6j_MhwVWyIQ3FIU55KkcG7xI1cAAkDWscQniFeGKw-yL-pBnXILTiSnwpjG119lBRlqpATtYrscHo6mFUAXoHluwVaLt9SelJB6oljOTpFXIFDm_djDF-PLZI4SlX-EB9g8lVg168'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcLbk7K8_hzRi6A9M6yjGArGJWrtaYc9Br2iwOxIqojD9ABCr9NfmR8BFwGLt9JcE8W2peRisQuztfI7HuGg_M1L75frb9dkPmk4KdfAqUnFmR7lOvhDCiN2EGmENUS0VJ1LmXnMiEy6dSb-XswxBoXLqiPMbXj-ZQdV5mNp8y3txHSGm6fbrnp9JZY-G3ejtE4_dHS9_NSj-igkbEp7ggEtaIGWNRqM-OZA1qyszckpo38s4l5y5zNDcFBs9r3AfRRQBF_2TKmpnc3ie8D96DWBt5enojiNlgmTrA3tpLE'\n" +
+  '  }\n' +
+  ']" (type string) at path "photos.0" because of "CastError"
+    at Document.invalidate (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\document.js:3329:32)
+    at model.$set (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\document.js:1480:12)
+    at model.$set (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\document.js:1132:16)
+    at model.Document (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\document.js:178:12)
+    at model.Model (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\model.js:128:12)
+    at new model (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\model.js:4800:15)
+    at C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\model.js:2759:20
+    at Array.map (<anonymous>)
+    at Function.create (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\model.js:2747:34)
+    at C:\Users\condu\Desktop\proiect-web\backend\controllers\hotelController.js:71:29
+    URL: /api/hotels
+    Method: POST
+    IP: ::1
+    User: 67ff8d897b1707da1253e263
+  
+[2025-04-18T19:31:40.159Z] 
+    Error: Hotel validation failed: photos.0: Cast to [string] failed for value "[\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcK2_CPs6J8CeAfLYjCYjJBrsI1EqdrtUF-IRNyWnoC2JpnjIma57K1D3f5N1NRfPFZ8P1kQYF-H8wfxZxKLNLBQ72J8CBUfY7BrL9bwq1QEHIThWOTv2mAbEPBcgej1sNfPfdhZqNAXH_l75SOHkK-f7gOyBUaA4qsHyp-08IkaNuChH2jee8-llkyc5gZMJh4_7zCTyjNENeYOQp2t4UYyOeUg62RuLRn65-HZwaLWA_isJ5Qav6h8I475xpT8IFiYbAB7JTj_dELQ2LplZVBT-3L_ClA4wP1CkA7sNzI'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcKYYAtZbDoqv4-vUnH8A5JvLsB8aPVg-ZsVEV2Eft1laWYxLuXYs6csbp5WlLwTWi7dkxjbksGVMcPhsOCvqZCyve5tSAUxsNvTJZZWivXbs_IIsyH7xPy8boMgdXX_ZJaUmr0FSMpLYVzVeNILv-PImTrTddmD9ciWRXvVuXIMjaoQBgKVSam1nxdTmYmS9uU4RadYX0lGje85cQ-BFEBSI1eA1dEbXiL2rk7lreqU-G1nazt_kM8R0tZEQ9uPtUCBNJu-mlsqZ_LO8fOAc2DFegTbc7oFVByN7lbwZvA'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcI3-CKtQNNSj4nM7gJ9vRG2IYL8uwSs9zBg2z6ANzOjaCeUrNawY_b5wBw64HXGgc7u2b5qrzyeDuY_c7mbdR2rUHFidf51MlnYwsL5pVy7G8zFjxqIbOlGfdjEPRNgBLh2yvsj4DsZJLCKlPTVvu5yT4DiMUBcGH9x47Bk_N7UXPYWFZ6xTopxPdE-RbbfK0MFpvvvKkEQCdeWJkenU-LbyUnR08Avvzze082VM-PZwm9XWXipntSdgcFgpZQct3a5qGzACIkT82rHWvxcgoR0cAThuCLnT66LZ9m0DIcvgeVXNueSUQpwd0p6t4sxWHiN81jbgJ___McKVqdl1pO_ZFUrg2L9nAV8wkA1-W-GVqSZtgIvvgf2atzIeZeLfjJlXBLF_Qb5t-FoePb22jfQOmdBK5-3L6Q6r7BX22Y'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcLfdT9_BYGdWgdyIIyTxAnvAIWwWZr4_Emk-7l98dJMGX2AWbvW02pRJXkIhHRblp0oEf23C7DEBQ9b7TGTy3gwiKwhCAO7_KOli_OyzkN-DdpmmfU3DsbKsTXNAifpZLmNONs6O5xn-HfE1c1MDQE-7cRzMn-xo6CYT0PrHAumEgFXvrmK7B3w3d2ZOklalmGG3RMkeIqmAss1wUnnULll-lueojKApghD1jVPG-8EzKpIhT4pdkzfE3oWrmvQcWSshUutg94X5NgZRpXyqLRtcvBKk-0FEgIpUPIHg-U'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcJol2EHzKb3DAkVFFw9fPVtPShszYUoXMkA66HVeGgW0FwQmiI8TAslv1_PyDxVZdG-7Wa6zuDu1WmGktoIeRFv0HyWFAiK_jQcp9wOZ-6MmoTDPUiqAX2A_umCvYcEX-oHAdgBc8G6bgX1VcIt1A5JsJzbAZm8DgKoqtqlWOGjTLY0uQV2jJfFLl72ws5vY7SdyoPWiyRzdobi19Q9ePTf3SuYht3WixbEvJ4Z5GheB7BNqUwIkrvyvjpmHWNX8skonTXKCZ5Oa1DCCz68--Hf4sZh67v7yfSgdYf3ig4'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcJXXM8spz89fU3s2Ig_NeGGAc_yHWoE_wknoPDnYvBqgL2ncx5zuBTUrQ-tNxmkOA8I0bjK0YZM2Bv4SJ4HGDHmFpsDSBgOf7dl3ie0SW6p-gjoRorkksojkfTWbR1faScs2gux9-MV2D2U2c8yX3JZowdyYvsznkmussFZObZMIeB8Ub8i5-dfE-WbhFqUF9AoPSi0wYhoDnmVvvqAT2NbhbfaHwKkj5cwS8OUtBV2LPSJorYh3njQrIqrQBgVzLioNvfABW5siTvIUm2HH5j8H430SIXPARoIenub5os'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcKTkdyDzUV2IIFYueAD6HGs5IgMwt8uXIySG2NNxyMrKLvybX6JQyTiK9F_0cxv5q7SzcmOSfBpsHZEX5TpXy0VVf5KEtuwh6swU7iN_bulpSU6oB9A_i-bmciJoOJWU_uHffGmkOfCQZ0jJNaEX3UIN8jOS5t4ldCCZC70cOunqd1C2hjZwe2bjEy9WqdKK00y_EXTp_gZD0Y0zRV4Hg0iB2pravUNUv4Diz-LN_M9hn-sUjVFnddUGRVC3IRELaPJLBAwZdsoCZ6ICn0S0tPVwaqB-26KpjePH3ckp8E'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcIi1nZn2nEsPT7axBh7SlwGCximmtwSqvyG7ydrVhrukptRVUSN368fpEsR-g_LQPMDim1eeXEYGPZ0-hA_0HXWYZA1oV3UwTWEtsqi-Qcgst8JZwgZPcsPf3pDe183yMpKsguIIg3LLq5RYx6dFi9AlMALazuJQuLKgcAcybpmn85MkJuieP8ToCj8oHiDdp6gLVmvH84K5vG9hRtwSvJ0CUhHud6MnPIljxB1fCzSRjbWg8UEs718-V24S1UJZcnETZT50fSBX8N7OZNRoK89B8LOEW-Y4OfQ1VvhE0U'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcLMEY_XTEzaNF_viLPjSUEQOFIvyGvTcrEEySl8-6zWc7-RIU7SoDVL6jxbcaH3kPOLjt2cC0NoFrYaji2CIdy82ekeQBeo3sUVBMks9a9qaAJ6ITqKFGcaKgPt37J3_fCrIoeoJN7P6-ZzFv9aOcnlDGGBkK2cavNE1jC3FOc7LHFOBp7y3BOQLZurNSRrYHZslDODn1MgHrCfYFduFmduF6QXTjfQsVcwMYf9OqMS6G6il_RyCKp9uiZ0p5yjBvyodErc4foIykbUR4tO7MqPwVmlkg5GKvfxItDmKdI'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcLH9QSRxZoRV6KTwzTBSwIDmRxPpKNhxEpIFd9rrn1eiQHVJfNiWfjxeBpaMMJARbS9R9YQx2rX4gVdHSeYBer5COsEC8jjPfCADzC_Kf9OOMg22pz3jeGqv6jTeV8M0dbFATFV8kAb_jaQ_olpAlYSIzAsAFmDwnQ0azM48AfCn16znG_V_A9FIvO0SA7pK_r_IjEnkERdg_Fprj6OM1Kga7pcOY9h7OaEqldRHAblpttfVLX9lQRU2IQuaZTDt0FUOP21PYGnwudtS0FJz8C1u3zm4BAYDhfD2d7zDY8'\n" +
+  '  }\n' +
+  ']" (type string) at path "photos.0" because of "CastError"
+    Stack: ValidationError: Hotel validation failed: photos.0: Cast to [string] failed for value "[\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcK2_CPs6J8CeAfLYjCYjJBrsI1EqdrtUF-IRNyWnoC2JpnjIma57K1D3f5N1NRfPFZ8P1kQYF-H8wfxZxKLNLBQ72J8CBUfY7BrL9bwq1QEHIThWOTv2mAbEPBcgej1sNfPfdhZqNAXH_l75SOHkK-f7gOyBUaA4qsHyp-08IkaNuChH2jee8-llkyc5gZMJh4_7zCTyjNENeYOQp2t4UYyOeUg62RuLRn65-HZwaLWA_isJ5Qav6h8I475xpT8IFiYbAB7JTj_dELQ2LplZVBT-3L_ClA4wP1CkA7sNzI'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcKYYAtZbDoqv4-vUnH8A5JvLsB8aPVg-ZsVEV2Eft1laWYxLuXYs6csbp5WlLwTWi7dkxjbksGVMcPhsOCvqZCyve5tSAUxsNvTJZZWivXbs_IIsyH7xPy8boMgdXX_ZJaUmr0FSMpLYVzVeNILv-PImTrTddmD9ciWRXvVuXIMjaoQBgKVSam1nxdTmYmS9uU4RadYX0lGje85cQ-BFEBSI1eA1dEbXiL2rk7lreqU-G1nazt_kM8R0tZEQ9uPtUCBNJu-mlsqZ_LO8fOAc2DFegTbc7oFVByN7lbwZvA'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcI3-CKtQNNSj4nM7gJ9vRG2IYL8uwSs9zBg2z6ANzOjaCeUrNawY_b5wBw64HXGgc7u2b5qrzyeDuY_c7mbdR2rUHFidf51MlnYwsL5pVy7G8zFjxqIbOlGfdjEPRNgBLh2yvsj4DsZJLCKlPTVvu5yT4DiMUBcGH9x47Bk_N7UXPYWFZ6xTopxPdE-RbbfK0MFpvvvKkEQCdeWJkenU-LbyUnR08Avvzze082VM-PZwm9XWXipntSdgcFgpZQct3a5qGzACIkT82rHWvxcgoR0cAThuCLnT66LZ9m0DIcvgeVXNueSUQpwd0p6t4sxWHiN81jbgJ___McKVqdl1pO_ZFUrg2L9nAV8wkA1-W-GVqSZtgIvvgf2atzIeZeLfjJlXBLF_Qb5t-FoePb22jfQOmdBK5-3L6Q6r7BX22Y'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcLfdT9_BYGdWgdyIIyTxAnvAIWwWZr4_Emk-7l98dJMGX2AWbvW02pRJXkIhHRblp0oEf23C7DEBQ9b7TGTy3gwiKwhCAO7_KOli_OyzkN-DdpmmfU3DsbKsTXNAifpZLmNONs6O5xn-HfE1c1MDQE-7cRzMn-xo6CYT0PrHAumEgFXvrmK7B3w3d2ZOklalmGG3RMkeIqmAss1wUnnULll-lueojKApghD1jVPG-8EzKpIhT4pdkzfE3oWrmvQcWSshUutg94X5NgZRpXyqLRtcvBKk-0FEgIpUPIHg-U'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcJol2EHzKb3DAkVFFw9fPVtPShszYUoXMkA66HVeGgW0FwQmiI8TAslv1_PyDxVZdG-7Wa6zuDu1WmGktoIeRFv0HyWFAiK_jQcp9wOZ-6MmoTDPUiqAX2A_umCvYcEX-oHAdgBc8G6bgX1VcIt1A5JsJzbAZm8DgKoqtqlWOGjTLY0uQV2jJfFLl72ws5vY7SdyoPWiyRzdobi19Q9ePTf3SuYht3WixbEvJ4Z5GheB7BNqUwIkrvyvjpmHWNX8skonTXKCZ5Oa1DCCz68--Hf4sZh67v7yfSgdYf3ig4'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcJXXM8spz89fU3s2Ig_NeGGAc_yHWoE_wknoPDnYvBqgL2ncx5zuBTUrQ-tNxmkOA8I0bjK0YZM2Bv4SJ4HGDHmFpsDSBgOf7dl3ie0SW6p-gjoRorkksojkfTWbR1faScs2gux9-MV2D2U2c8yX3JZowdyYvsznkmussFZObZMIeB8Ub8i5-dfE-WbhFqUF9AoPSi0wYhoDnmVvvqAT2NbhbfaHwKkj5cwS8OUtBV2LPSJorYh3njQrIqrQBgVzLioNvfABW5siTvIUm2HH5j8H430SIXPARoIenub5os'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcKTkdyDzUV2IIFYueAD6HGs5IgMwt8uXIySG2NNxyMrKLvybX6JQyTiK9F_0cxv5q7SzcmOSfBpsHZEX5TpXy0VVf5KEtuwh6swU7iN_bulpSU6oB9A_i-bmciJoOJWU_uHffGmkOfCQZ0jJNaEX3UIN8jOS5t4ldCCZC70cOunqd1C2hjZwe2bjEy9WqdKK00y_EXTp_gZD0Y0zRV4Hg0iB2pravUNUv4Diz-LN_M9hn-sUjVFnddUGRVC3IRELaPJLBAwZdsoCZ6ICn0S0tPVwaqB-26KpjePH3ckp8E'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcIi1nZn2nEsPT7axBh7SlwGCximmtwSqvyG7ydrVhrukptRVUSN368fpEsR-g_LQPMDim1eeXEYGPZ0-hA_0HXWYZA1oV3UwTWEtsqi-Qcgst8JZwgZPcsPf3pDe183yMpKsguIIg3LLq5RYx6dFi9AlMALazuJQuLKgcAcybpmn85MkJuieP8ToCj8oHiDdp6gLVmvH84K5vG9hRtwSvJ0CUhHud6MnPIljxB1fCzSRjbWg8UEs718-V24S1UJZcnETZT50fSBX8N7OZNRoK89B8LOEW-Y4OfQ1VvhE0U'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcLMEY_XTEzaNF_viLPjSUEQOFIvyGvTcrEEySl8-6zWc7-RIU7SoDVL6jxbcaH3kPOLjt2cC0NoFrYaji2CIdy82ekeQBeo3sUVBMks9a9qaAJ6ITqKFGcaKgPt37J3_fCrIoeoJN7P6-ZzFv9aOcnlDGGBkK2cavNE1jC3FOc7LHFOBp7y3BOQLZurNSRrYHZslDODn1MgHrCfYFduFmduF6QXTjfQsVcwMYf9OqMS6G6il_RyCKp9uiZ0p5yjBvyodErc4foIykbUR4tO7MqPwVmlkg5GKvfxItDmKdI'\n" +
+  '  },\n' +
+  '  {\n' +
+  "    name: 'places/ChIJXUZKrnr_sUARIOuw_E6Ngg8/photos/AeeoHcLH9QSRxZoRV6KTwzTBSwIDmRxPpKNhxEpIFd9rrn1eiQHVJfNiWfjxeBpaMMJARbS9R9YQx2rX4gVdHSeYBer5COsEC8jjPfCADzC_Kf9OOMg22pz3jeGqv6jTeV8M0dbFATFV8kAb_jaQ_olpAlYSIzAsAFmDwnQ0azM48AfCn16znG_V_A9FIvO0SA7pK_r_IjEnkERdg_Fprj6OM1Kga7pcOY9h7OaEqldRHAblpttfVLX9lQRU2IQuaZTDt0FUOP21PYGnwudtS0FJz8C1u3zm4BAYDhfD2d7zDY8'\n" +
+  '  }\n' +
+  ']" (type string) at path "photos.0" because of "CastError"
+    at Document.invalidate (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\document.js:3329:32)
+    at model.$set (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\document.js:1480:12)
+    at model.$set (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\document.js:1132:16)
+    at model.Document (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\document.js:178:12)
+    at model.Model (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\model.js:128:12)
+    at new model (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\model.js:4800:15)
+    at C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\model.js:2759:20
+    at Array.map (<anonymous>)
+    at Function.create (C:\Users\condu\Desktop\proiect-web\backend\node_modules\mongoose\lib\model.js:2747:34)
+    at C:\Users\condu\Desktop\proiect-web\backend\controllers\hotelController.js:71:29
+    URL: /api/hotels
+    Method: POST
+    IP: ::1
+    User: 67ff8d897b1707da1253e263
+  

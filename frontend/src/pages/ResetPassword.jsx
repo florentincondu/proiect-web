@@ -19,7 +19,7 @@ const ResetPassword = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Extract token and email from URL query parameters
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tokenParam = params.get('token');
@@ -44,7 +44,7 @@ const ResetPassword = () => {
     e.preventDefault();
     setError('');
     
-    // Validate passwords
+
     const passwordError = validatePassword(password);
     if (passwordError) {
       setError(passwordError);
@@ -67,7 +67,7 @@ const ResetPassword = () => {
       setSuccess('Your password has been reset successfully');
       setResetCompleted(true);
       
-      // Clear form
+
       setPassword('');
       setConfirmPassword('');
     } catch (error) {

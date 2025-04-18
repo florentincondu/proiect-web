@@ -34,11 +34,11 @@ const AdminVerification = () => {
       setEmail(location.state.email);
     }
 
-    // Check verification status if we have a token
+
     if (tokenParam) {
       checkVerificationStatus(tokenParam);
     } else if (emailParam) {
-      // If we only have email but no token, try to look up the user's verification
+
       checkVerificationStatusByEmail(emailParam);
     }
   }, [location]);
@@ -49,7 +49,7 @@ const AdminVerification = () => {
         `${API_URL}/api/admin-approval/status?token=${verificationToken}`
       );
       
-      // If the user is already verified, redirect to dashboard
+
       if (response.data.adminVerified) {
         setSuccess('Your admin account is already verified.');
         setTimeout(() => {
@@ -57,17 +57,17 @@ const AdminVerification = () => {
         }, 1500);
       }
       
-      // If verification code is pending, update UI to show code input
+
       if (response.data.verificationPending) {
         setSuccess('Your admin request has been approved. Please enter the verification code sent to your email.');
       }
       
-      // If user is approved but hasn't yet received the code
+
       if (response.data.adminApproved && !response.data.verificationPending) {
         setSuccess('Your admin request has been approved, but it seems you haven\'t received the verification code yet. You can request to resend it.');
       }
       
-      // Store email from response if available
+
       if (response.data.email && !email) {
         setEmail(response.data.email);
       }
@@ -79,13 +79,13 @@ const AdminVerification = () => {
 
   const checkVerificationStatusByEmail = async (userEmail) => {
     try {
-      // Check if there's a pending verification for this email
+
       const response = await axios.post(
         `${API_URL}/api/admin-approval/resend-code`,
         { email: userEmail }
       );
       
-      // If successful, update the UI
+
       if (response.data.success) {
         setSuccess('A verification code has been sent to your email. Please check your inbox.');
       }
@@ -103,18 +103,18 @@ const AdminVerification = () => {
     try {
       console.log(`Attempting verification with token: ${token}, code: ${verificationCode}, email: ${email}`);
       
-      // Pass the email to help identify the user if token is invalid
+
       const response = await verifyAdminCode(token || '', verificationCode, email);
       
       if (response.success) {
         console.log('Verification successful:', response);
         if (response.token && response.user) {
-          // Login the user automatically
+
           TokenService.setToken(response.token);
           TokenService.setUser(response.user);
         }
         
-        // Always redirect to dashboard on success, regardless of token presence
+
         console.log('Redirecting to dashboard');
         navigate('/dashboard', { replace: true });
       } else {
@@ -138,7 +138,7 @@ const AdminVerification = () => {
     setError('');
     
     try {
-      // Request to resend the verification code
+
       const response = await axios.post(`${API_URL}/api/admin-approval/resend-code`, {
         token,
         email
@@ -153,7 +153,7 @@ const AdminVerification = () => {
     }
   };
 
-  // Add check for missing parameters
+
   useEffect(() => {
     if (!token && !email) {
       setError('Missing verification parameters. Please check your verification link or enter your email below.');
@@ -164,7 +164,7 @@ const AdminVerification = () => {
 
   useEffect(() => {
     if (success === true) {
-      // Redirect to dashboard immediately after successful verification
+
       console.log('Success state is true, redirecting to dashboard immediately');
       navigate('/dashboard', { replace: true });
     }

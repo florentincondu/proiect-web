@@ -3,7 +3,7 @@ import { FaTicketAlt, FaFileAlt, FaTools, FaSearch, FaDownload, FaExclamationTri
 import axios from 'axios';
 
 const AdminSupportTools = () => {
-  // State management
+
   const [activeTab, setActiveTab] = useState('tickets');
   const [tickets, setTickets] = useState([]);
   const [logs, setLogs] = useState([]);
@@ -16,7 +16,7 @@ const AdminSupportTools = () => {
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [isToggling, setIsToggling] = useState(false);
 
-  // Fetch data on component mount
+
   useEffect(() => {
     if (activeTab === 'tickets') {
       fetchTickets();
@@ -27,12 +27,12 @@ const AdminSupportTools = () => {
     }
   }, [activeTab]);
 
-  // API calls
+
   const fetchTickets = async () => {
     setIsLoading(true);
     setError('');
     try {
-      // Get authentication token from localStorage
+
       const token = localStorage.getItem('token') || '';
       
       const response = await axios.get(
@@ -56,7 +56,7 @@ const AdminSupportTools = () => {
     setIsLoading(true);
     setError('');
     try {
-      // Get authentication token from localStorage
+
       const token = localStorage.getItem('token') || '';
       
       const response = await axios.get(
@@ -80,7 +80,7 @@ const AdminSupportTools = () => {
     setIsLoading(true);
     setError('');
     try {
-      // Get authentication token from localStorage
+
       const token = localStorage.getItem('token') || '';
       
       console.log('Fetching maintenance status');
@@ -109,7 +109,7 @@ const AdminSupportTools = () => {
     setError('');
     setSuccess('');
     try {
-      // Get authentication token from localStorage
+
       const token = localStorage.getItem('token') || '';
       
       console.log('Toggling maintenance mode, current state:', maintenanceMode);
@@ -141,7 +141,7 @@ const AdminSupportTools = () => {
     setIsLoading(true);
     setError('');
     try {
-      // Get authentication token from localStorage
+
       const token = localStorage.getItem('token') || '';
       
       await axios.patch(
@@ -154,7 +154,7 @@ const AdminSupportTools = () => {
           }
         }
       );
-      // Update the local state
+
       setTickets(tickets.map(ticket => 
         ticket.id === ticketId ? { ...ticket, status: newStatus } : ticket
       ));
@@ -168,11 +168,11 @@ const AdminSupportTools = () => {
   };
 
   const downloadLogs = () => {
-    // Create a blob with the logs data
+
     const blob = new Blob([JSON.stringify(logs, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     
-    // Create a temporary link and click it to download
+
     const link = document.createElement('a');
     link.href = url;
     link.download = `system-logs-${new Date().toISOString().split('T')[0]}.json`;
@@ -181,7 +181,7 @@ const AdminSupportTools = () => {
     document.body.removeChild(link);
   };
 
-  // Filtering functions
+
   const filteredTickets = tickets.filter(ticket => {
     const matchesSearch = ticket.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           ticket.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -199,7 +199,7 @@ const AdminSupportTools = () => {
     log.source.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Helpers
+
   const getPriorityClass = (priority) => {
     switch (priority) {
       case 'high': return 'bg-red-500/20 text-red-100';

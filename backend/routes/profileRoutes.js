@@ -6,7 +6,7 @@ const { profileUpload, coverUpload } = require('../middleware/uploadMiddleware')
 const path = require('path');
 const fs = require('fs');
 
-// Public route - Get Be Part of Us plans information
+
 router.get('/be-part-of-us/plans', async (req, res) => {
   try {
     const plans = {
@@ -93,7 +93,7 @@ router.get('/be-part-of-us/plans', async (req, res) => {
   }
 });
 
-// Get user profile
+
 router.get('/profile', protect, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
@@ -106,7 +106,7 @@ router.get('/profile', protect, async (req, res) => {
   }
 });
 
-// Update user profile
+
 router.put('/profile', protect, async (req, res) => {
   try {
     const {
@@ -129,7 +129,7 @@ router.put('/profile', protect, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Update fields
+
     if (name) user.name = name;
     if (email) user.email = email;
     if (phone) user.phone = phone;
@@ -150,7 +150,7 @@ router.put('/profile', protect, async (req, res) => {
   }
 });
 
-// Get subscription details - "Be Part of Us"
+
 router.get('/be-part-of-us', protect, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
@@ -220,7 +220,7 @@ router.get('/be-part-of-us', protect, async (req, res) => {
   }
 });
 
-// Change subscription - "Be Part of Us"
+
 router.post('/be-part-of-us/change', protect, async (req, res) => {
   try {
     const { planType, duration } = req.body;
@@ -238,12 +238,12 @@ router.post('/be-part-of-us/change', protect, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Calculate subscription end date
+
     const startDate = new Date();
     const endDate = new Date();
     endDate.setMonth(endDate.getMonth() + duration);
 
-    // Set features based on plan type
+
     const features = {
       free: {
         searchAndBook: true,
@@ -295,7 +295,7 @@ router.post('/be-part-of-us/change', protect, async (req, res) => {
       }
     };
 
-    // Update user's subscription plan
+
     user.bePartOfUs = {
       type: planType,
       startDate,
@@ -303,7 +303,7 @@ router.post('/be-part-of-us/change', protect, async (req, res) => {
       features: features[planType]
     };
 
-    // Add to recent activity
+
     user.recentActivity.unshift({
       type: 'subscription',
       description: `S-a abonat la planul ${planType} pentru ${duration} luni`,
@@ -312,7 +312,7 @@ router.post('/be-part-of-us/change', protect, async (req, res) => {
 
     await user.save();
     
-    // Return detailed response
+
     res.json({
       message: `Felicitări! Acum ești abonat la planul ${planType.toUpperCase()}`,
       plan: {
@@ -327,7 +327,7 @@ router.post('/be-part-of-us/change', protect, async (req, res) => {
   }
 });
 
-// Add property to favorites
+
 router.post('/favorites/:propertyId', protect, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
@@ -339,7 +339,7 @@ router.post('/favorites/:propertyId', protect, async (req, res) => {
     if (!user.favorites.some(fav => fav.propertyId.toString() === propertyId)) {
       user.favorites.push({ propertyId });
       
-      // Add to recent activity
+
       user.recentActivity.unshift({
         type: 'favorite',
         description: 'A adăugat o proprietate la favorite',
@@ -356,7 +356,7 @@ router.post('/favorites/:propertyId', protect, async (req, res) => {
   }
 });
 
-// Remove property from favorites
+
 router.delete('/favorites/:propertyId', protect, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
@@ -373,7 +373,7 @@ router.delete('/favorites/:propertyId', protect, async (req, res) => {
   }
 });
 
-// Get user favorites
+
 router.get('/favorites', protect, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).populate('favorites.propertyId');
@@ -386,7 +386,7 @@ router.get('/favorites', protect, async (req, res) => {
   }
 });
 
-// Get property details for a user
+
 router.get('/properties', protect, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
@@ -394,7 +394,7 @@ router.get('/properties', protect, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
-    // Check if user can add properties based on subscription
+
     if (!user.bePartOfUs.features.addProperties) {
       return res.status(403).json({ 
         message: 'Planul tău nu permite adăugarea de proprietăți. Actualizează la planul Pro sau Premium.',
@@ -413,7 +413,7 @@ router.get('/properties', protect, async (req, res) => {
   }
 });
 
-// Update preferences
+
 router.put('/preferences', protect, async (req, res) => {
   try {
     const { notifications, language, theme } = req.body;
@@ -445,7 +445,7 @@ router.put('/preferences', protect, async (req, res) => {
   }
 });
 
-// Get user statistics
+
 router.get('/statistics', protect, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
@@ -453,9 +453,9 @@ router.get('/statistics', protect, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Check if user has access to advanced statistics
+
     if (!user.bePartOfUs.features.advancedStatistics) {
-      // Provide basic statistics only
+
       return res.status(403).json({ 
         message: 'Statisticile avansate necesită un abonament Premium',
         basicStats: {
@@ -468,14 +468,14 @@ router.get('/statistics', protect, async (req, res) => {
       });
     }
 
-    // Provide all statistics
+
     res.json(user.statistics);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Update security settings
+
 router.put('/security', protect, async (req, res) => {
   try {
     const { twoFactorEnabled, emailNotifications } = req.body;
@@ -502,7 +502,7 @@ router.put('/security', protect, async (req, res) => {
   }
 });
 
-// Update theme preference
+
 router.put('/theme', protect, async (req, res) => {
   try {
     const { theme } = req.body;
@@ -522,7 +522,7 @@ router.put('/theme', protect, async (req, res) => {
   }
 });
 
-// Upload profile image
+
 router.post('/upload-profile-image', protect, profileUpload, async (req, res) => {
   try {
     if (!req.file) {
@@ -531,13 +531,13 @@ router.post('/upload-profile-image', protect, profileUpload, async (req, res) =>
     
     console.log('Profile image uploaded:', req.file);
     
-    // Extract just the relative path - from /uploads/profile/filename.jpg
+
     const relativePath = `/uploads/profile/${path.basename(req.file.path)}`;
     console.log('Relative path to be saved:', relativePath);
     
     const user = await User.findById(req.user.id);
     
-    // If user already has profile image, delete the old one
+
     if (user.profileImage) {
       try {
         const oldImagePath = path.join(__dirname, '..', user.profileImage.replace(/^\//, ''));
@@ -552,7 +552,7 @@ router.post('/upload-profile-image', protect, profileUpload, async (req, res) =>
       }
     }
     
-    // Update user with the new profile image path
+
     user.profileImage = relativePath;
     await user.save();
     
@@ -566,7 +566,7 @@ router.post('/upload-profile-image', protect, profileUpload, async (req, res) =>
   }
 });
 
-// Upload cover image
+
 router.post('/upload-cover-image', protect, coverUpload, async (req, res) => {
   try {
     if (!req.file) {
@@ -575,13 +575,13 @@ router.post('/upload-cover-image', protect, coverUpload, async (req, res) => {
     
     console.log('Cover image uploaded:', req.file);
     
-    // Extract just the relative path - from /uploads/cover/filename.jpg
+
     const relativePath = `/uploads/cover/${path.basename(req.file.path)}`;
     console.log('Relative path to be saved:', relativePath);
     
     const user = await User.findById(req.user.id);
     
-    // If user already has cover image, delete the old one
+
     if (user.coverImage) {
       try {
         const oldImagePath = path.join(__dirname, '..', user.coverImage.replace(/^\//, ''));
@@ -596,7 +596,7 @@ router.post('/upload-cover-image', protect, coverUpload, async (req, res) => {
       }
     }
     
-    // Update user with the new cover image path
+
     user.coverImage = relativePath;
     await user.save();
     

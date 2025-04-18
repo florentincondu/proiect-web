@@ -15,7 +15,7 @@ export const NotificationProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Fetch notifications from the server
+
   const fetchNotifications = async () => {
     if (!isAuthenticated || !user) return;
     
@@ -36,7 +36,7 @@ export const NotificationProvider = ({ children }) => {
     } catch (err) {
       console.error('Error fetching notifications:', err);
       setError('Failed to load notifications');
-      // Set empty notifications instead of mock data
+
       setNotifications([]);
       setUnreadCount(0);
     } finally {
@@ -44,10 +44,10 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
-  // Mark a notification as read
+
   const markAsRead = async (notificationId) => {
     try {
-      // First update UI for responsiveness
+
       setNotifications(prev => 
         prev.map(notif => 
           notif._id === notificationId ? { ...notif, read: true } : notif
@@ -55,7 +55,7 @@ export const NotificationProvider = ({ children }) => {
       );
       setUnreadCount(prev => Math.max(0, prev - 1));
       
-      // Then update on server
+
       await axios.patch(`${API_BASE_URL}/api/notifications/${notificationId}/read`, {}, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`
@@ -63,20 +63,20 @@ export const NotificationProvider = ({ children }) => {
       });
     } catch (err) {
       console.error('Error marking notification as read:', err);
-      // If server update fails, we can keep the UI updated anyway
+
     }
   };
 
-  // Mark all notifications as read
+
   const markAllAsRead = async () => {
     try {
-      // First update UI for responsiveness
+
       setNotifications(prev => 
         prev.map(notif => ({ ...notif, read: true }))
       );
       setUnreadCount(0);
       
-      // Then update on server
+
       await axios.patch(`${API_BASE_URL}/api/notifications/read-all`, {}, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`
@@ -84,14 +84,14 @@ export const NotificationProvider = ({ children }) => {
       });
     } catch (err) {
       console.error('Error marking all notifications as read:', err);
-      // If server update fails, we can keep the UI updated anyway
+
     }
   };
 
-  // Delete a notification
+
   const deleteNotification = async (notificationId) => {
     try {
-      // First update UI for responsiveness
+
       const deletedNotif = notifications.find(n => n._id === notificationId);
       const wasUnread = deletedNotif && !deletedNotif.read;
       
@@ -103,7 +103,7 @@ export const NotificationProvider = ({ children }) => {
         setUnreadCount(prev => Math.max(0, prev - 1));
       }
       
-      // Then update on server
+
       await axios.delete(`${API_BASE_URL}/api/notifications/${notificationId}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`
@@ -111,11 +111,11 @@ export const NotificationProvider = ({ children }) => {
       });
     } catch (err) {
       console.error('Error deleting notification:', err);
-      // If server update fails, we can keep the UI updated anyway
+
     }
   };
 
-  // Add a simulation function to add a new notification (for testing)
+
   const addTestNotification = (type) => {
     const newNotification = {
       _id: Date.now().toString(),
@@ -132,12 +132,12 @@ export const NotificationProvider = ({ children }) => {
     setUnreadCount(prev => prev + 1);
   };
 
-  // Fetch notifications when user authenticates
+
   useEffect(() => {
     if (isAuthenticated && user) {
       fetchNotifications();
       
-      // Set up polling to check for new notifications (every 30 seconds)
+
       const interval = setInterval(fetchNotifications, 30000);
       
       return () => clearInterval(interval);

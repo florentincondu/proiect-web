@@ -9,16 +9,16 @@ const MyBookings = () => {
   const { user, isAuthenticated, loading, refreshAuthState } = useAuth();
   const [refreshed, setRefreshed] = useState(false);
   
-  // Handle authentication persistence on page refresh
+
   useEffect(() => {
     const handlePageRefresh = async () => {
       if (!isAuthenticated && !loading && !refreshed) {
-        // Try to restore auth state from localStorage
+
         const restored = await refreshAuthState();
         setRefreshed(true);
         
         if (!restored) {
-          // If not restored, redirect to login
+
           navigate('/login', { 
             state: { 
               returnUrl: '/my-bookings',
@@ -32,7 +32,7 @@ const MyBookings = () => {
     handlePageRefresh();
   }, [isAuthenticated, loading, navigate, refreshAuthState, refreshed]);
   
-  // Extra check to ensure user is authenticated
+
   useEffect(() => {
     if (!loading && !isAuthenticated && refreshed) {
       navigate('/login', { state: { returnUrl: '/my-bookings' } });
@@ -58,21 +58,6 @@ const MyBookings = () => {
           >
             <span className="text-blue-400 mr-1">B</span>oksy
           </div>
-          
-          <nav className="flex items-center space-x-6">
-            <button 
-              onClick={() => navigate('/')}
-              className="text-gray-300 hover:text-blue-400 transition-colors"
-            >
-              Home
-            </button>
-            <button 
-              onClick={handleProfileClick}
-              className="text-gray-300 hover:text-blue-400 transition-colors"
-            >
-              My Profile
-            </button>
-          </nav>
         </div>
       </header>
 

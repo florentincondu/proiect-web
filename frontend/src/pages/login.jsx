@@ -1,4 +1,4 @@
-// src/components/Login.js
+
 import React, { useState, useEffect } from 'react';
 import '../styles/Login.css';
 import { FaEye, FaEyeSlash, FaEnvelope, FaLock, FaPaperPlane } from 'react-icons/fa';
@@ -29,7 +29,7 @@ const Login = () => {
   const location = useLocation();
   const { login: authLogin } = useAuth();
 
-  // Check for returnUrl in location state (from booking attempts)
+
   useEffect(() => {
     if (location.state?.returnUrl) {
       setReturnUrl(location.state.returnUrl);
@@ -47,7 +47,7 @@ const Login = () => {
     });
   };
 
-  // Handle forgot password form submission
+
   const handleForgotPassword = async (e) => {
     e.preventDefault();
     
@@ -67,7 +67,7 @@ const Login = () => {
       );
       
       setSuccess('Password reset email sent. Please check your inbox.');
-      // Reset state
+
       setShowForgotPassword(false);
     } catch (error) {
       setError(error.response?.data?.message || 'Failed to send password reset email');
@@ -87,13 +87,13 @@ const Login = () => {
       const response = await apiLogin(formData.email, formData.password, formData.rememberMe);
       console.log('Login response:', response);
       
-      // Handle admin verification status
+
       if (response.status === 'admin_pending' || 
           (response.requiresVerification && response.email && response.redirectTo)) {
         setError('Your admin account requires verification. Please check your email for the verification link.');
         setIsLoading(false);
         
-        // Auto-redirect to verification page if appropriate
+
         if (response.redirectTo) {
           setTimeout(() => {
             navigate(response.redirectTo, { 
@@ -107,25 +107,25 @@ const Login = () => {
         return;
       }
       
-      // Ensure we have both token and user data
+
       if (!response.token || !response.user) {
         setError('Login successful but received incomplete user data. Please try again.');
         setIsLoading(false);
         return;
       }
       
-      // Set authentication in context
+
       authLogin(response.user, response.token);
       setSuccess('Login successful! Redirecting...');
       
-      // Check if there's a return URL (from booking attempt)
+
       if (returnUrl) {
         console.log('Redirecting to:', returnUrl);
         setTimeout(() => navigate(returnUrl, { replace: true }), 1000);
         return;
       }
       
-      // Redirect based on user role
+
       if (response.user.role === 'admin' || response.role === 'admin') {
         console.log('Redirecting admin user to dashboard');
         setTimeout(() => navigate('/dashboard', { replace: true }), 1000);
@@ -136,12 +136,12 @@ const Login = () => {
     } catch (error) {
       console.error('Login error:', error);
       
-      // Check if the error is related to admin verification
+
       if (error.response?.data?.status === 'admin_pending' || 
           error.response?.data?.requiresVerification) {
         setError('Admin account verification required. Please check your email for a verification link.');
         
-        // Show resend verification button/prompt
+
         setShowResendVerification(true);
       } else {
         setError(error.response?.data?.message || error.message || 'Authentication failed');
@@ -151,7 +151,7 @@ const Login = () => {
     }
   };
 
-  // Function to request a new verification email
+
   const handleResendVerification = async () => {
     if (!formData.email) {
       setError('Please enter your email address to resend the verification link');
@@ -170,7 +170,7 @@ const Login = () => {
       
       if (response.data.verificationLink) {
         setSuccess(`${response.data.message} Click the link below to verify your admin account.`);
-        // Store the verification link for display
+
         setFormData(prev => ({ ...prev, verificationLink: response.data.verificationLink }));
       } else {
         setSuccess(response.data.message);

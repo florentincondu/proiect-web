@@ -1,12 +1,12 @@
 const Setting = require('../models/Setting');
 const SystemLog = require('../models/SystemLog');
 
-// Get all system settings
+
 exports.getAllSettings = async (req, res) => {
   try {
     console.log('All settings requested');
     
-    // Mock settings data
+
     const mockSettings = {
       siteTitle: 'Luxury Hotels',
       siteDescription: 'Book your dream vacation with us',
@@ -57,13 +57,13 @@ exports.getAllSettings = async (req, res) => {
   }
 };
 
-// Get settings by group
+
 exports.getSettingsByGroup = async (req, res) => {
   try {
     const { group } = req.params;
     const settings = await Setting.getSettingsByGroup(group);
     
-    // Transform to key-value object
+
     const result = settings.reduce((acc, setting) => {
       acc[setting.key] = setting.value;
       return acc;
@@ -77,12 +77,12 @@ exports.getSettingsByGroup = async (req, res) => {
   }
 };
 
-// Get public settings (available without authentication)
+
 exports.getPublicSettings = async (req, res) => {
   try {
     const settings = await Setting.getPublicSettings();
     
-    // Transform to key-value object
+
     const result = settings.reduce((acc, setting) => {
       acc[setting.key] = setting.value;
       return acc;
@@ -96,7 +96,7 @@ exports.getPublicSettings = async (req, res) => {
   }
 };
 
-// Update system settings
+
 exports.updateSettings = async (req, res) => {
   try {
     const { key, value } = req.body;
@@ -107,7 +107,7 @@ exports.updateSettings = async (req, res) => {
     
     console.log('Settings update requested for key:', key, 'with value:', value);
     
-    // Simulate successful update
+
     console.log('Settings updated successfully');
     res.json({ 
       message: 'Settings updated successfully',
@@ -122,12 +122,12 @@ exports.updateSettings = async (req, res) => {
   }
 };
 
-// Get app configuration
+
 exports.getAppConfig = async (req, res) => {
   try {
     console.log('App configuration requested');
     
-    // Mock app configuration
+
     const mockAppConfig = {
       features: {
         enableBookings: true,
@@ -155,12 +155,12 @@ exports.getAppConfig = async (req, res) => {
   }
 };
 
-// Get email templates
+
 exports.getEmailTemplates = async (req, res) => {
   try {
     console.log('Email templates requested');
     
-    // Mock email templates
+
     const mockEmailTemplates = [
       {
         id: 'welcome',
@@ -196,7 +196,7 @@ exports.getEmailTemplates = async (req, res) => {
   }
 };
 
-// Update email template
+
 exports.updateEmailTemplate = async (req, res) => {
   try {
     const { id, subject, body } = req.body;
@@ -207,7 +207,7 @@ exports.updateEmailTemplate = async (req, res) => {
     
     console.log('Email template update requested for template:', id);
     
-    // Simulate successful update
+
     console.log('Email template updated successfully');
     res.json({ 
       message: 'Email template updated successfully',
@@ -223,7 +223,7 @@ exports.updateEmailTemplate = async (req, res) => {
   }
 };
 
-// Get individual setting by key
+
 exports.getSetting = async (req, res) => {
   try {
     const { key } = req.params;
@@ -241,7 +241,7 @@ exports.getSetting = async (req, res) => {
   }
 };
 
-// Update individual setting
+
 exports.updateSetting = async (req, res) => {
   try {
     const { key } = req.params;
@@ -258,7 +258,7 @@ exports.updateSetting = async (req, res) => {
       lastUpdatedBy: req.user._id
     });
     
-    // Log the update
+
     SystemLog.logInfo('Setting updated', 'settingController', {
       key,
       userId: req.user._id
@@ -272,7 +272,7 @@ exports.updateSetting = async (req, res) => {
   }
 };
 
-// Reset settings to default
+
 exports.resetSettings = async (req, res) => {
   try {
     const defaultSettings = {
@@ -307,7 +307,7 @@ exports.resetSettings = async (req, res) => {
       }
     };
     
-    // Update each setting
+
     const updatePromises = [];
     
     for (const group in defaultSettings) {
@@ -324,12 +324,12 @@ exports.resetSettings = async (req, res) => {
     
     await Promise.all(updatePromises);
     
-    // Log the reset
+
     SystemLog.logInfo('Settings reset to default', 'settingController', {
       userId: req.user._id
     });
     
-    // Return updated settings
+
     const updatedSettings = await Setting.getAllSettings();
     res.json(updatedSettings);
   } catch (error) {

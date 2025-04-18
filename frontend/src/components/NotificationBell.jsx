@@ -28,14 +28,14 @@ const NotificationBell = () => {
       markAsRead(notification._id);
     }
 
-    // Navigate based on notification type
+
     if (notification.type === 'booking') {
       navigate('/my-bookings');
     } else if (notification.type === 'support') {
       navigate('/contact-us');
     }
 
-    // Close dropdown
+
     setIsOpen(false);
   };
 

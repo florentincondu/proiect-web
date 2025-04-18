@@ -36,7 +36,7 @@ const systemLogSchema = new mongoose.Schema({
   }
 });
 
-// Static method to log information
+
 systemLogSchema.statics.logInfo = async function(message, module, metadata = {}) {
   return this.create({
     action: 'System Info',
@@ -47,7 +47,7 @@ systemLogSchema.statics.logInfo = async function(message, module, metadata = {})
   });
 };
 
-// Static method to log warnings
+
 systemLogSchema.statics.logWarning = async function(message, module, metadata = {}) {
   return this.create({
     action: 'System Warning',
@@ -58,7 +58,7 @@ systemLogSchema.statics.logWarning = async function(message, module, metadata = 
   });
 };
 
-// Static method to log errors
+
 systemLogSchema.statics.logError = async function(message, module, metadata = {}) {
   return this.create({
     action: 'System Error',
@@ -69,7 +69,7 @@ systemLogSchema.statics.logError = async function(message, module, metadata = {}
   });
 };
 
-// Create index for timestamp to optimize sorting
+
 systemLogSchema.index({ timestamp: -1 });
 
 const SystemLog = mongoose.model('SystemLog', systemLogSchema);

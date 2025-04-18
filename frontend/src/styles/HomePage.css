@@ -16,7 +16,6 @@
     overflow-x: hidden;
   }
   
-  /* Stiluri pentru navbar - responsive */
   .navbar {
     display: flex;
     justify-content: space-between;
@@ -82,7 +81,6 @@
     color: #93c5fd;
   }
   
-  /* Mobile menu */
   .mobile-menu {
     position: fixed;
     top: 0;
@@ -126,7 +124,6 @@
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   }
   
-  /* Stiluri pentru secțiunea hero - responsive */
   .hero-section {
     padding: 1.5rem 1rem;
     max-width: 1200px;
@@ -202,7 +199,6 @@
     }
   }
   
-  /* Stiluri pentru formularul de căutare - responsive */
   .search-form {
     margin-top: 1.5rem;
     background-color: rgba(30, 58, 138, 0.4);
@@ -306,7 +302,6 @@
     background-color: #1d4ed8;
   }
   
-  /* Stiluri pentru secțiunea de hoteluri populare - responsive */
   .hotels-section {
     padding: 2rem 1rem;
     max-width: 1200px;
@@ -455,7 +450,6 @@
     background-color: #1d4ed8;
   }
   
-  /* Stiluri pentru modal - responsive */
   .modal-overlay {
     position: fixed;
     top: 0;

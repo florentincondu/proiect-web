@@ -80,7 +80,7 @@ const reviewRoutes = require('./routes/reviewRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const placeRoutes = require('./routes/placeRoutes');
 
-// Add debugging and status routes
+
 app.get('/api/debug/status', (req, res) => {
   res.json({
     status: 'OK',
@@ -96,13 +96,13 @@ app.get('/api/debug/status', (req, res) => {
   });
 });
 
-// Testing route for hotel API endpoints
+
 app.get('/api/debug/hotels', async (req, res) => {
   try {
-    // Check if Hotel model is accessible
+
     const Hotel = mongoose.models.Hotel || require('./models/Hotel');
     
-    // Count documents in the Hotel collection
+
     const count = await Hotel.countDocuments();
     
     res.json({
@@ -142,9 +142,9 @@ app.use('/api/support', supportRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/places', placeRoutes);
 
-// Add catch-all error handler for API routes - must be after all other route definitions
+
 app.use('/api/*', (req, res, next) => {
-  // Check if the response has already been sent
+
   if (res.headersSent) {
     return next();
   }
@@ -171,7 +171,7 @@ if (!fs.existsSync(logsDir)) {
   console.log('Created logs directory at:', logsDir);
 }
 
-// Add a direct API for hotel search
+
 app.get('/api/hotels/search', async (req, res) => {
   try {
     const { query } = req.query;
@@ -183,10 +183,10 @@ app.get('/api/hotels/search', async (req, res) => {
       });
     }
     
-    // Import the Hotel model directly here
+
     const Hotel = require('./models/Hotel');
     
-    // Search hotels by name, location or description
+
     const hotels = await Hotel.find({
       $or: [
         { name: { $regex: query, $options: 'i' } },
@@ -210,7 +210,7 @@ app.get('/api/hotels/search', async (req, res) => {
   }
 });
 
-// Add endpoint to update price for a place/hotel
+
 app.patch('/api/hotels/:id/price', async (req, res) => {
   try {
     const { id } = req.params;
@@ -232,14 +232,14 @@ app.patch('/api/hotels/:id/price', async (req, res) => {
       });
     }
     
-    // Import the PlacePrice model
+
     let PlacePrice;
     try {
       const modelPath = path.join(__dirname, 'models', 'PlacePrice.js');
       
       if (!fs.existsSync(modelPath)) {
         console.error('PlacePrice model file does not exist at path:', modelPath);
-        // Create PlacePrice schema on the fly if it doesn't exist
+
         const mongoose = require('mongoose');
         
         const placePriceSchema = new mongoose.Schema({
@@ -288,11 +288,11 @@ app.patch('/api/hotels/:id/price', async (req, res) => {
       });
     }
     
-    // Find if a price already exists for this place
+
     let placePrice = await PlacePrice.findOne({ placeId: id });
     
     if (placePrice) {
-      // Update existing price
+
       placePrice.price = parseFloat(price);
       placePrice.updatedAt = new Date();
       if (name) placePrice.name = name;
@@ -301,7 +301,7 @@ app.patch('/api/hotels/:id/price', async (req, res) => {
       
       console.log(`Updated existing price for ${id} to ${price}`);
     } else {
-      // Create new price entry
+
       placePrice = new PlacePrice({
         placeId: id,
         name: name || `Hotel ${id}`,
@@ -333,7 +333,7 @@ app.patch('/api/hotels/:id/price', async (req, res) => {
   }
 });
 
-// Setup logging
+
 const logToFile = (message) => {
   const timestamp = new Date().toISOString();
   const logMessage = `[${timestamp}] ${message}\n`;
@@ -347,22 +347,22 @@ const logToFile = (message) => {
   );
 };
 
-// Make logToFile available globally
+
 global.logToFile = logToFile;
 
-// Error handler middleware (must be after routes)
+
 app.use(errorHandler);
 
-// Connect to MongoDB
+
 connectDB();
 
-// Remove the test price seeding code
+
 const seedTestPrices = async () => {
-  // Simply log that we're not seeding test prices anymore
+
   console.log('Test price seeding disabled');
 };
 
-// Call the seed function when the server starts
+
 seedTestPrices();
 
 app.get('/api/places/geocode', async (req, res) => {
@@ -392,7 +392,7 @@ app.get('/api/places/geocode', async (req, res) => {
   }
 });
 
-// Reverse geocoding endpoint to get address from lat/lng
+
 app.get('/api/places/geocode/reverse', async (req, res) => {
   try {
     const { lat, lng } = req.query;
@@ -420,7 +420,7 @@ app.get('/api/places/geocode/reverse', async (req, res) => {
   }
 });
 
-// Add a simple test endpoint that doesn't require external API calls
+
 app.get('/api/test', (req, res) => {
   try {
     res.json({
@@ -440,7 +440,7 @@ app.get('/api/test', (req, res) => {
   }
 });
 
-// Start server
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

@@ -9,6 +9,11 @@ const hotelSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  placeId: {
+    type: String,
+    unique: true,
+    sparse: true // Allows null values and maintains uniqueness for non-null values
+  },
   description: String,
   rating: {
     type: Number,
@@ -50,20 +55,17 @@ const hotelSchema = new mongoose.Schema({
       count: Number
     }]
   }],
-  restrictions: {
-    isRestricted: {
-      type: Boolean,
-      default: false
+  isRestricted: {
+    type: Boolean,
+    default: false
+  },
+  restrictionDetails: {
+    restrictedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
     },
-    reason: {
-      type: String,
-      default: ''
-    },
-    restrictedDates: [{
-      startDate: Date,
-      endDate: Date,
-      reason: String
-    }]
+    restrictedAt: Date,
+    reason: String
   },
   owner: {
     type: mongoose.Schema.Types.ObjectId,

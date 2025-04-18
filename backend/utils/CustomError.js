@@ -13,7 +13,7 @@ class CustomError extends Error {
     this.statusCode = statusCode;
     this.status = `${statusCode}`.startsWith('4') ? 'fail' : 'error';
     
-    // Flag to identify operational errors (vs programming errors)
+
     this.isOperational = true;
     
     Error.captureStackTrace(this, this.constructor);

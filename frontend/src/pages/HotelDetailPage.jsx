@@ -12,7 +12,7 @@ import backgr from '../assets/start.avif';
 import { generateHotelPrice } from '../utils/priceUtils';
 import ReviewItem from '../components/ReviewItem';
 
-// Add API_BASE_URL constant
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 const HotelDetailPage = ({ reservationMode }) => {
@@ -29,26 +29,26 @@ const HotelDetailPage = ({ reservationMode }) => {
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [coordinates, setCoordinates] = useState({ lat: 44.4268, lng: 26.1025 }); // Default Bucharest coordinates
   
-  // Add state for lightbox/image modal
+
   const [showLightbox, setShowLightbox] = useState(false);
   const [lightboxImageIndex, setLightboxImageIndex] = useState(0);
   
-  // Exchange rate (approximate): 1 AED ≈ 1.2 RON
+
   const aedToRon = 1.2;
-  // EUR to RON conversion for pricing
+
   const eurToRon = 4.97;
 
-  // Google API Key
+
   const GOOGLE_API_KEY = import.meta.env.VITE_API_KEY || "AIzaSyA2ITzS0YozxlkFmdG7r8ZLo-rHUftwNEM";
   
-  // Function to generate photo URL from Google Places API
+
   const getPhotoUrl = (photoReference, maxWidth = 800, maxHeight = null) => {
     if (!photoReference || !photoReference.name) return backgr;
     
-    // Use our backend proxy instead of direct Google API call
+
     let url = `http://localhost:5000/api/places/media/${encodeURIComponent(photoReference.name)}?`;
     
-    // Add dimension parameters
+
     if (maxWidth) {
       url += `maxWidthPx=${maxWidth}`;
     }
@@ -61,9 +61,9 @@ const HotelDetailPage = ({ reservationMode }) => {
     return url;
   };
   
-  // Function to generate room types based on hotel data
+
   const generateRoomTypes = (basePrice) => {
-    // Round base price to nearest 10 for consistency
+
     const roundedBasePrice = Math.round(basePrice / 10) * 10;
     
     return [
@@ -94,13 +94,13 @@ const HotelDetailPage = ({ reservationMode }) => {
     ];
   };
   
-  // Function to open location in Google Maps
+
   const openInGoogleMaps = () => {
     const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hotel.name)}&query_place_id=${hotel.id}`;
     window.open(url, '_blank');
   };
 
-  // Fetch hotel data from Google Places API
+
   useEffect(() => {
     const fetchHotelDetails = async () => {
       setLoading(true);
@@ -159,7 +159,7 @@ const HotelDetailPage = ({ reservationMode }) => {
             if (selectedIndex >= 0 && selectedIndex < response.data.places.length) {
               const selectedHotel = response.data.places[selectedIndex];
               
-              // Extract coordinates if available
+
               if (selectedHotel.location) {
                 setCoordinates({
                   lat: selectedHotel.location.latitude,
@@ -184,22 +184,22 @@ const HotelDetailPage = ({ reservationMode }) => {
       }
     };
     
-    // Funcție pentru procesarea datelor hotelului și setarea stării
+
     const processHotelData = async (selectedHotel) => {
-      // Logging pentru debugging
+
       console.log('Processing hotel data:', selectedHotel);
       
-      // Check if this is actually our database hotel instead of Places API
+
       let dbHotel = null;
       let hotelPrice = 0;
       
       if (selectedHotel._id) {
         try {
-          // This is already a hotel from our database
+
           dbHotel = selectedHotel;
           hotelPrice = dbHotel.price || generateHotelPrice(selectedHotel);
           
-          // Get up-to-date price from the API
+
           const hotelResponse = await axios.get(`${API_BASE_URL}/api/hotels/${dbHotel._id}`);
           if (hotelResponse.data.success) {
             dbHotel = hotelResponse.data.data;
@@ -210,8 +210,8 @@ const HotelDetailPage = ({ reservationMode }) => {
           hotelPrice = generateHotelPrice(selectedHotel);
         }
       } else {
-        // This is likely a Google Places API hotel
-        // Try to get saved price from database
+
+
         try {
           const savedPricesResponse = await axios.get(`${API_BASE_URL}/api/places/prices`);
           if (savedPricesResponse.data.success) {
@@ -236,7 +236,7 @@ const HotelDetailPage = ({ reservationMode }) => {
         }
       }
       
-      // Ensure we have a valid price
+
       if (!hotelPrice || hotelPrice === 0) {
         console.log('Price was 0 or invalid, generating new price');
         hotelPrice = generateHotelPrice(selectedHotel);
@@ -244,17 +244,17 @@ const HotelDetailPage = ({ reservationMode }) => {
       
       console.log('Final hotel price:', hotelPrice);
       
-      // Generate room types if needed - ensure prices are numbers
+
       const roomTypes = dbHotel?.rooms || generateRoomTypes(hotelPrice);
       console.log('Room types with prices:', roomTypes);
       
-      // Make sure all room prices are valid numbers
+
       const validatedRoomTypes = roomTypes.map(room => ({
         ...room,
         price: typeof room.price === 'number' && !isNaN(room.price) ? room.price : hotelPrice
       }));
       
-      // Create default data for missing parts
+
       const defaultFacilities = [
         { name: "Wi-Fi gratuit", icon: <FaWifi /> },
         { name: "Piscină", icon: <FaSwimmingPool /> },
@@ -268,21 +268,21 @@ const HotelDetailPage = ({ reservationMode }) => {
         { name: "Transfer aeroport", icon: <MdAirportShuttle /> }
       ];
       
-      // Default reviews if none exist
+
       const defaultReviews = dbHotel?.reviews || [
         { id: 1, author: "Maria P.", rating: 5, comment: "O experiență minunată! Personalul a fost foarte amabil și camera impecabilă.", date: "10 Februarie 2025" },
         { id: 2, author: "Alexandru M.", rating: 4, comment: "Foarte mulțumit de servicii și facilități. Micul dejun ar putea fi îmbunătățit.", date: "28 Ianuarie 2025" },
         { id: 3, author: "Elena D.", rating: 5, comment: "Unul dintre cele mai bune hoteluri din această zonă! Recomand cu încredere.", date: "15 Ianuarie 2025" }
       ];
       
-      // Prepare images
+
       const hotelImages = dbHotel?.photos 
         ? dbHotel.photos 
         : selectedHotel.photos && selectedHotel.photos.length > 0
           ? selectedHotel.photos.map(photo => getPhotoUrl(photo))
           : [backgr];
       
-      // Set the hotel data with consistent property names
+
       const processedHotel = {
         id: dbHotel?._id || selectedHotel.id || hotelId,
         name: dbHotel?.name || selectedHotel.displayName?.text || selectedHotel.name || "Hotel necunoscut",
@@ -301,21 +301,21 @@ const HotelDetailPage = ({ reservationMode }) => {
         types: selectedHotel.types || []
       };
       
-      // Fetch reviews for this hotel if ID exists
+
       if (processedHotel.id) {
         try {
           console.log('Fetching reviews for hotel ID:', processedHotel.id);
           const reviewsResponse = await axios.get(`${API_BASE_URL}/api/reviews/hotel/${processedHotel.id}`);
           console.log('Reviews response:', reviewsResponse.data);
           
-          // Check if we have a valid response
+
           if (reviewsResponse.data) {
-            // Default values in case data is missing
+
             let reviews = [];
             let avgRating = processedHotel.averageRating;
             let reviewCount = 0;
             
-            // Safely access reviews data with try-catch blocks
+
             try {
               if (Array.isArray(reviewsResponse.data.reviews)) {
                 reviews = reviewsResponse.data.reviews;
@@ -341,7 +341,7 @@ const HotelDetailPage = ({ reservationMode }) => {
               console.error('Error processing review count:', e);
             }
             
-            // Update the hotel object with the processed data
+
             processedHotel.reviews = reviews;
             processedHotel.averageRating = avgRating;
             processedHotel.reviewCount = reviewCount;
@@ -349,7 +349,7 @@ const HotelDetailPage = ({ reservationMode }) => {
         } catch (error) {
           console.error('Error fetching reviews:', error);
           console.error('Error details:', error.response?.data || 'No detailed error');
-          // Use empty reviews array as fallback
+
           processedHotel.reviews = [];
         }
       }
@@ -361,33 +361,33 @@ const HotelDetailPage = ({ reservationMode }) => {
     fetchHotelDetails();
   }, [hotelId, GOOGLE_API_KEY]);
 
-  // Load the Google Maps script dynamically
+
   useEffect(() => {
     const loadGoogleMapsScript = () => {
-      // Check if script already exists
+
       if (document.getElementById('google-maps-script')) {
-        // If script exists, just initialize the map
+
         if (window.google && window.google.maps) {
           initMap();
         }
         return;
       }
       
-      // Create script element
+
       const script = document.createElement('script');
       script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_API_KEY}&callback=initMap`;
       script.async = true;
       script.defer = true;
       script.id = 'google-maps-script';
       
-      // Define the callback function globally
+
       window.initMap = () => {
         if (hotel) {
           initMap();
         }
       };
       
-      // Append script to document
+
       document.head.appendChild(script);
     };
     
@@ -395,16 +395,16 @@ const HotelDetailPage = ({ reservationMode }) => {
       loadGoogleMapsScript();
     }
     
-    // Cleanup function
+
     return () => {
-      // Remove the global callback when component unmounts
+
       if (window.initMap) {
         window.initMap = undefined;
       }
     };
   }, [hotel, coordinates]);
   
-  // Function to initialize Google Maps
+
   const initMap = () => {
     if (!window.google || !window.google.maps) {
       console.error('Google Maps API not loaded');
@@ -441,14 +441,14 @@ const HotelDetailPage = ({ reservationMode }) => {
         ]
       });
       
-      // Add marker at hotel location
+
       const marker = new window.google.maps.Marker({
         position: { lat: coordinates.lat, lng: coordinates.lng },
         map: map,
         title: hotel.name || 'Hotel Location'
       });
       
-      // Add info window when marker is clicked
+
       const infoWindow = new window.google.maps.InfoWindow({
         content: `<div style="color: #333; padding: 8px; max-width: 200px;">
                     <strong>${hotel.name || 'Hotel'}</strong>
@@ -460,7 +460,7 @@ const HotelDetailPage = ({ reservationMode }) => {
         infoWindow.open(map, marker);
       });
       
-      // Initially open the info window
+
       infoWindow.open(map, marker);
       
     } catch (error) {
@@ -504,24 +504,24 @@ const HotelDetailPage = ({ reservationMode }) => {
     }
   };
   
-  // Open lightbox with clicked image
+
   const openLightbox = (index) => {
     setLightboxImageIndex(index);
     setShowLightbox(true);
     
-    // Disable scrolling when lightbox is open
+
     document.body.style.overflow = 'hidden';
   };
   
-  // Close lightbox
+
   const closeLightbox = () => {
     setShowLightbox(false);
     
-    // Re-enable scrolling
+
     document.body.style.overflow = 'auto';
   };
 
-  // Handle keyboard navigation for lightbox
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (!showLightbox) return;
@@ -577,7 +577,7 @@ const HotelDetailPage = ({ reservationMode }) => {
       });
       
       if (response.data) {
-        // Add the new review to the reviews list
+
         const newReview = {
           _id: response.data._id,
           rating: response.data.rating,
@@ -589,7 +589,7 @@ const HotelDetailPage = ({ reservationMode }) => {
           }
         };
         
-        // Refresh the reviews from the server to get updated data
+
         try {
           const updatedReviews = await axios.get(`${API_BASE_URL}/api/reviews/hotel/${hotel.id}`);
           setHotel(prevHotel => ({
@@ -599,16 +599,16 @@ const HotelDetailPage = ({ reservationMode }) => {
             reviewCount: updatedReviews.data.reviewCount || prevHotel.reviews.length
           }));
           
-          // Reset form
+
           setReviewText('');
           setReviewRating(5);
           
-          // Show success message
+
           alert('Recenzia a fost adăugată cu succes!');
         } catch (error) {
           console.error('Error refreshing reviews:', error);
           
-          // If refresh fails, manually add the new review
+
     setHotel(prevHotel => ({
       ...prevHotel,
       reviews: [newReview, ...prevHotel.reviews],
@@ -616,11 +616,11 @@ const HotelDetailPage = ({ reservationMode }) => {
             reviewCount: prevHotel.reviews.length + 1
     }));
     
-    // Reset form
+
     setReviewText('');
     setReviewRating(5);
           
-          // Show success message
+
           alert('Recenzia a fost adăugată cu succes!');
         }
       }
@@ -642,7 +642,7 @@ const HotelDetailPage = ({ reservationMode }) => {
 
   const handleBookNow = () => {
     if (!isAuthenticated) {
-      // Redirect to login page with a return URL
+
       navigate('/login', { 
         state: { 
           returnUrl: `/reserve/${hotelId}`, 
@@ -657,7 +657,7 @@ const HotelDetailPage = ({ reservationMode }) => {
       return;
     }
     
-    // Find the selected room object from hotel rooms
+
     const roomToBook = hotel.rooms.find(room => room.id === selectedRoom);
     
     if (!roomToBook) {
@@ -668,7 +668,7 @@ const HotelDetailPage = ({ reservationMode }) => {
     
     console.log('Selected room for booking:', roomToBook);
     
-    // Prepare hotel data for booking flow
+
     const hotelData = {
       id: hotel.id || hotelId,
       name: hotel?.displayName?.text || hotel?.name || 'Hotel',
@@ -676,9 +676,9 @@ const HotelDetailPage = ({ reservationMode }) => {
       image: hotel.images && hotel.images.length > 0 ? hotel.images[0] : null,
       price: roomToBook.price, // Make sure we're using the room's price here
       rating: hotel.rating,
-      // Add phone if available
+
       phone: hotel?.phoneNumber || hotel?.phone || '',
-      // Create rooms array with the selected room
+
       rooms: [
         {
           id: roomToBook.id,
@@ -697,7 +697,7 @@ const HotelDetailPage = ({ reservationMode }) => {
     console.log('Booking hotel with data:', hotelData);
     console.log('Room price being passed:', roomToBook.price);
     
-    // Navigate to booking flow with hotel data and pre-selected room
+
     navigate('/booking', { 
       state: { 
         hotel: hotelData,
@@ -714,9 +714,9 @@ const HotelDetailPage = ({ reservationMode }) => {
     });
   };
 
-  // useEffect to check reservation mode
+
   useEffect(() => {
-    // If reservationMode is true but user is not authenticated, redirect to login
+
     if (reservationMode && !isAuthenticated) {
       navigate('/login', { 
         state: { 
@@ -1355,7 +1355,7 @@ const HotelDetailPage = ({ reservationMode }) => {
   );
 };
 
-// Set default props
+
 HotelDetailPage.defaultProps = {
   reservationMode: false
 };

@@ -3,14 +3,14 @@ const Booking = require('../models/Booking');
 const User = require('../models/User');
 const SystemLog = require('../models/SystemLog');
 
-// Get all payments (admin only)
+
 exports.getAllPayments = async (req, res) => {
   try {
     const { status, method, startDate, endDate, minAmount, maxAmount, sort = 'createdAt', order = 'desc', page = 1, limit = 20 } = req.query;
     
     console.log('Payments requested with filters:', { status, method, startDate, endDate, minAmount, maxAmount, sort, order, page, limit });
     
-    // Build query for filtering
+
     const query = {};
     
     if (status && status !== 'All Statuses') {
@@ -38,14 +38,14 @@ exports.getAllPayments = async (req, res) => {
       query.total.$lte = Number(maxAmount);
     }
     
-    // Create sort object for ordering
+
     const sortObj = {};
     sortObj[sort] = order === 'asc' ? 1 : -1;
     
-    // Calculate pagination values
+
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
-    // Get real payments from database
+
     const payments = await Payment.find(query)
       .populate('user', 'firstName lastName email')
       .populate('booking', 'checkIn checkOut roomType status hotel')
@@ -54,14 +54,14 @@ exports.getAllPayments = async (req, res) => {
       .limit(parseInt(limit))
       .lean();
     
-    // Get total count for pagination
+
     const total = await Payment.countDocuments(query);
     
     console.log(`Found ${payments.length} payments in database`);
     
-    // Format payment data to include computed fields
+
     const formattedPayments = payments.map(payment => {
-      // Calculate total refunded amount
+
       const totalRefunded = payment.refunds && payment.refunds.length > 0
         ? payment.refunds
             .filter(refund => refund.status === 'completed')
@@ -72,7 +72,7 @@ exports.getAllPayments = async (req, res) => {
         ...payment,
         totalRefunded,
         isFullyRefunded: totalRefunded >= payment.total,
-        // Add hotel and room information from booking
+
         hotelInfo: payment.booking ? {
           name: payment.booking.hotel?.name || 'Unknown Hotel',
           location: payment.booking.hotel?.location || 'Unknown Location',
@@ -81,7 +81,7 @@ exports.getAllPayments = async (req, res) => {
       };
     });
     
-    // Return found payments with pagination
+
     res.json({
       payments: formattedPayments,
       pagination: {
@@ -98,7 +98,7 @@ exports.getAllPayments = async (req, res) => {
   }
 };
 
-// Get payment by ID
+
 exports.getPaymentById = async (req, res) => {
   try {
     const payment = await Payment.findById(req.params.id)
@@ -110,19 +110,19 @@ exports.getPaymentById = async (req, res) => {
       return res.status(404).json({ message: 'Payment not found' });
     }
     
-    // Calculate total refunded amount
+
     const totalRefunded = payment.refunds && payment.refunds.length > 0
       ? payment.refunds
           .filter(refund => refund.status === 'completed')
           .reduce((sum, refund) => sum + refund.amount, 0)
       : 0;
     
-    // Format the payment with additional calculated fields
+
     const formattedPayment = {
       ...payment,
       totalRefunded,
       isFullyRefunded: totalRefunded >= payment.total,
-      // Add booking information
+
       bookingInfo: payment.booking ? {
         id: payment.booking._id,
         hotel: payment.booking.hotel?.name || 'Unknown Hotel',
@@ -134,7 +134,7 @@ exports.getPaymentById = async (req, res) => {
         paymentStatus: payment.booking.paymentStatus,
         totalAmount: payment.booking.totalAmount
       } : null,
-      // Add customer information
+
       customerInfo: {
         id: payment.user?._id || 'unknown',
         name: payment.user ? `${payment.user.firstName || ''} ${payment.user.lastName || ''}`.trim() : 'Unknown User',
@@ -154,7 +154,7 @@ exports.getPaymentById = async (req, res) => {
   }
 };
 
-// Create a new payment/invoice
+
 exports.createPayment = async (req, res) => {
   try {
     const { 
@@ -162,13 +162,13 @@ exports.createPayment = async (req, res) => {
       total, currency, status, paymentMethod, dueDate, notes 
     } = req.body;
     
-    // Validate user
+
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
     
-    // Validate booking if provided
+
     let booking = null;
     if (bookingId) {
       booking = await Booking.findById(bookingId);
@@ -177,10 +177,10 @@ exports.createPayment = async (req, res) => {
       }
     }
     
-    // Generate invoice number
+
     const invoiceNumber = await Payment.generateInvoiceNumber();
     
-    // Create payment/invoice
+
     const payment = new Payment({
       invoiceNumber,
       user: userId,
@@ -202,7 +202,7 @@ exports.createPayment = async (req, res) => {
     
     const savedPayment = await payment.save();
     
-    // If booking exists, update payment information
+
     if (booking) {
       booking.payment = savedPayment._id;
       booking.paymentStatus = status || 'pending';
@@ -226,7 +226,7 @@ exports.createPayment = async (req, res) => {
   }
 };
 
-// Update payment status
+
 exports.updatePaymentStatus = async (req, res) => {
   try {
     const { status, notes } = req.body;
@@ -236,18 +236,18 @@ exports.updatePaymentStatus = async (req, res) => {
       return res.status(404).json({ message: 'Payment not found' });
     }
     
-    // Update payment
+
     payment.status = status;
     if (notes) payment.notes = notes;
     
-    // If status is 'paid', update paidDate
+
     if (status === 'paid' && !payment.paidDate) {
       payment.paidDate = new Date();
     }
     
     await payment.save();
     
-    // If there's a booking attached, update its payment status
+
     if (payment.booking) {
       const booking = await Booking.findById(payment.booking);
       if (booking) {
@@ -274,7 +274,7 @@ exports.updatePaymentStatus = async (req, res) => {
   }
 };
 
-// Process payment
+
 exports.processPayment = async (req, res) => {
   try {
     const { paymentMethodId, bookingId, amount, currency = 'USD' } = req.body;
@@ -285,13 +285,13 @@ exports.processPayment = async (req, res) => {
     
     console.log('Processing payment:', { paymentMethodId, bookingId, amount, currency });
     
-    // Verify booking exists
+
     const booking = await Booking.findById(bookingId);
     if (!booking) {
       return res.status(404).json({ message: 'Booking not found' });
     }
     
-    // Verify user owns this booking
+
     if (booking.user.toString() !== req.user._id.toString()) {
       SystemLog.logWarning('Unauthorized payment attempt', 'paymentController', {
         userId: req.user._id,
@@ -300,13 +300,13 @@ exports.processPayment = async (req, res) => {
       return res.status(403).json({ message: 'You are not authorized to make payment for this booking' });
     }
     
-    // Generate transaction ID
+
     const transactionId = `TXN-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     
-    // Generate invoice number
+
     const invoiceNumber = await Payment.generateInvoiceNumber();
     
-    // Create line item for the booking
+
     const bookingItem = {
       description: `Booking at ${booking.hotel.name || 'Hotel'} - ${booking.roomType || 'Room'}`,
       quantity: 1,
@@ -316,12 +316,12 @@ exports.processPayment = async (req, res) => {
       total: parseFloat(amount)
     };
     
-    // Set due date (today) and issue date
+
     const today = new Date();
     const dueDate = new Date();
     dueDate.setDate(today.getDate() + 1); // Due tomorrow
     
-    // Create payment record
+
     const payment = new Payment({
       invoiceNumber,
       user: req.user._id,
@@ -342,11 +342,11 @@ exports.processPayment = async (req, res) => {
     
     const savedPayment = await payment.save();
     
-    // Update booking payment status
+
     booking.paymentStatus = 'paid';
     await booking.save();
     
-    // Log successful payment
+
     SystemLog.logInfo('Payment processed successfully', 'paymentController', {
       paymentId: savedPayment._id,
       bookingId,
@@ -376,7 +376,7 @@ exports.processPayment = async (req, res) => {
   }
 };
 
-// Process refund
+
 exports.processRefund = async (req, res) => {
   try {
     const { paymentId, amount, reason } = req.body;
@@ -387,26 +387,26 @@ exports.processRefund = async (req, res) => {
     
     console.log('Processing refund:', { paymentId, amount, reason });
     
-    // Find the payment
+
     const payment = await Payment.findById(paymentId);
     if (!payment) {
       return res.status(404).json({ message: 'Payment not found' });
     }
     
-    // Ensure payment is in a refundable state
+
     if (payment.status !== 'paid' && payment.status !== 'partially_refunded') {
       return res.status(400).json({ 
         message: `Cannot refund a payment with status: ${payment.status}` 
       });
     }
     
-    // Calculate refund amount (use requested amount or full payment amount)
+
     const refundAmount = amount ? parseFloat(amount) : payment.total;
     
-    // Generate refund transaction ID
+
     const refundTransactionId = `REF-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     
-    // Create the refund record
+
     const refund = {
       amount: refundAmount,
       reason: reason || 'Admin initiated refund',
@@ -416,10 +416,10 @@ exports.processRefund = async (req, res) => {
       createdAt: new Date()
     };
     
-    // Add refund to payment
+
     payment.refunds.push(refund);
     
-    // Update payment status based on refund amount
+
     const totalRefundedSoFar = payment.refunds.reduce((total, refund) => 
       refund.status === 'completed' ? total + refund.amount : total, 0);
     
@@ -429,14 +429,14 @@ exports.processRefund = async (req, res) => {
       payment.status = 'partially_refunded';
     }
     
-    // Save payment with refund information
+
     await payment.save();
     
-    // Update booking status if this payment is associated with a booking
+
     if (payment.booking) {
       const booking = await Booking.findById(payment.booking);
       if (booking) {
-        // Update payment status based on refund
+
         if (payment.status === 'refunded') {
           booking.paymentStatus = 'refunded';
         } else {
@@ -444,7 +444,7 @@ exports.processRefund = async (req, res) => {
         }
         await booking.save();
         
-        // Log booking update
+
         SystemLog.logInfo('Booking payment status updated due to refund', 'paymentController', {
           bookingId: booking._id,
           paymentId: payment._id,
@@ -453,7 +453,7 @@ exports.processRefund = async (req, res) => {
       }
     }
     
-    // Log successful refund
+
     SystemLog.logInfo('Refund processed successfully', 'paymentController', {
       paymentId: payment._id,
       refundAmount,
@@ -461,7 +461,7 @@ exports.processRefund = async (req, res) => {
       initiatedBy: req.user._id
     });
     
-    // Prepare response
+
     const refundResponse = {
       _id: payment._id,
       refundId: refundTransactionId,
@@ -493,12 +493,12 @@ exports.processRefund = async (req, res) => {
   }
 };
 
-// Get payment statistics
+
 exports.getPaymentStats = async (req, res) => {
   try {
     console.log('Payment statistics requested');
     
-    // Structure for statistics data
+
     let statsData = {
       byStatus: [],
       byMethod: [],
@@ -507,7 +507,7 @@ exports.getPaymentStats = async (req, res) => {
       totals: { revenue: 0, count: 0, average: 0 }
     };
     
-    // Get payments by status
+
     const byStatus = await Payment.aggregate([
       {
         $group: {
@@ -524,7 +524,7 @@ exports.getPaymentStats = async (req, res) => {
       console.log('Payment stats by status:', JSON.stringify(byStatus));
     }
     
-    // Get payments by method
+
     const byMethod = await Payment.aggregate([
       {
         $group: {
@@ -541,7 +541,7 @@ exports.getPaymentStats = async (req, res) => {
       console.log('Payment stats by method:', JSON.stringify(byMethod));
     }
     
-    // Get monthly revenue for the past 6 months
+
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     
@@ -570,7 +570,7 @@ exports.getPaymentStats = async (req, res) => {
       console.log('Monthly revenue stats:', JSON.stringify(monthlyRevenue));
     }
     
-    // Calculate totals from all successful payments
+
     const totalRevenue = await Payment.aggregate([
       {
         $match: {
@@ -596,7 +596,7 @@ exports.getPaymentStats = async (req, res) => {
       console.log('Total revenue stats:', JSON.stringify(totalRevenue));
     }
     
-    // Get daily revenue for the past 30 days
+
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
@@ -622,18 +622,18 @@ exports.getPaymentStats = async (req, res) => {
     ]);
     
     if (dailyRevenue && dailyRevenue.length > 0) {
-      // Format dates for daily revenue
+
       statsData.dailyRevenue = dailyRevenue.map(day => ({
         ...day,
         date: `${day._id.year}-${String(day._id.month).padStart(2, '0')}-${String(day._id.day).padStart(2, '0')}`
       }));
     }
     
-    // If no data found in database, try to get data from bookings
+
     if (statsData.byStatus.length === 0 && statsData.totals.count === 0) {
       console.log('No payment data in database, checking bookings...');
       
-      // Try to get data from bookings to generate statistics
+
       const bookings = await Booking.find({
         paymentStatus: { $in: ['paid', 'partially_refunded'] }
       }).lean();
@@ -641,7 +641,7 @@ exports.getPaymentStats = async (req, res) => {
       if (bookings && bookings.length > 0) {
         console.log(`Found ${bookings.length} paid bookings`);
         
-        // Generate basic statistics from bookings
+
         const totalFromBookings = bookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
         
         statsData.totals = {
@@ -650,7 +650,7 @@ exports.getPaymentStats = async (req, res) => {
           average: bookings.length > 0 ? (totalFromBookings / bookings.length).toFixed(2) : 0
         };
         
-        // Group by payment status
+
         const statusMap = {};
         bookings.forEach(booking => {
           const status = booking.paymentStatus || 'pending';
@@ -671,7 +671,7 @@ exports.getPaymentStats = async (req, res) => {
       }
     }
     
-    // If still no data, provide empty values with the right structure
+
     if (statsData.byStatus.length === 0) {
       statsData.byStatus = [
         { _id: 'paid', count: 0, revenue: 0 },
@@ -690,7 +690,7 @@ exports.getPaymentStats = async (req, res) => {
       ];
     }
     
-    // Ensure we have statistics for the past 6 months
+
     if (statsData.monthlyRevenue.length === 0) {
       const now = new Date();
       statsData.monthlyRevenue = [];
@@ -709,7 +709,7 @@ exports.getPaymentStats = async (req, res) => {
       }
     }
     
-    // Ensure we have daily statistics for the past 30 days
+
     if (statsData.dailyRevenue.length === 0) {
       const now = new Date();
       statsData.dailyRevenue = [];
@@ -729,7 +729,7 @@ exports.getPaymentStats = async (req, res) => {
       }
     }
     
-    // Add indicator for data source
+
     statsData.dataSource = statsData.totals.count > 0 ? 'database' : 'fallback';
     
     console.log('Returning payment statistics');
@@ -744,25 +744,25 @@ exports.getPaymentStats = async (req, res) => {
   }
 };
 
-// Get public payment statistics
+
 exports.getPublicStats = async (req, res) => {
   try {
     console.log('Public payment statistics requested');
     
-    // Calculate total successful transactions (paid payments)
+
     const totalSuccessfulPayments = await Payment.countDocuments({ 
       status: { $in: ['paid', 'partially_refunded'] } 
     });
     
-    // Calculate total attempted transactions
+
     const totalAttemptedPayments = await Payment.countDocuments();
     
-    // Calculate success rate based on real data
+
     const successRate = totalAttemptedPayments > 0 
       ? (totalSuccessfulPayments / totalAttemptedPayments * 100).toFixed(1)
       : 0;
     
-    // Calculate total revenue from successful payments
+
     const revenueData = await Payment.aggregate([
       {
         $match: { 
@@ -778,7 +778,7 @@ exports.getPublicStats = async (req, res) => {
       }
     ]);
     
-    // Extract total revenue and average booking value
+
     let totalRevenue = 0;
     let averageBookingValue = 0;
     
@@ -789,11 +789,11 @@ exports.getPublicStats = async (req, res) => {
         : 0;
     }
     
-    // Get top destinations from bookings (if available)
+
     let featuredDestinations = [];
     
     try {
-      // Attempt to get real booking destination data
+
       const destinationStats = await Booking.aggregate([
         {
           $match: {
@@ -819,10 +819,10 @@ exports.getPublicStats = async (req, res) => {
       }
     } catch (destinationError) {
       console.error('Error fetching destination statistics:', destinationError);
-      // Continue with default featured destinations if error
+
     }
     
-    // If no destinations found, use default list
+
     if (featuredDestinations.length === 0) {
       featuredDestinations = [
         { name: 'New York', bookings: 0 },
@@ -831,7 +831,7 @@ exports.getPublicStats = async (req, res) => {
       ];
     }
     
-    // Compile public statistics
+
     const stats = {
       totalTransactions: totalSuccessfulPayments,
       totalRevenue: totalRevenue,
@@ -849,13 +849,13 @@ exports.getPublicStats = async (req, res) => {
   }
 };
 
-// Get user's payments
+
 exports.getUserPayments = async (req, res) => {
   try {
     const userId = req.user._id;
     console.log('User payments requested for user ID:', userId);
     
-    // Fetch all payments for this user
+
     const payments = await Payment.find({ user: userId })
       .populate('booking', 'hotel roomType checkIn checkOut status')
       .sort({ createdAt: -1 })
@@ -863,16 +863,16 @@ exports.getUserPayments = async (req, res) => {
     
     console.log(`Found ${payments.length} payments for user ${userId}`);
     
-    // Format payment data to include computed fields
+
     const formattedPayments = payments.map(payment => {
-      // Calculate total refunded amount
+
       const totalRefunded = payment.refunds && payment.refunds.length > 0
         ? payment.refunds
             .filter(refund => refund.status === 'completed')
             .reduce((sum, refund) => sum + refund.amount, 0)
         : 0;
       
-      // Format the payment data
+
       return {
         _id: payment._id,
         invoiceNumber: payment.invoiceNumber,
@@ -896,7 +896,7 @@ exports.getUserPayments = async (req, res) => {
       };
     });
     
-    // Return user's payments
+
     res.json({
       success: true,
       count: formattedPayments.length,
@@ -909,7 +909,7 @@ exports.getUserPayments = async (req, res) => {
   }
 };
 
-// Get user's payment by ID
+
 exports.getUserPaymentById = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -917,7 +917,7 @@ exports.getUserPaymentById = async (req, res) => {
     
     console.log(`Payment details requested for payment ID: ${paymentId} by user: ${userId}`);
     
-    // Find the specific payment that belongs to this user
+
     const payment = await Payment.findOne({
       _id: paymentId,
       user: userId
@@ -931,14 +931,14 @@ exports.getUserPaymentById = async (req, res) => {
     
     console.log(`Found payment ${payment._id} for user ${userId}`);
     
-    // Calculate total refunded amount
+
     const totalRefunded = payment.refunds && payment.refunds.length > 0
       ? payment.refunds
           .filter(refund => refund.status === 'completed')
           .reduce((sum, refund) => sum + refund.amount, 0)
       : 0;
     
-    // Format the payment with additional calculated fields
+
     const formattedPayment = {
       ...payment,
       totalRefunded,
@@ -955,7 +955,7 @@ exports.getUserPaymentById = async (req, res) => {
       } : null
     };
     
-    // Return detailed payment information
+
     res.json({
       success: true,
       payment: formattedPayment
@@ -971,7 +971,7 @@ exports.getUserPaymentById = async (req, res) => {
   }
 };
 
-// Generate invoice PDF
+
 exports.generateInvoice = async (req, res) => {
   try {
     const payment = await Payment.findById(req.params.id)
@@ -983,12 +983,12 @@ exports.generateInvoice = async (req, res) => {
       return res.status(404).json({ message: 'Payment not found' });
     }
     
-    // Check if user is authorized (admin or payment owner)
+
     if (!req.user.isAdmin && payment.user._id.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized to access this invoice' });
     }
     
-    // Format payment data for invoice
+
     const formattedPayment = {
       invoiceNumber: payment.invoiceNumber,
       transactionId: payment.transactionId || 'N/A',
@@ -1013,7 +1013,7 @@ exports.generateInvoice = async (req, res) => {
       notes: payment.notes || ''
     };
     
-    // Add booking information if available
+
     if (payment.booking) {
       formattedPayment.booking = {
         id: payment.booking._id,
@@ -1026,14 +1026,14 @@ exports.generateInvoice = async (req, res) => {
     
     console.log(`Generated invoice data for payment ${payment._id}`);
     
-    // Log invoice generation
+
     SystemLog.logInfo('Invoice generated', 'paymentController', {
       paymentId: payment._id,
       invoiceNumber: payment.invoiceNumber,
       generatedBy: req.user._id
     });
     
-    // Return the formatted payment data as a pseudo-invoice
+
     res.json({
       success: true,
       invoice: formattedPayment
@@ -1045,20 +1045,20 @@ exports.generateInvoice = async (req, res) => {
   }
 };
 
-// Generate invoice PDF
+
 exports.generateInvoicePdf = async (req, res) => {
   try {
     const { id } = req.params;
     
     console.log('Invoice PDF generation requested for payment ID:', id);
     
-    // Find the payment to ensure it exists
+
     const payment = await Payment.findById(id);
     if (!payment) {
       return res.status(404).json({ message: 'Payment not found' });
     }
     
-    // Check authorization
+
     if (!req.user.isAdmin && payment.user.toString() !== req.user._id.toString()) {
       SystemLog.logWarning('Unauthorized invoice PDF access attempt', 'paymentController', {
         userId: req.user._id,
@@ -1067,17 +1067,17 @@ exports.generateInvoicePdf = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to access this invoice' });
     }
     
-    // In a real implementation, here we would generate a PDF file
-    // For now, we'll just simulate successful generation
+
+
     
-    // Log PDF generation
+
     SystemLog.logInfo('Invoice PDF generated', 'paymentController', {
       paymentId: payment._id,
       invoiceNumber: payment.invoiceNumber,
       generatedBy: req.user._id
     });
     
-    // Return success with information about the generated PDF
+
     res.json({
       success: true,
       message: 'Invoice PDF generated successfully',
@@ -1104,21 +1104,21 @@ exports.generateInvoicePdf = async (req, res) => {
   }
 };
 
-// Get payments for a booking
+
 exports.getPaymentsForBooking = async (req, res) => {
   try {
     const { bookingId } = req.params;
     
     console.log('Payments requested for booking:', bookingId);
     
-    // Verify booking exists and user has access to it
+
     const booking = await Booking.findById(bookingId);
     
     if (!booking) {
       return res.status(404).json({ message: 'Booking not found' });
     }
     
-    // Only allow admin or the booking owner to view payments
+
     if (!req.user.isAdmin && booking.user.toString() !== req.user._id.toString()) {
       SystemLog.logWarning('Unauthorized booking payment access attempt', 'paymentController', {
         userId: req.user._id,
@@ -1127,16 +1127,16 @@ exports.getPaymentsForBooking = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to view payment details for this booking' });
     }
     
-    // Get all payments associated with the booking
+
     const payments = await Payment.find({ booking: bookingId })
       .sort({ createdAt: -1 })
       .lean();
     
     console.log(`Found ${payments.length} payments for booking ${bookingId}`);
     
-    // Format payment data to include computed fields
+
     const formattedPayments = payments.map(payment => {
-      // Calculate total refunded amount
+
       const totalRefunded = payment.refunds && payment.refunds.length > 0
         ? payment.refunds
             .filter(refund => refund.status === 'completed')
@@ -1169,10 +1169,10 @@ exports.getPaymentsForBooking = async (req, res) => {
   }
 };
 
-// Get recent payments summary for admin dashboard
+
 exports.getRecentPaymentsSummary = async (req, res) => {
   try {
-    // Obține ultimele 10 plăți pentru afișare în dashboard
+
     const recentPayments = await Payment.find()
       .populate('user', 'firstName lastName email')
       .populate('booking', 'hotel roomType checkIn checkOut')
@@ -1180,7 +1180,7 @@ exports.getRecentPaymentsSummary = async (req, res) => {
       .limit(10)
       .lean();
     
-    // Obține sumarizări pentru plăți
+
     const paymentCounts = await Payment.aggregate([
       {
         $group: {
@@ -1191,7 +1191,7 @@ exports.getRecentPaymentsSummary = async (req, res) => {
       }
     ]);
     
-    // Calculează totaluri pentru dashboard
+
     const totals = {
       all: 0,
       paid: 0,
@@ -1224,7 +1224,7 @@ exports.getRecentPaymentsSummary = async (req, res) => {
       amounts.all += item.total;
     });
     
-    // Formatează plățile recente pentru afișare
+
     const formattedPayments = recentPayments.map(payment => ({
       _id: payment._id,
       invoiceNumber: payment.invoiceNumber,
@@ -1240,7 +1240,7 @@ exports.getRecentPaymentsSummary = async (req, res) => {
       } : null
     }));
     
-    // Răspundem cu datele formatate
+
     res.json({
       success: true,
       recentPayments: formattedPayments,

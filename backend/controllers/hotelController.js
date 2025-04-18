@@ -27,7 +27,9 @@ exports.checkAvailability = async (req, res) => {
 };
 
 exports.getHotels = asyncHandler(async (req, res, next) => {
-  const hotels = await Hotel.find();
+  const query = req.user?.isAdmin ? {} : { isRestricted: { $ne: true } };
+  
+  const hotels = await Hotel.find(query);
   
   res.status(200).json({
     success: true,
@@ -51,12 +53,68 @@ exports.getHotel = asyncHandler(async (req, res, next) => {
 });
 
 exports.createHotel = asyncHandler(async (req, res, next) => {
-  const hotel = await Hotel.create(req.body);
-  
-  res.status(201).json({
-    success: true,
-    data: hotel
-  });
+  try {
+    console.log('Received hotel creation request with data:', JSON.stringify(req.body, null, 2));
+    const requiredFields = ['name', 'location', 'price'];
+    const missingFields = requiredFields.filter(field => !req.body[field]);
+    
+    if (missingFields.length > 0) {
+      console.log('Missing required fields:', missingFields);
+      return res.status(400).json({
+        success: false,
+        message: `Missing required fields: ${missingFields.join(', ')}`
+      });
+    }
+    const hotelData = {
+      ...req.body,
+      owner: req.user._id, // Always set owner to current user
+      status: 'active',    // Set default status
+      rooms: req.body.rooms || [  // Set default rooms if not provided
+        {
+          type: 'single',
+          capacity: 1,
+          price: Math.round(req.body.price * 0.7),
+          count: 2
+        },
+        {
+          type: 'double',
+          capacity: 2,
+          price: req.body.price,
+          count: 3
+        }
+      ]
+    };
+    if (hotelData.placeId) {
+      console.log('Checking for existing hotel with placeId:', hotelData.placeId);
+      const existingHotel = await Hotel.findOne({ placeId: hotelData.placeId });
+      if (existingHotel) {
+        console.log('Found existing hotel:', existingHotel._id);
+        return res.status(200).json({
+          success: true,
+          data: existingHotel
+        });
+      }
+    }
+
+    console.log('Creating new hotel with data:', JSON.stringify(hotelData, null, 2));
+    const hotel = await Hotel.create(hotelData);
+    console.log('Hotel created successfully:', hotel._id);
+
+    res.status(201).json({
+      success: true,
+      data: hotel
+    });
+  } catch (error) {
+    console.error('Error creating hotel:', error);
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+      details: error.errors ? Object.keys(error.errors).map(key => ({
+        field: key,
+        message: error.errors[key].message
+      })) : undefined
+    });
+  }
 });
 
 exports.updateHotel = asyncHandler(async (req, res, next) => {
@@ -100,14 +158,14 @@ exports.updateHotelPrice = asyncHandler(async (req, res, next) => {
   }
   
   try {
-    // Import the PlacePrice model
+
     let PlacePrice;
     try {
       const modelPath = path.join(__dirname, '..', 'models', 'PlacePrice.js');
       
       if (!fs.existsSync(modelPath)) {
         console.error('PlacePrice model file does not exist at path:', modelPath);
-        // Create PlacePrice schema on the fly if it doesn't exist
+
         const mongoose = require('mongoose');
         
         const placePriceSchema = new mongoose.Schema({
@@ -152,7 +210,7 @@ exports.updateHotelPrice = asyncHandler(async (req, res, next) => {
       return next(new CustomError('Server error loading models', 500));
     }
     
-    // Update both Hotel and PlacePrice models
+
     const [hotel, placePrice] = await Promise.all([
       Hotel.findByIdAndUpdate(
         req.params.id,
@@ -272,7 +330,7 @@ exports.getHotelById = async (req, res) => {
   }
 };
 
-// Search hotels by query
+
 exports.searchHotels = asyncHandler(async (req, res, next) => {
   const { query } = req.query;
   
@@ -282,15 +340,22 @@ exports.searchHotels = asyncHandler(async (req, res, next) => {
       message: 'Search query is required'
     });
   }
-
-  // Search by hotel name, location, or description using regex for partial matches
-  const hotels = await Hotel.find({
-    $or: [
-      { name: { $regex: query, $options: 'i' } },
-      { location: { $regex: query, $options: 'i' } },
-      { description: { $regex: query, $options: 'i' } }
+  const searchQuery = {
+    $and: [
+      {
+        $or: [
+          { name: { $regex: query, $options: 'i' } },
+          { location: { $regex: query, $options: 'i' } },
+          { description: { $regex: query, $options: 'i' } }
+        ]
+      }
     ]
-  });
+  };
+  if (!req.user?.isAdmin) {
+    searchQuery.$and.push({ isRestricted: { $ne: true } });
+  }
+
+  const hotels = await Hotel.find(searchQuery);
   
   res.status(200).json({
     success: true,
@@ -299,7 +364,7 @@ exports.searchHotels = asyncHandler(async (req, res, next) => {
   });
 });
 
-// Update room prices
+
 exports.updateRoomPrices = asyncHandler(async (req, res, next) => {
   const { rooms } = req.body;
   
@@ -316,7 +381,7 @@ exports.updateRoomPrices = asyncHandler(async (req, res, next) => {
     return next(new CustomError(`Hotel not found with id of ${req.params.id}`, 404));
   }
   
-  // Update each room's price
+
   rooms.forEach(roomUpdate => {
     const room = hotel.rooms.find(r => r._id.toString() === roomUpdate.roomId);
     if (room) {
@@ -340,18 +405,18 @@ exports.createUserHotel = asyncHandler(async (req, res, next) => {
     payment, weeklyDiscount, monthlyDiscount, status, isHotel, rating, reviews
   } = req.body;
 
-  // Verifică dacă utilizatorul este autentificat
+
   if (!req.user) {
     return next(new CustomError('Nu sunteți autorizat să adăugați cazări. Vă rugăm să vă autentificați.', 401));
   }
 
-  // Validări de bază
+
   if (!title || !description || !address || !price) {
     return next(new CustomError('Vă rugăm să completați toate câmpurile obligatorii', 400));
   }
 
   try {
-    // Inițializăm datele de bază pentru Hotel
+
     const hotelData = {
       name: title,
       location: address,
@@ -379,9 +444,9 @@ exports.createUserHotel = asyncHandler(async (req, res, next) => {
       }
     };
 
-    // Procesăm amenitățile
+
     if (amenities) {
-      // Convertim obiectul de amenități într-un array de string-uri
+
       const amenitiesArray = [];
       for (const [key, value] of Object.entries(amenities)) {
         if (value === true) amenitiesArray.push(key);
@@ -389,7 +454,7 @@ exports.createUserHotel = asyncHandler(async (req, res, next) => {
       hotelData.amenities = amenitiesArray;
     }
 
-    // Setăm rooms pe baza informațiilor de bază
+
     hotelData.rooms = [
       {
         type: 'single',
@@ -417,7 +482,7 @@ exports.createUserHotel = asyncHandler(async (req, res, next) => {
       }
     ];
 
-    // Setăm informațiile despre plată
+
     if (payment) {
       hotelData.payment = {
         isPaid: true,
@@ -428,10 +493,10 @@ exports.createUserHotel = asyncHandler(async (req, res, next) => {
         currency: 'EUR'
       };
 
-      // Salvăm datele cardului dacă există (pentru simulare)
+
       if (payment.cardDetails) {
         hotelData.payment.cardDetails = {
-          // Salvăm doar ultimele 4 cifre ale cardului pentru securitate
+
           cardNumber: payment.cardDetails.cardNumber.slice(-4),
           expiryDate: payment.cardDetails.expiryDate,
           cardholderName: payment.cardDetails.cardholderName
@@ -448,20 +513,20 @@ exports.createUserHotel = asyncHandler(async (req, res, next) => {
       };
     }
 
-    // Procesăm fotografiile (utilizatorul poate încărca fotografii în profilePage)
+
     if (photos && photos.length > 0) {
-      // Aici ar trebui să procesezi array-ul de fotografii
-      // De obicei, acesta ar fi un array de URL-uri către imagini deja încărcate
+
+
       hotelData.photos = photos;
     }
 
-    // Creăm o nouă cazare
+
     const hotel = await Hotel.create(hotelData);
 
-    // Trimitem un email de confirmare (opțional)
-    // sendConfirmationEmail(req.user.email, hotel);
 
-    // Răspundem cu datele cazării create
+
+
+
     res.status(201).json({
       success: true,
       data: hotel,
@@ -473,7 +538,7 @@ exports.createUserHotel = asyncHandler(async (req, res, next) => {
   }
 });
 
-// Adăugăm o metodă pentru a permite utilizatorilor să-și vadă propriile cazări
+
 exports.getUserHotels = asyncHandler(async (req, res, next) => {
   if (!req.user) {
     return next(new CustomError('Nu sunteți autorizat. Vă rugăm să vă autentificați.', 401));
@@ -488,7 +553,7 @@ exports.getUserHotels = asyncHandler(async (req, res, next) => {
   });
 });
 
-// Adăugăm o metodă pentru procesarea plății pentru cazare
+
 exports.processHotelPayment = asyncHandler(async (req, res, next) => {
   const { paymentMethod, hotelId } = req.body;
 
@@ -504,7 +569,7 @@ exports.processHotelPayment = asyncHandler(async (req, res, next) => {
     let hotel;
 
     if (hotelId) {
-      // Actualizăm o cazare existentă
+
       hotel = await Hotel.findById(hotelId);
 
       if (!hotel) {
@@ -527,12 +592,12 @@ exports.processHotelPayment = asyncHandler(async (req, res, next) => {
       hotel.status = 'pending';
       await hotel.save();
     } else {
-      // Dacă nu avem un ID, înseamnă că plata este procesată înainte de crearea cazării
-      // În acest caz, vom returna un token de plată care va fi utilizat la crearea cazării
+
+
       const paymentToken = `TOKEN-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
       
-      // Aici am putea stoca temporar token-ul în baza de date pentru validare ulterioară
-      // ...
+
+
 
       return res.status(200).json({
         success: true,
@@ -549,5 +614,36 @@ exports.processHotelPayment = asyncHandler(async (req, res, next) => {
   } catch (error) {
     console.error('Eroare la procesarea plății:', error);
     return next(new CustomError('A apărut o eroare la procesarea plății. Vă rugăm să încercați din nou.', 500));
+  }
+});
+
+exports.toggleHotelRestriction = asyncHandler(async (req, res, next) => {
+  try {
+    const hotel = await Hotel.findById(req.params.id);
+    
+    if (!hotel) {
+      return next(new CustomError(`Hotel not found with id of ${req.params.id}`, 404));
+    }
+    hotel.isRestricted = !hotel.isRestricted;
+    if (hotel.isRestricted) {
+      hotel.restrictionDetails = {
+        restrictedBy: req.user._id,
+        restrictedAt: new Date(),
+        reason: req.body.reason || 'Administrative action'
+      };
+    } else {
+      hotel.restrictionDetails = null;
+    }
+
+    await hotel.save();
+
+    res.status(200).json({
+      success: true,
+      data: hotel,
+      message: `Hotel ${hotel.isRestricted ? 'restricted' : 'unrestricted'} successfully`
+    });
+  } catch (error) {
+    console.error('Error toggling hotel restriction:', error);
+    return next(new CustomError('Error updating hotel restriction status', 500));
   }
 }); 

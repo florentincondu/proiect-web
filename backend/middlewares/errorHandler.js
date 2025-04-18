@@ -5,10 +5,10 @@ const CustomError = require('../utils/CustomError');
  * Global error handler middleware
  */
 module.exports = (err, req, res, next) => {
-  // Log error to console and file
+
   console.error(err);
   
-  // Log detailed error information to file
+
   const errorDetails = `
     Error: ${err.message}
     Stack: ${err.stack}
@@ -19,12 +19,12 @@ module.exports = (err, req, res, next) => {
   `;
   logToFile(errorDetails, 'errors.log');
 
-  // Set default values
+
   const statusCode = err.statusCode || 500;
   const status = err.status || 'error';
   const message = err.message || 'Something went wrong';
 
-  // Handle specific error types
+
   if (err.name === 'ValidationError') {
     return res.status(400).json({
       status: 'error',
@@ -34,7 +34,7 @@ module.exports = (err, req, res, next) => {
   }
 
   if (err.code === 11000) {
-    // MongoDB duplicate key error
+
     const field = Object.keys(err.keyValue)[0];
     return res.status(400).json({
       status: 'error',
@@ -56,11 +56,11 @@ module.exports = (err, req, res, next) => {
     });
   }
 
-  // Development vs Production error responses
+
   const isDevelopment = process.env.NODE_ENV === 'development';
   
   if (isDevelopment) {
-    // Development: send detailed error
+
     return res.status(statusCode).json({
       status,
       message,
@@ -69,7 +69,7 @@ module.exports = (err, req, res, next) => {
     });
   }
 
-  // Production: send clean error
+
   return res.status(statusCode).json({
     status,
     message: err instanceof CustomError ? message : 'Something went wrong'
