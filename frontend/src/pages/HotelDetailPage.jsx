@@ -15,6 +15,59 @@ import ReviewItem from '../components/ReviewItem';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
+/**
+ * Funcție utilitară care generează URL-ul corect pentru o imagine, indiferent de sursa ei
+ * @param {string|object} imageUrl - URL-ul sau obiectul cu referința imaginii
+ * @param {number} maxWidth - Lățimea maximă pentru imagini (opțional)
+ * @return {string} - URL-ul complet și valid pentru imagine
+ */
+const getImageUrl = (imageUrl, maxWidth = 800) => {
+  // Dacă nu avem nicio imagine, returnăm imaginea implicită
+  if (!imageUrl) return backgr;
+  
+  // Dacă avem un obiect cu proprietatea name (cazul API-ului Google Places)
+  if (typeof imageUrl === 'object' && imageUrl.name) {
+    return `${API_BASE_URL}/api/places/media/${encodeURIComponent(imageUrl.name)}?maxWidthPx=${maxWidth}`;
+  }
+  
+  // Dacă avem un string, procesăm diferitele tipuri de URL-uri
+  if (typeof imageUrl === 'string') {
+    // 1. Pentru URL-uri relative încărcate de utilizator (încep cu /uploads/)
+    if (imageUrl.startsWith('/uploads/')) {
+      return `${API_BASE_URL}${imageUrl}`;
+    }
+    
+    // 2. Pentru URL-uri absolute externe (încep cu http)
+    if (imageUrl.startsWith('http')) {
+      return imageUrl;
+    }
+    
+    // 3. Pentru imagini placeholder
+    if (imageUrl.includes('placehold.co')) {
+      return imageUrl;
+    }
+    
+    // 4. Pentru alte stringuri (presupunem că sunt ID-uri pentru media)
+    try {
+      // Check if the string might be a file path
+      if (imageUrl.includes('/') || imageUrl.includes('\\')) {
+        // This could be a file path - try to construct a URL based on backend
+        const fileName = imageUrl.split(/[\/\\]/).pop(); // Get the filename
+        return `${API_BASE_URL}/uploads/hotels/${fileName}`;
+      }
+      
+      return `${API_BASE_URL}/api/places/media/${encodeURIComponent(imageUrl)}?maxWidthPx=${maxWidth}`;
+    } catch (error) {
+      console.error('Error formatting image URL string:', error);
+      return backgr;
+    }
+  }
+  
+  // Pentru orice alt tip de date, returnăm imaginea implicită
+  console.warn('Unsupported image URL format:', imageUrl);
+  return backgr;
+};
+
 const HotelDetailPage = ({ reservationMode }) => {
   const { hotelId } = useParams();
   const navigate = useNavigate();
@@ -28,6 +81,9 @@ const HotelDetailPage = ({ reservationMode }) => {
   const [reviewRating, setReviewRating] = useState(5);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [coordinates, setCoordinates] = useState({ lat: 44.4268, lng: 26.1025 }); // Default Bucharest coordinates
+  const [roomAvailability, setRoomAvailability] = useState({});
+  const [checkInDate] = useState(new Date());
+  const [checkOutDate] = useState(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)); // Default to 2 days from now
   
 
   const [showLightbox, setShowLightbox] = useState(false);
@@ -40,26 +96,6 @@ const HotelDetailPage = ({ reservationMode }) => {
 
 
   const GOOGLE_API_KEY = import.meta.env.VITE_API_KEY || "AIzaSyA2ITzS0YozxlkFmdG7r8ZLo-rHUftwNEM";
-  
-
-  const getPhotoUrl = (photoReference, maxWidth = 800, maxHeight = null) => {
-    if (!photoReference || !photoReference.name) return backgr;
-    
-
-    let url = `http://localhost:5000/api/places/media/${encodeURIComponent(photoReference.name)}?`;
-    
-
-    if (maxWidth) {
-      url += `maxWidthPx=${maxWidth}`;
-    }
-    
-    if (maxHeight) {
-      url += `&maxHeightPx=${maxHeight}`;
-    }
-    
-    console.log('Generated photo URL:', url);
-    return url;
-  };
   
 
   const generateRoomTypes = (basePrice) => {
@@ -106,59 +142,165 @@ const HotelDetailPage = ({ reservationMode }) => {
       setLoading(true);
       
       try {
-        const requestData = {
-          includedTypes: ["lodging"],
-          maxResultCount: 20,
-          locationRestriction: {
-            circle: {
-              center: {
-                latitude: 44.4268,
-                longitude: 26.1025
-              },
-              radius: 5000.0
+        const isGoogleId = hotelId && (hotelId.startsWith('ChI') || hotelId.startsWith('0x'));
+        const isNumericId = !isNaN(parseInt(hotelId));
+        const isMongoId = hotelId && /^[0-9a-fA-F]{24}$/.test(hotelId); // Check for MongoDB ObjectId format
+
+        if (isMongoId || (!isGoogleId && !isNumericId)) {
+          try {
+            console.log('Fetching hotel details from database for ID:', hotelId);
+            const hotelResponse = await axios.get(
+              `${API_BASE_URL}/api/hotels/${hotelId}`, 
+              {
+                headers: isAuthenticated ? {
+                  'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                } : {}
+              }
+            );
+
+            if (hotelResponse.data && hotelResponse.data.success) {
+              const dbHotel = hotelResponse.data.data;
+              console.log('Found hotel in database:', dbHotel.name);
+              
+              const processed = {
+                id: dbHotel._id,
+                _id: dbHotel._id,
+                name: dbHotel.name,
+                displayName: { text: dbHotel.name },
+                formattedAddress: dbHotel.location,
+                location: dbHotel.location,
+                photos: dbHotel.photos?.map(url => ({ name: url })) || [],
+                images: dbHotel.photos?.map(url => getImageUrl(url)) || [backgr],
+                rating: dbHotel.rating || 4.5,
+                averageRating: dbHotel.rating || 4.5,
+                userRatingCount: dbHotel.reviews?.length || 0,
+                estimatedPrice: parseFloat(dbHotel.price),
+                price: parseFloat(dbHotel.price),
+                basePrice: parseFloat(dbHotel.price),
+                editorialSummary: { text: dbHotel.description },
+                description: dbHotel.description,
+                internationalPhoneNumber: dbHotel.phoneNumber,
+                phone: dbHotel.phoneNumber,
+                type: dbHotel.propertyType,
+                maxGuests: dbHotel.maxGuests,
+                bedrooms: dbHotel.bedrooms,
+                bathrooms: dbHotel.bathrooms,
+                cancellationPolicy: dbHotel.cancellationPolicy,
+                houseRules: dbHotel.houseRules,
+                checkInTime: dbHotel.checkInTime,
+                checkOutTime: dbHotel.checkOutTime,
+                currency: dbHotel.currency || 'RON',
+                rooms: dbHotel.rooms ? dbHotel.rooms.map(room => ({
+                  ...room,
+                  id: room._id || `room-${room.type}-${Math.random().toString(36).substring(2, 9)}`,
+                  capacity: room.capacity,
+                  persons: room.capacity
+                })) : generateRoomTypes(parseFloat(dbHotel.price)),
+                reviews: dbHotel.reviews || [],
+                owner: dbHotel.owner,
+                coordinates: dbHotel.coordinates,
+                amenities: dbHotel.amenities,
+                facilities: transformAmenities(dbHotel.amenities),
+                types: dbHotel.propertyType ? [dbHotel.propertyType] : ['accommodation'],
+                source: 'internal'
+              };
+              
+              if (dbHotel.coordinates && dbHotel.coordinates.lat && dbHotel.coordinates.lng) {
+                setCoordinates({
+                  lat: dbHotel.coordinates.lat,
+                  lng: dbHotel.coordinates.lng
+                });
+              }
+              
+              setHotel(processed);
+              setLoading(false);
+              return;
             }
+          } catch (dbError) {
+            console.error('Error fetching from database:', dbError);
           }
-        };
+        }
         
-        const headers = {
-          'Content-Type': 'application/json',
-          'X-Goog-FieldMask': 'places.id,places.displayName,places.photos,places.formattedAddress,places.rating,places.types,places.websiteUri,places.priceLevel,places.businessStatus,places.internationalPhoneNumber,places.editorialSummary,places.location'
-        };
-        
-        if (hotelId && hotelId.startsWith('ChI')) {
+        if (isGoogleId) {
           const placeDetailsResponse = await axios.get(
-            `/api/places/${hotelId}`,
+            `${API_BASE_URL}/api/places/${hotelId}`,
             { 
               headers: {
-                'X-Goog-FieldMask': 'userRatingCount,id,displayName,photos,formattedAddress,rating,types,websiteUri,priceLevel,businessStatus,internationalPhoneNumber,editorialSummary,location'
+                'X-Goog-FieldMask': 'userRatingCount,id,displayName,photos,formattedAddress,rating,types,websiteUri,priceLevel,businessStatus,phone,internationalPhoneNumber,nationalPhoneNumber,editorialSummary,location'
               } 
             }
           );
-          console.log(placeDetailsResponse.data);
           
           if (placeDetailsResponse.data) {
+            console.log('Found hotel in Google Places API');
+            
             if (placeDetailsResponse.data.location) {
               setCoordinates({
                 lat: placeDetailsResponse.data.location.latitude,
                 lng: placeDetailsResponse.data.location.longitude
               });
             }
-            processHotelData(placeDetailsResponse.data);
-          } else {
-            throw new Error('Nu s-au putut găsi detaliile hotelului.');
+            
+            const price = generateHotelPrice(placeDetailsResponse.data);
+            console.log("Hotel data:",placeDetailsResponse.data)
+            
+            const googleHotel = {
+              ...placeDetailsResponse.data,
+              images: placeDetailsResponse.data.photos 
+                ? placeDetailsResponse.data.photos.map(photo => 
+                    getImageUrl(photo, 800)
+                  )
+                : [backgr],
+              price: price,
+              basePrice: price,
+              estimatedPrice: price,
+              currency: 'RON',
+              source: 'external',
+              rooms: generateRoomTypes(price),
+              facilities: transformAmenities(placeDetailsResponse.data.types),
+              reviews: [],
+              averageRating: placeDetailsResponse.data.rating || 4.0,
+              location: placeDetailsResponse.data.address,
+              description: placeDetailsResponse.data.description || 'No description available',
+              phone: placeDetailsResponse.data.phone,
+              internationalPhoneNumber: placeDetailsResponse.data.internationalPhoneNumber,
+              nationalPhoneNumber: placeDetailsResponse.data.nationalPhoneNumber,
+              website: placeDetailsResponse.data.website
+            };
+            setHotel(googleHotel);
+            setLoading(false);
+            return;
           }
-        } else {
+        } 
+        // For numeric IDs (index in the popular hotels array - legacy approach)
+        else if (isNumericId) {
           const response = await axios.post(
-            '/api/places/search-nearby',
-            requestData,
-            { headers }
+            `${API_BASE_URL}/api/places/search-nearby`,
+            {
+              includedTypes: ["lodging"],
+              maxResultCount: 20,
+              locationRestriction: {
+                circle: {
+                  center: {
+                    latitude: 44.4268,
+                    longitude: 26.1025
+                  },
+                  radius: 5000.0
+                }
+              }
+            },
+            { 
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Goog-FieldMask': 'places.id,places.displayName,places.photos,places.formattedAddress,places.rating,places.types,places.websiteUri,places.priceLevel,places.businessStatus,places.phone,places.internationalPhoneNumber,places.nationalPhoneNumber,places.editorialSummary,places.location'
+              }
+            }
           );
           
           if (response.data && response.data.places && response.data.places.length > 0) {
             const selectedIndex = parseInt(hotelId);
             if (selectedIndex >= 0 && selectedIndex < response.data.places.length) {
               const selectedHotel = response.data.places[selectedIndex];
-              
 
               if (selectedHotel.location) {
                 setCoordinates({
@@ -167,199 +309,104 @@ const HotelDetailPage = ({ reservationMode }) => {
                 });
               }
               
-              processHotelData(selectedHotel);
-            } else {
-              setError('Hotel negăsit - index invalid');
-            }
-          } else {
-            setError('Nu sunt hoteluri disponibile');
-          }
-        }
-        
-        
-      } catch (error) {
-        console.error('Eroare la obținerea detaliilor hotelului:', error);
-        setError('Nu s-au putut obține detaliile hotelului. Vă rugăm să încercați din nou mai târziu.');
+              const price = generateHotelPrice(selectedHotel);
+              
+              const indexHotel = {
+                ...selectedHotel,
+                // Create images array from photos for compatibility
+                images: selectedHotel.photos 
+                  ? selectedHotel.photos.map(photo => 
+                      getImageUrl(photo, 800)
+                    )
+                  : [backgr],
+                price: price,
+                basePrice: price,
+                estimatedPrice: price,
+                source: 'external',
+                currency: 'RON',
+                rooms: generateRoomTypes(price),
+                facilities: transformAmenities(selectedHotel.types),
+                reviews: [],
+                averageRating: selectedHotel.rating || 4.0,
+                location: selectedHotel.formattedAddress,
+                description: selectedHotel.editorialSummary?.text || 'No description available',
+                // Store all phone number fields
+                phone: selectedHotel.phone,
+                internationalPhoneNumber: selectedHotel.internationalPhoneNumber,
+                nationalPhoneNumber: selectedHotel.nationalPhoneNumber,
+                website: selectedHotel.websiteUri
+              };
+              
+              setHotel(indexHotel);
         setLoading(false);
-      }
-    };
-    
-
-    const processHotelData = async (selectedHotel) => {
-
-      console.log('Processing hotel data:', selectedHotel);
-      
-
-      let dbHotel = null;
-      let hotelPrice = 0;
-      
-      if (selectedHotel._id) {
+              return;
+            }
+          }
+        }
+        
+        // Fallback to localStorage if all else fails
         try {
-
-          dbHotel = selectedHotel;
-          hotelPrice = dbHotel.price || generateHotelPrice(selectedHotel);
+          const mockHotels = JSON.parse(localStorage.getItem('mockHotels') || '[]');
+          const foundHotel = mockHotels.find(h => h.id === hotelId || h._id === hotelId);
           
-
-          const hotelResponse = await axios.get(`${API_BASE_URL}/api/hotels/${dbHotel._id}`);
-          if (hotelResponse.data.success) {
-            dbHotel = hotelResponse.data.data;
-            hotelPrice = dbHotel.price || generateHotelPrice(selectedHotel);
+          if (foundHotel) {
+            console.log('Found hotel in localStorage:', foundHotel.title || foundHotel.name);
+            
+            const mockHotel = {
+              id: foundHotel.id || foundHotel._id,
+              name: foundHotel.title || foundHotel.name,
+              displayName: { text: foundHotel.title || foundHotel.name },
+              formattedAddress: foundHotel.address || foundHotel.location,
+              location: foundHotel.address || foundHotel.location,
+              photos: foundHotel.photos?.map(url => ({ name: url })) || [],
+              // Create images array from photos
+              images: foundHotel.photos?.length > 0 
+                ? foundHotel.photos.map(url => getImageUrl(url))
+                : [backgr],
+              rating: foundHotel.rating || 4.5,
+              averageRating: foundHotel.rating || 4.5,
+              userRatingCount: 0,
+              price: parseFloat(foundHotel.price),
+              basePrice: parseFloat(foundHotel.price),
+              estimatedPrice: parseFloat(foundHotel.price),
+              editorialSummary: { text: foundHotel.description },
+              description: foundHotel.description,
+              coordinates: foundHotel.coordinates,
+              amenities: foundHotel.amenities,
+              facilities: transformAmenities(foundHotel.types),
+              source: 'internal',
+              currency: foundHotel.currency || 'RON',
+              rooms: generateRoomTypes(parseFloat(foundHotel.price)),
+              reviews: [],
+              types: foundHotel.propertyType ? [foundHotel.propertyType] : ['accommodation']
+            };
+            
+            if (foundHotel.coordinates) {
+              setCoordinates(foundHotel.coordinates);
+            }
+            
+            setHotel(mockHotel);
+            setLoading(false);
+            return;
           }
-        } catch (error) {
-          console.warn('Could not fetch updated hotel data:', error);
-          hotelPrice = generateHotelPrice(selectedHotel);
+        } catch (localStorageError) {
+          console.error('Error accessing localStorage:', localStorageError);
         }
-      } else {
-
-
-        try {
-          const savedPricesResponse = await axios.get(`${API_BASE_URL}/api/places/prices`);
-          if (savedPricesResponse.data.success) {
-            const savedPrice = savedPricesResponse.data.prices.find(
-              price => price.placeId === selectedHotel.id
-            );
-            
-            if (savedPrice) {
-              console.log('Found saved price:', savedPrice.price);
-              hotelPrice = savedPrice.price;
-            } else {
-              console.log('No saved price found, generating new price');
-              hotelPrice = generateHotelPrice(selectedHotel);
-            }
-          } else {
-            console.log('No saved prices available, generating new price');
-            hotelPrice = generateHotelPrice(selectedHotel);
-          }
+        
+        // If we reach here, the hotel was not found anywhere
+        setError('Hotel not found');
+        setLoading(false);
         } catch (error) {
-          console.warn('Could not fetch saved prices:', error);
-          hotelPrice = generateHotelPrice(selectedHotel);
-        }
-      }
-      
-
-      if (!hotelPrice || hotelPrice === 0) {
-        console.log('Price was 0 or invalid, generating new price');
-        hotelPrice = generateHotelPrice(selectedHotel);
-      }
-      
-      console.log('Final hotel price:', hotelPrice);
-      
-
-      const roomTypes = dbHotel?.rooms || generateRoomTypes(hotelPrice);
-      console.log('Room types with prices:', roomTypes);
-      
-
-      const validatedRoomTypes = roomTypes.map(room => ({
-        ...room,
-        price: typeof room.price === 'number' && !isNaN(room.price) ? room.price : hotelPrice
-      }));
-      
-
-      const defaultFacilities = [
-        { name: "Wi-Fi gratuit", icon: <FaWifi /> },
-        { name: "Piscină", icon: <FaSwimmingPool /> },
-        { name: "Parcare gratuită", icon: <FaParking /> },
-        { name: "Mic dejun inclus", icon: <FaCoffee /> },
-        { name: "Restaurant", icon: <FaUtensils /> },
-        { name: "Spa & Wellness", icon: <FaSpa /> },
-        { name: "Sală de fitness", icon: <FaDumbbell /> },
-        { name: "Concierge 24/7", icon: <FaConciergeBell /> },
-        { name: "Pet friendly", icon: <MdPets /> },
-        { name: "Transfer aeroport", icon: <MdAirportShuttle /> }
-      ];
-      
-
-      const defaultReviews = dbHotel?.reviews || [
-        { id: 1, author: "Maria P.", rating: 5, comment: "O experiență minunată! Personalul a fost foarte amabil și camera impecabilă.", date: "10 Februarie 2025" },
-        { id: 2, author: "Alexandru M.", rating: 4, comment: "Foarte mulțumit de servicii și facilități. Micul dejun ar putea fi îmbunătățit.", date: "28 Ianuarie 2025" },
-        { id: 3, author: "Elena D.", rating: 5, comment: "Unul dintre cele mai bune hoteluri din această zonă! Recomand cu încredere.", date: "15 Ianuarie 2025" }
-      ];
-      
-
-      const hotelImages = dbHotel?.photos 
-        ? dbHotel.photos 
-        : selectedHotel.photos && selectedHotel.photos.length > 0
-          ? selectedHotel.photos.map(photo => getPhotoUrl(photo))
-          : [backgr];
-      
-
-      const processedHotel = {
-        id: dbHotel?._id || selectedHotel.id || hotelId,
-        name: dbHotel?.name || selectedHotel.displayName?.text || selectedHotel.name || "Hotel necunoscut",
-        location: dbHotel?.location || selectedHotel.formattedAddress || selectedHotel.address || "Locație necunoscută",
-        description: dbHotel?.description || selectedHotel.editorialSummary?.text || selectedHotel.description || 
-                    "Acest hotel oferă facilități excelente și servicii de calitate pentru oaspeți. Bucurați-vă de o experiență plăcută într-o locație convenabilă.",
-        basePrice: hotelPrice,
-        price: hotelPrice,
-        rooms: validatedRoomTypes,
-        facilities: defaultFacilities,
-        images: hotelImages,
-        reviews: defaultReviews,
-        averageRating: dbHotel?.rating || selectedHotel.rating || 4.5,
-        phoneNumber: selectedHotel.internationalPhoneNumber || selectedHotel.nationalPhoneNumber || selectedHotel.phone || "+40 21 123 4567",
-        website: selectedHotel.websiteUri || selectedHotel.website || null,
-        types: selectedHotel.types || []
-      };
-      
-
-      if (processedHotel.id) {
-        try {
-          console.log('Fetching reviews for hotel ID:', processedHotel.id);
-          const reviewsResponse = await axios.get(`${API_BASE_URL}/api/reviews/hotel/${processedHotel.id}`);
-          console.log('Reviews response:', reviewsResponse.data);
-          
-
-          if (reviewsResponse.data) {
-
-            let reviews = [];
-            let avgRating = processedHotel.averageRating;
-            let reviewCount = 0;
-            
-
-            try {
-              if (Array.isArray(reviewsResponse.data.reviews)) {
-                reviews = reviewsResponse.data.reviews;
-                reviewCount = reviews.length;
-              }
-            } catch (e) {
-              console.error('Error processing reviews array:', e);
-            }
-            
-            try {
-              if (typeof reviewsResponse.data.averageRating === 'number') {
-                avgRating = reviewsResponse.data.averageRating;
-              }
-            } catch (e) {
-              console.error('Error processing average rating:', e);
-            }
-            
-            try {
-              if (typeof reviewsResponse.data.reviewCount === 'number') {
-                reviewCount = reviewsResponse.data.reviewCount;
-              }
-            } catch (e) {
-              console.error('Error processing review count:', e);
-            }
-            
-
-            processedHotel.reviews = reviews;
-            processedHotel.averageRating = avgRating;
-            processedHotel.reviewCount = reviewCount;
-          }
-        } catch (error) {
-          console.error('Error fetching reviews:', error);
-          console.error('Error details:', error.response?.data || 'No detailed error');
-
-          processedHotel.reviews = [];
-        }
-      }
-      
-      setHotel(processedHotel);
+        console.error('Error fetching hotel details:', error);
+        setError('Could not load hotel details. Please try again later.');
       setLoading(false);
+      }
     };
     
+    if (hotelId) {
     fetchHotelDetails();
-  }, [hotelId, GOOGLE_API_KEY]);
+    }
+  }, [hotelId, isAuthenticated]);
 
 
   useEffect(() => {
@@ -481,6 +528,8 @@ const HotelDetailPage = ({ reservationMode }) => {
   };
 
   const handlePrevImage = () => {
+    if (!hotel.images || hotel.images.length <= 1) return;
+    
     if (showLightbox) {
       setLightboxImageIndex((prevIndex) => 
         prevIndex === 0 ? hotel.images.length - 1 : prevIndex - 1
@@ -493,6 +542,8 @@ const HotelDetailPage = ({ reservationMode }) => {
   };
 
   const handleNextImage = () => {
+    if (!hotel.images || hotel.images.length <= 1) return;
+    
     if (showLightbox) {
       setLightboxImageIndex((prevIndex) => 
         prevIndex === hotel.images.length - 1 ? 0 : prevIndex + 1
@@ -506,9 +557,10 @@ const HotelDetailPage = ({ reservationMode }) => {
   
 
   const openLightbox = (index) => {
+    if (!hotel.images || hotel.images.length <= 1) return;
+    
     setLightboxImageIndex(index);
     setShowLightbox(true);
-    
 
     document.body.style.overflow = 'hidden';
   };
@@ -633,8 +685,19 @@ const HotelDetailPage = ({ reservationMode }) => {
 
   const handleRoomSelect = (room) => {
     console.log('Selected room:', room);
-    if (room && room.id) {
-    setSelectedRoom(room.id);
+    // Handle both _id (MongoDB) and id (Google Places) formats
+    if (room) {
+      // Use room._id or room.id, whichever is available
+      const roomId = room._id || room.id;
+      if (roomId) {
+        setSelectedRoom(roomId);
+      } else {
+        // If no ID is found, generate a temporary one based on room type
+        const tempId = `room-${room.type}-${Date.now()}`;
+        // Add the temporary ID to the room object
+        room.id = tempId;
+        setSelectedRoom(tempId);
+      }
     } else {
       console.error('Invalid room selected:', room);
     }
@@ -642,7 +705,6 @@ const HotelDetailPage = ({ reservationMode }) => {
 
   const handleBookNow = () => {
     if (!isAuthenticated) {
-
       navigate('/login', { 
         state: { 
           returnUrl: `/reserve/${hotelId}`, 
@@ -657,8 +719,10 @@ const HotelDetailPage = ({ reservationMode }) => {
       return;
     }
     
-
-    const roomToBook = hotel.rooms.find(room => room.id === selectedRoom);
+    // Find the selected room, handling both id and _id formats
+    const roomToBook = hotel.rooms.find(room => 
+      room.id === selectedRoom || room._id === selectedRoom
+    );
     
     if (!roomToBook) {
       console.error('Selected room not found:', selectedRoom);
@@ -666,27 +730,53 @@ const HotelDetailPage = ({ reservationMode }) => {
       return;
     }
     
+    // Check if the room is available
+    if (!roomAvailability[roomToBook.type]?.available || roomAvailability[roomToBook.type]?.availableRooms <= 0) {
+      alert('Ne pare rău, această cameră nu mai este disponibilă. Te rugăm să selectezi o altă cameră.');
+      return;
+    }
+    
     console.log('Selected room for booking:', roomToBook);
     
+    // Update booking count in localStorage for API hotels
+    if (hotel.source === 'external') {
+      const bookings = JSON.parse(localStorage.getItem('hotelBookings') || '{}');
+      if (!bookings[hotel.id]) {
+        bookings[hotel.id] = {};
+      }
+      if (!bookings[hotel.id][roomToBook.type]) {
+        bookings[hotel.id][roomToBook.type] = 0;
+      }
+      bookings[hotel.id][roomToBook.type] += 1;
+      localStorage.setItem('hotelBookings', JSON.stringify(bookings));
+      console.log('Updated booking count in localStorage:', bookings);
+    }
+    
+    // Prepare the room ID, using existing id or _id
+    const roomId = roomToBook.id || roomToBook._id;
+    
+    // Get capacity from roomAvailability if available, otherwise use room data
+    const roomCapacity = roomAvailability[roomToBook.type]?.capacity || 
+                         roomToBook.capacity || 
+                         roomToBook.persons || 
+                         (roomToBook.type === 'Suite' ? 4 : 2);
 
     const hotelData = {
-      id: hotel.id || hotelId,
+      id: hotel.id || hotel._id || hotelId,
       name: hotel?.displayName?.text || hotel?.name || 'Hotel',
       location: hotel?.formattedAddress || hotel?.location || '',
       image: hotel.images && hotel.images.length > 0 ? hotel.images[0] : null,
       price: roomToBook.price, // Make sure we're using the room's price here
       rating: hotel.rating,
-
       phone: hotel?.phoneNumber || hotel?.phone || '',
-
       rooms: [
         {
-          id: roomToBook.id,
+          id: roomId,
           name: roomToBook.name || roomToBook.type,
           type: roomToBook.type,
           description: roomToBook.description || '',
           price: roomToBook.price, // Explicitly set the room price
-          capacity: roomToBook.capacity || 2,
+          capacity: roomCapacity,
           amenities: roomToBook.amenities || ['Free WiFi', 'TV', 'AC'],
           image: roomToBook.image || (hotel.images && hotel.images.length > 0 ? hotel.images[0] : null),
           rating: roomToBook.rating || hotel.rating
@@ -696,17 +786,17 @@ const HotelDetailPage = ({ reservationMode }) => {
     
     console.log('Booking hotel with data:', hotelData);
     console.log('Room price being passed:', roomToBook.price);
+    console.log('Room capacity being passed:', roomCapacity);
     
-
     navigate('/booking', { 
       state: { 
         hotel: hotelData,
         selectedRoom: {
-          id: roomToBook.id,
+          id: roomId,
           name: roomToBook.name || roomToBook.type,
           type: roomToBook.type,
           price: roomToBook.price, // Explicitly include price in selectedRoom
-          capacity: roomToBook.capacity || 2,
+          capacity: roomCapacity,
           description: roomToBook.description || '',
           amenities: roomToBook.amenities || ['Free WiFi', 'TV', 'AC']
         }
@@ -726,6 +816,222 @@ const HotelDetailPage = ({ reservationMode }) => {
       });
     }
   }, [reservationMode, isAuthenticated, navigate, hotelId]);
+
+  // Helper function to clear booking data (for testing/admin purposes)
+  const clearBookingData = () => {
+    if (window.confirm('Această acțiune va reseta toate datele de rezervare pentru acest hotel. Continuați?')) {
+      const bookings = JSON.parse(localStorage.getItem('hotelBookings') || '{}');
+      if (bookings[hotel.id]) {
+        delete bookings[hotel.id];
+        localStorage.setItem('hotelBookings', JSON.stringify(bookings));
+        alert('Datele de rezervare au fost resetate.');
+        // Refresh the page to update room availability
+        window.location.reload();
+      } else {
+        alert('Nu există date de rezervare pentru acest hotel.');
+      }
+    }
+  };
+
+  // Helper function to transform amenities to facilities
+  const transformAmenities = (amenities) => {
+    if (!amenities || !Array.isArray(amenities)) {
+      return transformDefaultFacilities();
+    }
+    
+    return amenities.map(amenity => {
+      let icon;
+      switch(amenity) {
+        case 'wifi': icon = <FaWifi />; break;
+        case 'parking': icon = <FaParking />; break;
+        case 'pool': icon = <FaSwimmingPool />; break;
+        case 'ac': icon = <FaSnowflake />; break;
+        case 'breakfast': icon = <FaCoffee />; break;
+        case 'pets': icon = <MdPets />; break;
+        default: icon = <FaUtensils />; break;
+      }
+      return {
+        name: amenity.charAt(0).toUpperCase() + amenity.slice(1),
+        icon
+      };
+    });
+  };
+  
+  // Default facilities when none are specified
+  const transformDefaultFacilities = () => [
+    { name: 'WiFi', icon: <FaWifi /> },
+    { name: 'Parking', icon: <FaParking /> },
+    { name: 'Restaurant', icon: <FaUtensils /> },
+    { name: 'Air Conditioning', icon: <FaSnowflake /> },
+    { name: 'Spa', icon: <FaSpa /> },
+    { name: 'Fitness Center', icon: <FaDumbbell /> }
+  ];
+
+  // Add a function to calculate room availability deterministically based on hotel properties
+  const calculateRoomAvailability = (hotel, roomType) => {
+    if (!hotel) return 0;
+    
+    // Base availability on rating and price
+    const rating = parseFloat(hotel.rating || hotel.averageRating || 4.0);
+    const basePrice = parseFloat(hotel.price || hotel.basePrice || 500);
+    
+    // Calculate a quality score from 0-10
+    let qualityScore = (rating / 5) * 10; // 0-10 scale based on rating
+    
+    // Adjust based on price range (higher prices might indicate more exclusive hotels with fewer rooms)
+    // Prices below 300 RON get more availability, prices above 800 RON get less
+    const priceAdjustment = basePrice < 300 ? 2 : basePrice > 800 ? -2 : 0;
+    qualityScore += priceAdjustment;
+    
+    // Adjust based on room type
+    let roomTypeMultiplier = 1;
+    switch(roomType) {
+      case 'Standard':
+        roomTypeMultiplier = 0.5; // More standard rooms
+        break;
+      case 'Deluxe':
+        roomTypeMultiplier = 0.4; // Fewer deluxe rooms
+        break;
+      case 'Suite':
+        roomTypeMultiplier = 0.2; // Even fewer suites
+        break;
+      default:
+        roomTypeMultiplier = 1;
+    }
+    
+    // Calculate room count and ensure it's a whole number
+    // Higher quality score = more rooms (max = qualityScore * roomTypeMultiplier)
+    let calculatedRooms = Math.floor(qualityScore * roomTypeMultiplier);
+    
+    // Additional adjustments based on hotel type/category if available
+    if (hotel.types && Array.isArray(hotel.types)) {
+      // Hotels marked as "resort" or "hotel" likely have more rooms
+      if (hotel.types.some(type => type.includes('resort') || type === 'hotel')) {
+        calculatedRooms += 2;
+      }
+      // Hostels or small lodgings have fewer rooms
+      if (hotel.types.some(type => type.includes('hostel') || type.includes('motel'))) {
+        calculatedRooms -= 1;
+      }
+    }
+    
+    // Ensure we have a valid number (minimum 0)
+    return Math.max(0, calculatedRooms);
+  };
+
+  // Add a function to check room availability
+  const checkRoomsAvailability = async (hotelId, rooms) => {
+    if (!hotelId || !rooms || rooms.length === 0) return;
+    
+    try {
+      const startDate = checkInDate.toISOString().split('T')[0];
+      const endDate = checkOutDate.toISOString().split('T')[0];
+      const availability = {};
+      
+      // Check if this is an API-sourced hotel
+      const isExternalHotel = hotel.source === 'external';
+      
+      // Check each room type
+      for (const room of rooms) {
+        try {
+          console.log('Checking availability for room:', room.type, 'in hotel:', hotelId);
+          
+          if (isExternalHotel) {
+            // For external API hotels, calculate availability deterministically
+            const totalRooms = calculateRoomAvailability(hotel, room.type);
+            
+            // We'll track bookings in localStorage to simulate persistence
+            const bookings = JSON.parse(localStorage.getItem('hotelBookings') || '{}');
+            const hotelBookings = bookings[hotelId] || {};
+            const roomBookings = hotelBookings[room.type] || 0;
+            
+            // Calculate available rooms
+            const availableRooms = Math.max(0, totalRooms - roomBookings);
+            
+            availability[room.type] = {
+              available: availableRooms > 0, // Only available if there are rooms left
+              price: room.price,
+              totalRooms: totalRooms,
+              availableRooms: availableRooms,
+              capacity: room.persons || room.capacity || (room.type === 'Suite' ? 4 : 2)
+            };
+          } else {
+            // For internal hotels, use the API
+            const response = await axios.post(`${API_BASE_URL}/api/hotels/check-availability`, {
+              hotelId,
+              startDate,
+              endDate,
+              roomType: room.type,
+              roomId: room._id || room.id // Send both ID formats
+            });
+            
+            // Calculate the total available rooms
+            const totalRoomCount = room.count || 0;
+            const bookedRoomCount = response.data.bookedCount || 0;
+            const availableRoomCount = totalRoomCount - bookedRoomCount;
+            
+            availability[room.type] = {
+              available: response.data.available,
+              price: room.price,
+              totalRooms: totalRoomCount,
+              availableRooms: availableRoomCount,
+              capacity: room.persons || room.capacity || (room.type === 'Suite' ? 4 : 2)
+            };
+          }
+        } catch (err) {
+          console.error(`Error checking availability for room ${room.type}:`, err);
+          
+          // Fallback for error cases - calculate availability deterministically
+          const totalRooms = calculateRoomAvailability(hotel, room.type);
+          
+          availability[room.type] = { 
+            available: totalRooms > 0, 
+            price: room.price,
+            totalRooms: totalRooms,
+            availableRooms: totalRooms,
+            capacity: room.persons || room.capacity || (room.type === 'Suite' ? 4 : 2)
+          };
+        }
+      }
+      
+      setRoomAvailability(availability);
+    } catch (error) {
+      console.error('Error checking room availability:', error);
+    }
+  };
+
+  // Call this function after getting hotel data
+  useEffect(() => {
+    if (hotel && hotel.id && hotel.rooms) {
+      checkRoomsAvailability(hotel.id, hotel.rooms);
+    }
+  }, [hotel]);
+
+  // Add a separate effect to load reviews directly from the reviews API
+  useEffect(() => {
+    const fetchHotelReviews = async () => {
+      if (hotel && hotel.id) {
+        try {
+          console.log('Fetching reviews for hotel ID:', hotel.id);
+          const reviewsResponse = await axios.get(`${API_BASE_URL}/api/reviews/hotel/${hotel.id}`);
+          
+          if (reviewsResponse.data) {
+            console.log('Loaded reviews from API:', reviewsResponse.data.reviews?.length || 0);
+            setHotel(prevHotel => ({
+              ...prevHotel,
+              reviews: reviewsResponse.data.reviews || [],
+              averageRating: reviewsResponse.data.averageRating || prevHotel.averageRating,
+              reviewCount: reviewsResponse.data.reviewCount || prevHotel.reviews?.length || 0
+            }));
+          }
+        } catch (error) {
+          console.error('Error fetching hotel reviews:', error);
+        }
+      }
+    };
+    
+    fetchHotelReviews();
+  }, [hotel?.id]);
 
   if (loading) {
     return (
@@ -756,7 +1062,7 @@ const HotelDetailPage = ({ reservationMode }) => {
       <div className="relative h-[40vh] md:h-[50vh] lg:h-[60vh] overflow-hidden">
         <div className="absolute inset-0 z-0 bg-gradient-to-b from-transparent to-[#0a192f] opacity-90"></div>
         <img
-          src={hotel.images[currentImageIndex]}
+          src={(hotel.images && hotel.images.length > 0) ? getImageUrl(hotel.images[currentImageIndex]) : backgr}
           alt={hotel.name}
           className="w-full h-full object-cover"
           onError={(e) => {
@@ -764,6 +1070,40 @@ const HotelDetailPage = ({ reservationMode }) => {
             e.target.src = backgr;
           }}
         />
+        
+        {/* Website URL and Location badge overlay for API-extracted hotels */}
+        {(hotel.source === 'external' || (hotel.id && (hotel.id.startsWith('ChI') || hotel.id.startsWith('0x')))) && (
+          <div className="absolute top-6 left-6 z-20 flex flex-col gap-2">
+            {/* Website badge - improved styling */}
+            {hotel.websiteUri && (
+              <a 
+                href={hotel.websiteUri} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="bg-black/60 hover:bg-blue-900/80 backdrop-blur-sm text-white px-4 py-2 rounded-lg flex items-center transition-all border border-blue-500/30 group"
+              >
+                <FaGlobe className="mr-2 text-blue-400 group-hover:animate-pulse" />
+                <span className="hidden sm:inline">Website oficial</span>
+                <span className="sm:hidden">Website</span>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-2 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            )}
+            
+            {/* Location badge - improved styling and clickable */}
+            {hotel.formattedAddress && (
+              <div 
+                onClick={openInGoogleMaps} 
+                className="bg-black/60 hover:bg-blue-900/80 backdrop-blur-sm text-white px-4 py-2 rounded-lg flex items-center cursor-pointer transition-all border border-blue-500/30 group"
+              >
+                <FaMapMarkerAlt className="mr-2 text-red-500 group-hover:animate-bounce" />
+                <span className="text-sm line-clamp-1">{hotel.formattedAddress}</span>
+                <MdDirections className="ml-2 text-blue-400 group-hover:text-blue-300" />
+              </div>
+            )}
+          </div>
+        )}
         
         {/* Hotel info overlay - desktop */}
         <div className="hidden md:block absolute bottom-0 left-0 right-0 px-6 py-6 bg-gradient-to-t from-[#0a192f] to-transparent">
@@ -787,10 +1127,29 @@ const HotelDetailPage = ({ reservationMode }) => {
                   </div>
                   <span className="text-sm">{hotel.averageRating.toFixed(1)} ({hotel.reviews.length} recenzii)</span>
                 </div>
-                <div className="flex items-center text-sm text-gray-200">
+                
+                {/* Location with different display for API vs User-created hotels */}
+                <div 
+                  className={`flex items-center text-sm text-gray-200 ${(hotel.source === 'external' || (hotel.id && (hotel.id.startsWith('ChI') || hotel.id.startsWith('0x')))) ? 'cursor-pointer hover:text-white' : ''}`}
+                  onClick={(hotel.source === 'external' || (hotel.id && (hotel.id.startsWith('ChI') || hotel.id.startsWith('0x')))) ? openInGoogleMaps : undefined}
+                >
                   <FaMapMarkerAlt className="mr-1 text-red-500" />
-                  <span>{hotel.location}</span>
+                  <span>{(hotel.source === 'external' || (hotel.id && (hotel.id.startsWith('ChI') || hotel.id.startsWith('0x')))) ? hotel.formattedAddress : hotel.location}</span>
+                  {(hotel.source === 'external' || (hotel.id && (hotel.id.startsWith('ChI') || hotel.id.startsWith('0x')))) && <MdDirections className="ml-1 text-blue-400" />}
                 </div>
+                
+                {/* Website link for API-extracted hotels */}
+                {(hotel.source === 'external' || (hotel.id && (hotel.id.startsWith('ChI') || hotel.id.startsWith('0x')))) && hotel.websiteUri && (
+                  <a 
+                    href={hotel.websiteUri} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="flex items-center text-sm text-blue-400 mt-1 hover:text-blue-300"
+                  >
+                    <FaGlobe className="mr-1" />
+                    <span>Website oficial</span>
+                  </a>
+                )}
               </div>
               <div className="bg-blue-900/70 backdrop-blur-sm px-6 py-3 rounded-lg shadow-xl">
                 <div className="text-sm text-gray-200">Preț de la</div>
@@ -804,6 +1163,7 @@ const HotelDetailPage = ({ reservationMode }) => {
         </div>
         
         {/* Image gallery controls */}
+        {hotel.images && hotel.images.length > 1 && (
         <div className="absolute top-1/2 left-0 right-0 transform -translate-y-1/2 flex justify-between px-4">
           <button 
             onClick={handlePrevImage}
@@ -818,19 +1178,24 @@ const HotelDetailPage = ({ reservationMode }) => {
             <IoArrowForward className="text-white/90" />
           </button>
         </div>
+        )}
         
         {/* View all images button */}
+        {hotel.images && hotel.images.length > 1 && (
         <button 
           onClick={() => openLightbox(currentImageIndex)}
           className="absolute bottom-6 right-6 bg-black/50 hover:bg-black/70 text-white px-4 py-2 rounded-lg backdrop-blur-sm text-sm transition-all z-10"
         >
           Vezi toate imaginile ({hotel.images.length})
         </button>
+        )}
         
         {/* Image counter */}
+        {hotel.images && hotel.images.length > 1 && (
         <div className="absolute top-6 right-6 bg-black/50 text-white px-3 py-1 rounded-full text-sm backdrop-blur-sm">
           {currentImageIndex + 1} / {hotel.images.length}
         </div>
+        )}
       </div>
       
       {/* Hotel info overlay - mobile */}
@@ -852,10 +1217,44 @@ const HotelDetailPage = ({ reservationMode }) => {
           </div>
           <span className="text-sm">{hotel.averageRating.toFixed(1)} ({hotel.reviews.length} recenzii)</span>
         </div>
-        <div className="flex items-center text-sm text-gray-200">
+        
+        {/* Location with different display for API vs User-created hotels */}
+        <div 
+          className={`flex items-center text-sm text-gray-200 mb-2 ${(hotel.source === 'external' || (hotel.id && (hotel.id.startsWith('ChI') || hotel.id.startsWith('0x')))) ? 'cursor-pointer hover:text-white' : ''}`}
+          onClick={(hotel.source === 'external' || (hotel.id && (hotel.id.startsWith('ChI') || hotel.id.startsWith('0x')))) ? openInGoogleMaps : undefined}
+        >
           <FaMapMarkerAlt className="mr-1 text-red-500" />
-          <span>{hotel.location}</span>
+          <span className="line-clamp-1">{(hotel.source === 'external' || (hotel.id && (hotel.id.startsWith('ChI') || hotel.id.startsWith('0x')))) ? hotel.formattedAddress : hotel.location}</span>
+          {(hotel.source === 'external' || (hotel.id && (hotel.id.startsWith('ChI') || hotel.id.startsWith('0x')))) && <MdDirections className="ml-1 text-blue-400" />}
         </div>
+        
+        {/* Website link for API-extracted hotels */}
+        {(hotel.source === 'external' || (hotel.id && (hotel.id.startsWith('ChI') || hotel.id.startsWith('0x')))) && hotel.websiteUri && (
+          <a 
+            href={hotel.websiteUri} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="flex items-center text-sm text-blue-400 mb-2 hover:text-blue-300"
+          >
+            <FaGlobe className="mr-1" />
+            <span className="line-clamp-1">{hotel.websiteUri.replace(/^https?:\/\//, '').replace(/\/$/, '')}</span>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </a>
+        )}
+        
+        {/* Phone for API-extracted hotels */}
+        {(hotel.source === 'external' || (hotel.id && (hotel.id.startsWith('ChI') || hotel.id.startsWith('0x')))) && hotel.internationalPhoneNumber && (
+          <a 
+            href={`tel:${hotel.internationalPhoneNumber}`} 
+            className="flex items-center text-sm text-gray-200 mb-2 hover:text-blue-300"
+          >
+            <FaPhoneAlt className="mr-1 text-blue-400" />
+            <span>{hotel.internationalPhoneNumber}</span>
+          </a>
+        )}
+        
         <div className="mt-2 bg-blue-900/50 px-4 py-2 rounded-lg inline-block shadow-sm">
           <div className="text-sm text-gray-200">Preț de la</div>
           <div className="text-xl font-bold text-green-400">
@@ -866,6 +1265,7 @@ const HotelDetailPage = ({ reservationMode }) => {
       </div>
       
       {/* Thumbnail gallery */}
+      {hotel.images && hotel.images.length > 0 && (
       <div className="max-w-6xl mx-auto px-4 mt-6 mb-6">
         <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
           {hotel.images.slice(0, 6).map((image, index) => (
@@ -877,7 +1277,7 @@ const HotelDetailPage = ({ reservationMode }) => {
               onClick={() => setCurrentImageIndex(index)}
             >
               <img 
-                src={image} 
+                src={getImageUrl(image)} 
                 alt={`${hotel.name} imagine ${index + 1}`} 
                 className="w-full h-full object-cover"
                 onError={(e) => {
@@ -900,9 +1300,10 @@ const HotelDetailPage = ({ reservationMode }) => {
           )}
         </div>
       </div>
+      )}
 
       {/* Lightbox/Image Modal */}
-      {showLightbox && (
+      {showLightbox && hotel.images && hotel.images.length > 0 && (
         <div className="fixed inset-0 z-50 bg-black/95 flex flex-col justify-center items-center p-4">
           <button 
             onClick={closeLightbox}
@@ -916,7 +1317,7 @@ const HotelDetailPage = ({ reservationMode }) => {
             {/* Main image */}
             <div className="relative aspect-video">
               <img 
-                src={hotel.images[lightboxImageIndex]} 
+                src={getImageUrl(hotel.images[lightboxImageIndex])} 
                 alt={`${hotel.name} - Imagine full size ${lightboxImageIndex + 1}`} 
                 className="w-full h-full object-contain"
                 onError={(e) => {
@@ -957,7 +1358,7 @@ const HotelDetailPage = ({ reservationMode }) => {
                   onClick={() => setLightboxImageIndex(index)}
                 >
                   <img 
-                    src={image} 
+                    src={getImageUrl(image)} 
                     alt={`Thumbnail ${index + 1}`} 
                     className="w-full h-full object-cover"
                     onError={(e) => {
@@ -1027,59 +1428,116 @@ const HotelDetailPage = ({ reservationMode }) => {
             {/* Room Types */}
             <div className="mb-8">
               <h2 className="text-xl font-semibold mb-4 pb-2 border-b border-gray-700">Tipuri de camere</h2>
+              
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="font-medium text-blue-300">Disponibilitate camere</h3>
+                <div className="flex items-center gap-2">
+                  <div className="text-sm text-gray-400">
+                    Perioada: {checkInDate.toLocaleDateString('ro-RO')} - {checkOutDate.toLocaleDateString('ro-RO')}
+                  </div>
+                  
+                  {/* Admin reset button removed */}
+                </div>
+              </div>
+              
               <div className="space-y-4">
-                {hotel.rooms && hotel.rooms.map((room, index) => (
-                  <div
-                    key={index}
-                    className={`p-4 border rounded-xl transition-all ${
-                      selectedRoom === room.id
-                        ? 'border-blue-500 bg-blue-900/30'
-                        : 'border-gray-700 bg-[#112240] hover:border-blue-400'
-                    }`}
-                    onClick={() => handleRoomSelect(room)}
-                  >
-                    <div className="flex flex-col md:flex-row justify-between">
-                      <div className="mb-4 md:mb-0">
-                        <div className="flex items-center">
-                          <h3 className="text-lg font-medium mr-3">{room.type}</h3>
-                          <span className="bg-gray-700/70 text-gray-300 text-xs px-2 py-0.5 rounded-full flex items-center">
-                            <BiUser className="mr-1" />
-                            Max. {room.persons} {room.persons === 1 ? 'persoană' : 'persoane'}
-                          </span>
-                        </div>
-                        
-                        <div className="mt-3">
-                          <p className="text-sm text-gray-300">{room.description}</p>
-                          
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {room.amenities && room.amenities.map((amenity, i) => (
-                              <span key={i} className="text-xs bg-gray-700/60 px-2 py-0.5 rounded">
-                                {amenity}
+                {hotel.rooms && hotel.rooms.map((room, index) => {
+                  // Use either _id or id, whichever is available
+                  const roomId = room._id || room.id || `room-${index}`;
+                  
+                  // Check if room has availability
+                  const roomHasAvailability = roomAvailability[room.type] && 
+                                              roomAvailability[room.type].available &&
+                                              roomAvailability[room.type].totalRooms > 0;
+                  
+                  // Skip rooms with zero availability
+                  if (!roomHasAvailability) {
+                    return null;
+                  }
+                  
+                  return (
+                    <div
+                      key={index}
+                      className={`p-4 border rounded-xl transition-all ${
+                        selectedRoom === roomId
+                          ? 'border-blue-500 bg-blue-900/30'
+                          : 'border-gray-700 bg-[#112240] hover:border-blue-400'
+                      }`}
+                      onClick={() => handleRoomSelect(room)}
+                    >
+                      <div className="flex flex-col md:flex-row justify-between">
+                        <div className="mb-4 md:mb-0">
+                          <div className="flex items-center flex-wrap gap-2">
+                            <h3 className="text-lg font-medium mr-3">{room.type}</h3>
+                            <span className="bg-gray-700/70 text-gray-300 text-xs px-2 py-0.5 rounded-full flex items-center">
+                              <BiUser className="mr-1" />
+                              Max. {room.capacity || room.persons || 2} {(room.capacity || room.persons || 2) === 1 ? 'persoană' : 'persoane'}
+                            </span>
+                            
+                            {roomAvailability[room.type] && (
+                              <span className={`text-xs px-2 py-0.5 rounded-full flex items-center ${
+                                roomAvailability[room.type].available ? 'bg-green-600/70 text-green-100' : 'bg-red-600/70 text-red-100'
+                              }`}>
+                                {roomAvailability[room.type].available ? (
+                                  <>{roomAvailability[room.type].availableRooms} / {roomAvailability[room.type].totalRooms} disponibile</>
+                                ) : (
+                                  'Indisponibil'
+                                )}
                               </span>
-                            ))}
+                            )}
+                          </div>
+                          
+                          <div className="mt-3">
+                            <p className="text-sm text-gray-300">{room.description}</p>
+                            
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {room.amenities && room.amenities.map((amenity, i) => (
+                                <span key={i} className="text-xs bg-gray-700/60 px-2 py-0.5 rounded">
+                                  {amenity}
+                                </span>
+                              ))}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      
-                      <div className="text-right flex flex-col items-end">
-                        <div className="bg-blue-900/40 px-4 py-2 rounded-xl">
-                          <div className="font-bold text-lg text-green-400">{room.price} RON</div>
-                          <p className="text-xs text-gray-400">pe noapte</p>
-                        </div>
                         
-                        {selectedRoom === room.id && (
-                          <button
-                            className="mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors text-sm flex items-center"
-                            onClick={handleBookNow}
-                          >
-                            <FaRegCalendarAlt className="mr-2" />
-                            Rezervă acum
-                          </button>
-                        )}
+                        <div className="text-center md:text-right">
+                          <p className="text-gray-400 text-sm">Preț pe noapte</p>
+                          <p className="text-2xl font-bold text-white">{room.price} RON</p>
+                          
+                          {roomAvailability[room.type] && roomAvailability[room.type].available && roomAvailability[room.type].availableRooms <= 3 && (
+                            <p className="text-amber-400 text-xs mt-1">
+                              {roomAvailability[room.type].availableRooms === 1 
+                                ? 'Ultima cameră disponibilă!' 
+                                : `Doar ${roomAvailability[room.type].availableRooms} camere rămase!`
+                              }
+                            </p>
+                          )}
+                          
+                          {selectedRoom === roomId && (
+                            <button
+                              className="mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors text-sm flex items-center"
+                              onClick={handleBookNow}
+                            >
+                              <FaRegCalendarAlt className="mr-2" />
+                              Rezervă acum
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
+                  );
+                })}
+                
+                {!hotel.rooms?.some(room => 
+                  roomAvailability[room.type] && 
+                  roomAvailability[room.type].available &&
+                  roomAvailability[room.type].totalRooms > 0
+                ) && (
+                  <div className="text-center py-8 border border-gray-700 rounded-xl bg-[#112240]">
+                    <p className="text-gray-400">Nu există camere disponibile pentru perioada selectată.</p>
+                    <p className="text-gray-400 mt-2">Vă rugăm să reveniți mai târziu sau să încercați alte date.</p>
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
@@ -1202,7 +1660,9 @@ const HotelDetailPage = ({ reservationMode }) => {
                           </svg>
                           Camera selectată
                         </h3>
-                        <div className="mt-2 font-medium">{hotel.rooms.find(r => r.id === selectedRoom)?.type || 'Standard'}</div>
+                        <div className="mt-2 font-medium">
+                          {hotel.rooms.find(r => r._id === selectedRoom || r.id === selectedRoom)?.type || 'Standard'}
+                        </div>
                         <div className="flex items-center mt-2 bg-blue-500/20 rounded-full px-3 py-1 w-fit">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-green-400" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -1261,50 +1721,117 @@ const HotelDetailPage = ({ reservationMode }) => {
               
               {/* Hotel Info Card */}
               <div className="bg-[#112240] rounded-xl border border-gray-700 p-5 shadow-lg mb-6">
-                <h2 className="text-xl font-semibold mb-4 pb-2 border-b border-gray-700">Informații contact</h2>
+                <h2 className="text-xl font-semibold mb-4 pb-2 border-b border-gray-700 flex items-center justify-between">
+                  Informații contact
+                  
+                  {/* Official Hotel badge for API-extracted hotels */}
+                  {(hotel.source === 'external' || (hotel.id && (hotel.id.startsWith('ChI') || hotel.id.startsWith('0x')))) && (
+                    <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full flex items-center">
+                      <FaGlobe className="mr-1" size={12} />
+                      Sursă oficială
+                    </span>
+                  )}
+                </h2>
                 
                 <div className="space-y-4">
-                  {hotel.phone && (
-                    <div className="flex items-start">
-                      <FaPhoneAlt className="text-blue-400 mt-1 mr-3" />
-                      <div>
+                  {/* Phone Numbers - Show all available phone numbers */}
+                  {(hotel.phone || hotel.internationalPhoneNumber || hotel.nationalPhoneNumber) && (
+                    <div className="flex items-start group p-2 rounded-lg hover:bg-blue-900/20 transition-colors">
+                      <div className="flex items-center justify-center bg-blue-900/30 rounded-full p-2 text-blue-400 mr-3">
+                        <FaPhoneAlt />
+                      </div>
+                      <div className="flex-1">
                         <div className="text-sm text-gray-300 mb-1">Telefon:</div>
-                        <a href={`tel:${hotel.phone}`} className="hover:text-blue-400 transition-colors">
-                          {hotel.phone}
-                        </a>
+                        
+                        {/* International Phone Number */}
+                        {hotel.internationalPhoneNumber && (
+                          <a href={`tel:${hotel.internationalPhoneNumber}`} className="group-hover:text-blue-400 transition-colors flex items-center mb-1">
+                            <span className="text-xs bg-blue-900/30 text-blue-300 px-2 py-0.5 rounded mr-2">Internațional</span>
+                            {hotel.internationalPhoneNumber}
+                            <span className="ml-2 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                              </svg>
+                            </span>
+                          </a>
+                        )}
+                        
+                        {/* Regular Phone */}
+                        {hotel.phone && hotel.phone !== hotel.internationalPhoneNumber && (
+                          <a href={`tel:${hotel.phone}`} className="group-hover:text-blue-400 transition-colors flex items-center mb-1">
+                            {!hotel.internationalPhoneNumber && <span className="text-xs bg-blue-900/30 text-blue-300 px-2 py-0.5 rounded mr-2">Principal</span>}
+                            {hotel.phone}
+                            <span className="ml-2 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                              </svg>
+                            </span>
+                          </a>
+                        )}
+                        
+                        {/* National Phone Number */}
+                        {hotel.nationalPhoneNumber && 
+                         hotel.nationalPhoneNumber !== hotel.internationalPhoneNumber && 
+                         hotel.nationalPhoneNumber !== hotel.phone && (
+                          <a href={`tel:${hotel.nationalPhoneNumber}`} className="group-hover:text-blue-400 transition-colors flex items-center">
+                            <span className="text-xs bg-blue-900/30 text-blue-300 px-2 py-0.5 rounded mr-2">Național</span>
+                            {hotel.nationalPhoneNumber}
+                            <span className="ml-2 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                              </svg>
+                            </span>
+                          </a>
+                        )}
                       </div>
                     </div>
                   )}
                   
-                  {hotel.website && (
-                    <div className="flex items-start">
-                      <FaGlobe className="text-blue-400 mt-1 mr-3 flex-shrink-0" />
-                      <div className="w-full overflow-hidden">
-                        <div className="text-sm text-gray-300 mb-1">Website:</div>
+                  {/* Website */}
+                  {(hotel.website || hotel.websiteUri) && (
+                    <div className="flex items-start group p-2 rounded-lg hover:bg-blue-900/20 transition-colors">
+                      <div className="flex items-center justify-center bg-blue-900/30 rounded-full p-2 text-blue-400 mr-3">
+                        <FaGlobe />
+                      </div>
+                      <div className="flex-1 overflow-hidden">
+                        <div className="text-sm text-gray-300 mb-1">Website oficial:</div>
                         <a 
-                          href={hotel.website} 
+                          href={hotel.website || hotel.websiteUri} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="text-blue-400 hover:underline break-words overflow-hidden"
+                          className="text-blue-400 hover:underline break-words overflow-hidden flex items-center"
                           style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
                         >
-                          {hotel.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                          {(hotel.website || hotel.websiteUri).replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                          <span className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </span>
                         </a>
                       </div>
                     </div>
                   )}
                   
-                  <div className="flex items-start">
-                    <FaMapMarkerAlt className="text-blue-400 mt-1 mr-3" />
-                    <div>
+                  {/* Location */}
+                  <div className="flex items-start group p-2 rounded-lg hover:bg-blue-900/20 transition-colors">
+                    <div className="flex items-center justify-center bg-blue-900/30 rounded-full p-2 text-blue-400 mr-3">
+                      <FaMapMarkerAlt />
+                    </div>
+                    <div className="flex-1">
                       <div className="text-sm text-gray-300 mb-1">Adresă:</div>
-                      <div>{hotel.location}</div>
+                      <div>
+                        {/* Show formattedAddress for API hotels, or location for user-created hotels */}
+                        {(hotel.source === 'external' || (hotel.id && (hotel.id.startsWith('ChI') || hotel.id.startsWith('0x')))) 
+                          ? hotel.formattedAddress 
+                          : hotel.location}
+                      </div>
                       <button 
                         onClick={openInGoogleMaps}
                         className="mt-2 text-sm text-blue-400 hover:underline flex items-center"
                       >
                         <MdDirections className="mr-1" />
-                        Indicații rutiere
+                        Vezi pe Google Maps
                       </button>
                     </div>
                   </div>

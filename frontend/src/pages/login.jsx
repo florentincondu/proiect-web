@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import '../styles/Login.css';
-import { FaEye, FaEyeSlash, FaEnvelope, FaLock, FaPaperPlane } from 'react-icons/fa';
+import { FaEye, FaEyeSlash, FaEnvelope, FaLock, FaPaperPlane, FaTools, FaClock } from 'react-icons/fa';
 import backgroundImage from '../assets/backgr.webp';
 import { login as apiLogin } from '../api/auth';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -24,11 +23,15 @@ const Login = () => {
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
   const [isResetEmailSending, setIsResetEmailSending] = useState(false);
   const [showResendVerification, setShowResendVerification] = useState(false);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [maintenanceInfo, setMaintenanceInfo] = useState({
+    message: '',
+    completionTime: null
+  });
 
   const navigate = useNavigate();
   const location = useLocation();
   const { login: authLogin } = useAuth();
-
 
   useEffect(() => {
     if (location.state?.returnUrl) {
@@ -37,6 +40,27 @@ const Login = () => {
     if (location.state?.message) {
       setError(location.state.message);
     }
+
+    // Check for maintenance status when component mounts
+    const checkMaintenanceStatus = async () => {
+      try {
+        const response = await axios.get(
+          `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/support/maintenance-status`
+        );
+        
+        if (response.data && response.data.maintenanceMode) {
+          setMaintenanceMode(true);
+          setMaintenanceInfo({
+            message: response.data.maintenanceMessage || 'The site is currently under maintenance',
+            completionTime: response.data.completionTime
+          });
+        }
+      } catch (error) {
+        console.error('Error checking maintenance status:', error);
+      }
+    };
+
+    checkMaintenanceStatus();
   }, [location.state]);
 
   const handleChange = (e) => {
@@ -119,20 +143,25 @@ const Login = () => {
       setSuccess('Login successful! Redirecting...');
       
 
-      if (returnUrl) {
-        console.log('Redirecting to:', returnUrl);
-        setTimeout(() => navigate(returnUrl, { replace: true }), 1000);
-        return;
+      // Check if user is admin
+      const isUserAdmin = response.user.role === 'admin';
+      
+      // If site is in maintenance mode and user is NOT admin, show warning
+      if (maintenanceMode && !isUserAdmin) {
+        setError('Note: The site is currently in maintenance mode. Some features may be limited.');
       }
       
-
-      if (response.user.role === 'admin' || response.role === 'admin') {
-        console.log('Redirecting admin user to dashboard');
-        setTimeout(() => navigate('/dashboard', { replace: true }), 1000);
-      } else {
-        console.log('Redirecting regular user to homepage');
-        setTimeout(() => navigate('/homepage', { replace: true }), 1000);
-      }
+      // Handle redirection
+      setTimeout(() => {
+        if (returnUrl) {
+          navigate(returnUrl, { replace: true });
+        } else if (isUserAdmin) {
+          // Always redirect admins to dashboard
+          navigate('/dashboard', { replace: true });
+        } else {
+          navigate('/homepage', { replace: true });
+        }
+      }, 2000);
     } catch (error) {
       console.error('Login error:', error);
       
@@ -233,6 +262,27 @@ const Login = () => {
           <h2 className="text-4xl font-bold text-white mb-8">
             {showForgotPassword ? 'Reset Password' : 'Welcome\nback'}
           </h2>
+          
+          {maintenanceMode && (
+            <div className="bg-yellow-500/20 border border-yellow-600 text-yellow-100 p-4 rounded-lg mb-4">
+              <div className="flex items-start">
+                <FaTools className="text-yellow-400 mr-3 mt-1 flex-shrink-0" />
+                <div>
+                  <p className="font-medium mb-1">Site Under Maintenance</p>
+                  <p className="text-sm">{maintenanceInfo.message}</p>
+                  {maintenanceInfo.completionTime && (
+                    <p className="text-sm flex items-center mt-2">
+                      <FaClock className="mr-1.5" />
+                      Expected completion: {new Date(maintenanceInfo.completionTime).toLocaleString()}
+                    </p>
+                  )}
+                  <p className="mt-2 text-sm font-medium">
+                    Administrator login is still available.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           
           {error && (
             <div className="bg-red-500/20 border border-red-500 text-red-100 p-3 rounded-lg mb-4">

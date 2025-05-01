@@ -12,6 +12,13 @@ import NotificationBell from '../components/NotificationBell';
 import TermsOfService from '../components/termsOfservice';
 
 const HomePage = () => {
+  // Define getFormattedDate function before it's used
+  const getFormattedDate = (daysFromNow) => {
+    const date = new Date();
+    date.setDate(date.getDate() + daysFromNow);
+    return date.toISOString().split('T')[0];
+  };
+
   const [showModal, setShowModal] = useState(false);
   const [popularHotels, setPopularHotels] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,6 +32,9 @@ const HomePage = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedRating, setSelectedRating] = useState(0);
   const [hoveredHotelId, setHoveredHotelId] = useState(null);
+  const [checkInDate, setCheckInDate] = useState(getFormattedDate(1));
+  const [checkOutDate, setCheckOutDate] = useState(getFormattedDate(8));
+  const [guestCount, setGuestCount] = useState(2);
   
   const navigate = useNavigate();
   const { isAuthenticated, loading: authLoading, logout, user } = useAuth();
@@ -83,6 +93,9 @@ const HomePage = () => {
     const fetchPopularHotels = async () => {
       setLoading(true);
       try {
+        // Attempt to fetch hotels from external API
+        let apiHotels = [];
+        try {
         const response = await axios.post(
           `${API_BASE_URL}/api/places/search-nearby`,
           requestData,
@@ -92,76 +105,76 @@ const HomePage = () => {
         
         if (response.data && response.data.places) {
           console.log("Number of hotels from API:", response.data.places.length);
-          const hotelsWithPrices = response.data.places.map(hotel => ({
+            apiHotels = response.data.places.map(hotel => ({
             ...hotel,
             estimatedPrice: generateHotelPrice(hotel),
-
             amenities: {
               pool: Math.random() > 0.5,
               pets: Math.random() > 0.7,
               wifi: Math.random() > 0.2,
               breakfast: Math.random() > 0.6,
               parking: Math.random() > 0.4,
+              },
+              source: 'external'
+            }));
+          }
+        } catch (apiError) {
+          console.error('Error fetching hotels from API:', apiError);
+          apiHotels = [];
+        }
+
+        // Fetch user hotels from backend
+        let userHotels = [];
+        try {
+          const userHotelsResponse = await axios.get(
+            `${API_BASE_URL}/api/hotels`,
+            {
+              headers: isAuthenticated ? {
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+              } : {}
             }
-          }));
+          );
           
-
-          const mockHotels = JSON.parse(localStorage.getItem('mockHotels') || '[]');
-          console.log("Found mock hotels in localStorage:", mockHotels.length);
-          
-
-          const approvedMockHotels = mockHotels.filter(hotel => hotel.status === 'approved');
-          
-
-          const processedMockHotels = approvedMockHotels.map(hotel => ({
-            id: hotel.id,
+          if (userHotelsResponse.data && userHotelsResponse.data.success) {
+            const approvedHotels = userHotelsResponse.data.data.filter(hotel => 
+              hotel.status === 'approved' || hotel.status === 'active'
+            );
+            
+            userHotels = approvedHotels.map(hotel => ({
+              id: hotel._id,
             displayName: {
-              text: hotel.title
+                text: hotel.name
             },
-            formattedAddress: hotel.address,
+              formattedAddress: hotel.location,
             photos: hotel.photos?.length > 0 ? hotel.photos.map(url => ({ name: url })) : [],
             rating: hotel.rating || 4.5,
-            userRatingCount: Math.floor(Math.random() * 100) + 10,
+              userRatingCount: hotel.reviews?.length || Math.floor(Math.random() * 100) + 10,
             estimatedPrice: parseFloat(hotel.price),
             currency: hotel.currency || 'RON',
-            amenities: hotel.amenities || {
+              amenities: hotel.amenities?.reduce((obj, amenity) => {
+                obj[amenity] = true; 
+                return obj;
+              }, {}) || {
               wifi: true,
               parking: true,
               breakfast: true
             },
-            isMockHotel: true, // Flag to identify mock hotels
-            coordinates: hotel.coordinates
-          }));
+              coordinates: hotel.coordinates,
+              source: 'internal',
+              description: hotel.description
+            }));
+          }
+        } catch (userHotelsError) {
+          console.error('Error fetching user hotels:', userHotelsError);
           
-
-          const combinedHotels = [...hotelsWithPrices, ...processedMockHotels];
-          setPopularHotels(combinedHotels);
-          
-
-          const initialIndexes = {};
-          combinedHotels.forEach((hotel) => {
-            initialIndexes[hotel.id] = 0;
-          });
-          setCurrentImageIndexes(initialIndexes);
-        } else {
-          setError('Invalid response format. Places data not found.');
-        }
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching hotels:', error);
-        
-
+          // Fallback to localStorage if API fails
         try {
           const mockHotels = JSON.parse(localStorage.getItem('mockHotels') || '[]');
-          
-          if (mockHotels.length > 0) {
-            console.log("API call failed. Using mock hotels from localStorage:", mockHotels.length);
-            
+            console.log("Using mock hotels from localStorage:", mockHotels.length);
 
             const approvedMockHotels = mockHotels.filter(hotel => hotel.status === 'approved');
             
-
-            const processedMockHotels = approvedMockHotels.map(hotel => ({
+            userHotels = approvedMockHotels.map(hotel => ({
               id: hotel.id,
               displayName: {
                 text: hotel.title
@@ -177,61 +190,49 @@ const HomePage = () => {
                 parking: true,
                 breakfast: true
               },
-              isMockHotel: true, // Flag to identify mock hotels
+              source: 'internal',
+              description: hotel.description,
               coordinates: hotel.coordinates
             }));
+          } catch (localStorageError) {
+            console.error('Error accessing localStorage:', localStorageError);
+            userHotels = [];
+          }
+        }
             
-            setPopularHotels(processedMockHotels);
+        // Combine both API and user hotels
+        const combinedHotels = [...apiHotels, ...userHotels];
+        setPopularHotels(combinedHotels);
             
-
+        // Initialize image indexes
             const initialIndexes = {};
-            processedMockHotels.forEach((hotel) => {
+        combinedHotels.forEach((hotel) => {
               initialIndexes[hotel.id] = 0;
             });
             setCurrentImageIndexes(initialIndexes);
             
-
-            setError(null);
-          } else {
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching hotels:', error);
             setError('Failed to fetch popular hotels. Please try again later.');
-          }
-        } catch (localStorageError) {
-          console.error('Error accessing localStorage:', localStorageError);
-          setError('Failed to fetch popular hotels. Please try again later.');
-        }
-        
         setLoading(false);
       }
     };
 
     fetchPopularHotels();
-    
-
-    setTimeout(() => {
-      if (searchRef.current) {
-        window.scrollTo({
-          top: searchRef.current.offsetTop - 100,
-          behavior: 'smooth'
-        });
-      }
-    }, 1500);
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
-
     if (user && user.role === 'admin') {
       console.log('Admin user detected on homepage. Redirecting to dashboard.');
       navigate('/dashboard', { replace: true });
     }
   }, [user, navigate]);
 
-
   const getPhotoUrl = (photoReference, maxWidth = 400, maxHeight = null) => {
-
     if (photoReference && typeof photoReference === 'string') {
       return photoReference;
     }
-    
 
     if (photoReference && typeof photoReference.name === 'string' && 
         (photoReference.name.startsWith('http://') || photoReference.name.startsWith('https://'))) {
@@ -239,10 +240,8 @@ const HomePage = () => {
     }
     
     if (!photoReference || !photoReference.name) return backgr;
-    
 
     let url = `http://localhost:5000/api/places/media/${encodeURIComponent(photoReference.name)}?`;
-    
 
     if (maxWidth) {
       url += `maxWidthPx=${maxWidth}`;
@@ -254,7 +253,6 @@ const HomePage = () => {
     
     return url;
   };
-
 
   const navigateImage = (hotelId, direction, event) => {
     if (event) {
@@ -282,20 +280,38 @@ const HomePage = () => {
   const handleSearch = async (e) => {
     e.preventDefault();
     const query = searchQuery.trim();
-    
 
     if (!query) {
       setError('Please enter a location to search');
-          return;
-        }
+      return;
+    }
 
+    // Validate dates
+    const checkIn = new Date(checkInDate);
+    const checkOut = new Date(checkOutDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
+      setError('Please select valid dates');
+      return;
+    }
+
+    if (checkIn < today) {
+      setError('Check-in date cannot be in the past');
+      return;
+    }
+
+    if (checkOut <= checkIn) {
+      setError('Check-out date must be after check-in date');
+      return;
+    }
 
     setError(null);
     setLoading(true);
     
     try {
-      console.log(`Starting search for: "${query}"`);
-      
+      console.log(`Starting search for: "${query}" (${checkInDate} to ${checkOutDate}, ${guestCount} guests)`);
 
       const formattedQuery = query.toLowerCase().includes('hotel') 
         ? query  // If query already contains "hotel", use it as-is
@@ -303,59 +319,167 @@ const HomePage = () => {
       
       console.log(`Using formatted query: "${formattedQuery}"`);
       
-
-      const response = await axios.post(
+      // First, search for hotels using the external API
+      let apiHotels = [];
+      try {
+        const response = await axios.post(
           `${API_BASE_URL}/api/places/search-text`,
           {
-          textQuery: formattedQuery
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.photos,places.rating,places.userRatingCount,places.priceLevel,places.id'
+            textQuery: formattedQuery
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.photos,places.rating,places.userRatingCount,places.priceLevel,places.id'
+            }
           }
+        );
+
+        console.log(`Search complete. Found ${response.data.places?.length || 0} results from API`);
+
+        if (response.data.places && response.data.places.length > 0) {
+          apiHotels = response.data.places.map(hotel => ({
+            ...hotel,
+            estimatedPrice: generateHotelPrice(hotel),
+            amenities: {
+              pool: Math.random() > 0.5,
+              pets: Math.random() > 0.7,
+              wifi: Math.random() > 0.2,
+              breakfast: Math.random() > 0.6,
+              parking: Math.random() > 0.4,
+            },
+            source: 'external'
+          }));
         }
-      );
-
-      console.log(`Search complete. Found ${response.data.places?.length || 0} results`);
-
-      if (response.data.places && response.data.places.length > 0) {
-
-        const processedHotels = response.data.places.map(hotel => ({
-          ...hotel,
-          estimatedPrice: generateHotelPrice(hotel),
-          amenities: {
-            pool: Math.random() > 0.5,
-            pets: Math.random() > 0.7,
-            wifi: Math.random() > 0.2,
-            breakfast: Math.random() > 0.6,
-            parking: Math.random() > 0.4,
+      } catch (apiError) {
+        console.error('Error searching external API:', apiError);
+      }
+      
+      // Second, search for hotels in our database
+      let userHotels = [];
+      try {
+        // Search in our own database using the same query
+        const userHotelsResponse = await axios.get(
+          `${API_BASE_URL}/api/hotels/search?query=${encodeURIComponent(query)}`,
+          {
+            headers: isAuthenticated ? {
+              'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            } : {}
           }
-        }));
-
-
-        sessionStorage.setItem('searchResults', JSON.stringify(processedHotels));
-        sessionStorage.setItem('searchQuery', query);
+        );
         
-        console.log(`Stored ${processedHotels.length} hotels in sessionStorage`);
+        if (userHotelsResponse.data && userHotelsResponse.data.success) {
+          console.log(`Found ${userHotelsResponse.data.data.length} hotels in database`);
+          
+          const approvedHotels = userHotelsResponse.data.data.filter(hotel => 
+            hotel.status === 'approved' || hotel.status === 'active'
+          );
+          
+          userHotels = approvedHotels.map(hotel => ({
+            id: hotel._id,
+            displayName: {
+              text: hotel.name
+            },
+            formattedAddress: hotel.location,
+            photos: hotel.photos?.length > 0 ? hotel.photos.map(url => ({ name: url })) : [],
+            rating: hotel.rating || 4.5,
+            userRatingCount: hotel.reviews?.length || Math.floor(Math.random() * 100) + 10,
+            estimatedPrice: parseFloat(hotel.price),
+            currency: hotel.currency || 'RON',
+            amenities: hotel.amenities?.reduce((obj, amenity) => {
+              obj[amenity] = true; 
+              return obj;
+            }, {}) || {
+              wifi: true,
+              parking: true,
+              breakfast: true
+            },
+            source: 'internal',
+            description: hotel.description,
+            coordinates: hotel.coordinates
+          }));
+        }
+      } catch (dbError) {
+        console.error('Error searching database:', dbError);
         
-
+        // Fallback to localStorage if API fails
+        try {
+          const mockHotels = JSON.parse(localStorage.getItem('mockHotels') || '[]');
+          
+          if (mockHotels.length > 0) {
+            const searchTerms = query.toLowerCase().split(' ');
+            const filteredMockHotels = mockHotels.filter(hotel => {
+              const hotelNameLower = hotel.title.toLowerCase();
+              const hotelAddressLower = hotel.address.toLowerCase();
+              return searchTerms.some(term => 
+                hotelNameLower.includes(term) || hotelAddressLower.includes(term)
+              );
+            });
+            
+            const approvedMockHotels = filteredMockHotels.filter(hotel => hotel.status === 'approved');
+            
+            userHotels = approvedMockHotels.map(hotel => ({
+              id: hotel.id,
+              displayName: {
+                text: hotel.title
+              },
+              formattedAddress: hotel.address,
+              photos: hotel.photos?.length > 0 ? hotel.photos.map(url => ({ name: url })) : [],
+              rating: hotel.rating || 4.5,
+              userRatingCount: Math.floor(Math.random() * 100) + 10,
+              estimatedPrice: parseFloat(hotel.price),
+              currency: hotel.currency || 'RON',
+              amenities: hotel.amenities || {
+                wifi: true,
+                parking: true,
+                breakfast: true
+              },
+              source: 'internal',
+              description: hotel.description,
+              coordinates: hotel.coordinates
+            }));
+          }
+        } catch (localStorageError) {
+          console.error('Error accessing localStorage:', localStorageError);
+        }
+      }
+      
+      // Combine results from both sources
+      const combinedResults = [...apiHotels, ...userHotels];
+      
+      if (combinedResults.length > 0) {
+        console.log(`Combined search results: ${combinedResults.length} hotels`);
+        
+        // Store search parameters in sessionStorage
+        const searchParams = {
+          query,
+          checkInDate,
+          checkOutDate,
+          guestCount,
+          results: combinedResults
+        };
+        
+        sessionStorage.setItem('searchParams', JSON.stringify(searchParams));
+        
         setSearchQuery('');
-        
 
-          navigate('/search-results', {
-            state: {
-              searchQuery: query,
-            results: processedHotels
+        // Navigate to search results page with all search parameters
+        navigate('/search-results', {
+          state: {
+            searchQuery: query,
+            checkInDate,
+            checkOutDate,
+            guestCount,
+            results: combinedResults
           },
           replace: true // Use replace to prevent adding to history stack
-          });
-        } else {
-          setError('No hotels found in this location');
-        }
-      } catch (error) {
-        console.error('Search error:', error);
-        setError('Error performing search. Please try again.');
+        });
+      } else {
+        setError('No hotels found in this location');
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      setError('Error performing search. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -389,12 +513,6 @@ const HomePage = () => {
     setSelectedRating(rating === selectedRating ? 0 : rating);
   };
 
-  const getFormattedDate = (daysFromNow) => {
-    const date = new Date();
-    date.setDate(date.getDate() + daysFromNow);
-    return date.toISOString().split('T')[0];
-  };
-
   const handleGuestContinue = () => {
     setShowModal(false);
   };
@@ -422,7 +540,6 @@ const HomePage = () => {
     }
     
     if (!isAuthenticated) {
-
       navigate('/login', { 
         state: { 
           returnUrl: `/reserve/${hotelId}`,
@@ -431,18 +548,15 @@ const HomePage = () => {
       });
       return;
     }
-    
 
     navigate(`/reserve/${hotelId}`);
   };
 
   const filteredHotels = popularHotels
     .filter(hotel => {
-
       if (selectedRating > 0 && (!hotel.rating || hotel.rating < selectedRating)) {
         return false;
       }
-      
 
       if (activeFilters.length > 0) {
         return activeFilters.every(filter => hotel.amenities && hotel.amenities[filter]);
@@ -451,10 +565,8 @@ const HomePage = () => {
       return true;
     })
     .filter(hotel => {
-
       return hotel.estimatedPrice >= priceRange[0] && hotel.estimatedPrice <= priceRange[1];
     });
-
 
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -706,8 +818,11 @@ const HomePage = () => {
                   <input 
                     type="date" 
                     placeholder="Add dates" 
-                    defaultValue={getFormattedDate(1)}
+                    value={checkInDate}
+                    onChange={(e) => setCheckInDate(e.target.value)}
+                    min={getFormattedDate(0)}
                     className="p-2 md:p-3 bg-[#172a45] rounded-lg text-sm md:text-base border border-transparent focus:border-blue-500 transition-colors outline-none"
+                    required
                   />
                 </div>
                 <div className="flex flex-col">
@@ -718,8 +833,11 @@ const HomePage = () => {
                   <input 
                     type="date" 
                     placeholder="Add dates" 
-                    defaultValue={getFormattedDate(8)}
+                    value={checkOutDate}
+                    onChange={(e) => setCheckOutDate(e.target.value)}
+                    min={checkInDate}
                     className="p-2 md:p-3 bg-[#172a45] rounded-lg text-sm md:text-base border border-transparent focus:border-blue-500 transition-colors outline-none"
+                    required
                   />
                 </div>
                 <div className="flex flex-col">
@@ -727,12 +845,18 @@ const HomePage = () => {
                     <Users size={16} className="mr-2 text-blue-400" />
                     Guests
                   </label>
-                  <select className="p-2 md:p-3 bg-[#172a45] rounded-lg text-sm md:text-base border border-transparent focus:border-blue-500 transition-colors outline-none">
-                    <option>Add guests</option>
-                    <option>1 guest</option>
-                    <option>2 guests</option>
-                    <option>3 guests</option>
-                    <option>4+ guests</option>
+                  <select 
+                    className="p-2 md:p-3 bg-[#172a45] rounded-lg text-sm md:text-base border border-transparent focus:border-blue-500 transition-colors outline-none"
+                    value={guestCount}
+                    onChange={(e) => setGuestCount(parseInt(e.target.value))}
+                    required
+                  >
+                    <option value="1">1 guest</option>
+                    <option value="2">2 guests</option>
+                    <option value="3">3 guests</option>
+                    <option value="4">4 guests</option>
+                    <option value="5">5 guests</option>
+                    <option value="6">6+ guests</option>
                   </select>
                 </div>
               </div>

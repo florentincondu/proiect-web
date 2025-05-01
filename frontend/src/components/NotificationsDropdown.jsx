@@ -49,6 +49,8 @@ const NotificationsDropdown = () => {
         return <FaBell className="text-blue-500" />;
       case 'support':
         return <FaEnvelope className="text-green-500" />;
+      case 'contact':
+        return <FaEnvelope className="text-purple-500" />;
       default:
         return <FaBell className="text-gray-500" />;
     }

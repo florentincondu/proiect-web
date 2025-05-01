@@ -1,25 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { FaTicketAlt, FaFileAlt, FaTools, FaSearch, FaDownload, FaExclamationTriangle } from 'react-icons/fa';
+import { FaEnvelope, FaFileAlt, FaTools, FaSearch, FaDownload, FaExclamationTriangle, FaReply, FaTimes } from 'react-icons/fa';
 import axios from 'axios';
 
 const AdminSupportTools = () => {
 
-  const [activeTab, setActiveTab] = useState('tickets');
-  const [tickets, setTickets] = useState([]);
+  const [activeTab, setActiveTab] = useState('contacts');
+  const [contactSubmissions, setContactSubmissions] = useState([]);
   const [logs, setLogs] = useState([]);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [maintenanceMessage, setMaintenanceMessage] = useState('');
+  const [completionTime, setCompletionTime] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedPriority, setSelectedPriority] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [isToggling, setIsToggling] = useState(false);
-
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSendingResponse, setIsSendingResponse] = useState(false);
+  const [selectedSubmission, setSelectedSubmission] = useState(null);
+  const [responseText, setResponseText] = useState('');
+  const [showResponseModal, setShowResponseModal] = useState(false);
 
   useEffect(() => {
-    if (activeTab === 'tickets') {
-      fetchTickets();
+    if (activeTab === 'contacts') {
+      fetchContactSubmissions();
     } else if (activeTab === 'logs') {
       fetchLogs();
     } else if (activeTab === 'maintenance') {
@@ -28,25 +33,28 @@ const AdminSupportTools = () => {
   }, [activeTab]);
 
 
-  const fetchTickets = async () => {
+  const fetchContactSubmissions = async () => {
     setIsLoading(true);
     setError('');
     try {
-
       const token = localStorage.getItem('token') || '';
       
       const response = await axios.get(
-        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/support/admin/support-tickets`,
+        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/support/admin/contact-submissions`,
         {
           headers: { 
             'Authorization': `Bearer ${token}`
+          },
+          params: {
+            status: selectedStatus !== 'all' ? selectedStatus : undefined,
+            search: searchTerm || undefined
           }
         }
       );
-      setTickets(response.data.tickets);
+      setContactSubmissions(response.data.submissions);
     } catch (error) {
-      console.error('Error fetching tickets:', error);
-      setError(error.response?.data?.message || 'Failed to fetch support tickets');
+      console.error('Error fetching contact submissions:', error);
+      setError(error.response?.data?.message || 'Failed to fetch contact submissions');
     } finally {
       setIsLoading(false);
     }
@@ -56,7 +64,6 @@ const AdminSupportTools = () => {
     setIsLoading(true);
     setError('');
     try {
-
       const token = localStorage.getItem('token') || '';
       
       const response = await axios.get(
@@ -80,7 +87,6 @@ const AdminSupportTools = () => {
     setIsLoading(true);
     setError('');
     try {
-
       const token = localStorage.getItem('token') || '';
       
       console.log('Fetching maintenance status');
@@ -96,6 +102,18 @@ const AdminSupportTools = () => {
       
       console.log('Maintenance status response:', response.data);
       setMaintenanceMode(response.data.maintenanceMode);
+      setMaintenanceMessage(response.data.message || '');
+      
+      if (response.data.completionTime) {
+        // Convert to local datetime-local format
+        const date = new Date(response.data.completionTime);
+        const localDatetime = new Date(date.getTime() - (date.getTimezoneOffset() * 60000))
+          .toISOString()
+          .slice(0, 16);
+        setCompletionTime(localDatetime);
+      } else {
+        setCompletionTime('');
+      }
     } catch (error) {
       console.error('Error fetching maintenance status:', error);
       setError(error.response?.data?.message || 'Failed to fetch maintenance status');
@@ -109,7 +127,6 @@ const AdminSupportTools = () => {
     setError('');
     setSuccess('');
     try {
-
       const token = localStorage.getItem('token') || '';
       
       console.log('Toggling maintenance mode, current state:', maintenanceMode);
@@ -117,7 +134,11 @@ const AdminSupportTools = () => {
       
       const response = await axios.post(
         `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/support/admin/maintenance-mode`,
-        { enabled: !maintenanceMode },
+        { 
+          enabled: !maintenanceMode,
+          message: maintenanceMessage,
+          completionTime: completionTime ? new Date(completionTime).toISOString() : null
+        },
         {
           headers: { 
             'Content-Type': 'application/json',
@@ -137,16 +158,22 @@ const AdminSupportTools = () => {
     }
   };
 
-  const updateTicketStatus = async (ticketId, newStatus) => {
-    setIsLoading(true);
-    setError('');
-    try {
+  const respondToSubmission = async () => {
+    if (!selectedSubmission || !responseText.trim()) {
+      setError('Please select a submission and enter a response');
+      return;
+    }
 
+    setIsSendingResponse(true);
+    setError('');
+    setSuccess('');
+
+    try {
       const token = localStorage.getItem('token') || '';
       
-      await axios.patch(
-        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/support/admin/tickets/${ticketId}/status`,
-        { status: newStatus },
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/support/admin/contact-submissions/${selectedSubmission._id}/respond`,
+        { response: responseText },
         {
           headers: { 
             'Content-Type': 'application/json',
@@ -154,16 +181,23 @@ const AdminSupportTools = () => {
           }
         }
       );
-
-      setTickets(tickets.map(ticket => 
-        ticket.id === ticketId ? { ...ticket, status: newStatus } : ticket
-      ));
-      setSuccess('Ticket status updated successfully');
+      
+      // Update submission in the list
+      setContactSubmissions(prevSubmissions => 
+        prevSubmissions.map(sub => 
+          sub._id === selectedSubmission._id ? response.data.submission : sub
+        )
+      );
+      
+      setSuccess('Response sent successfully to ' + selectedSubmission.email);
+      setShowResponseModal(false);
+      setResponseText('');
+      setSelectedSubmission(null);
     } catch (error) {
-      console.error('Error updating ticket status:', error);
-      setError(error.response?.data?.message || 'Failed to update ticket status');
+      console.error('Error sending response:', error);
+      setError(error.response?.data?.message || 'Failed to send response');
     } finally {
-      setIsLoading(false);
+      setIsSendingResponse(false);
     }
   };
 
@@ -182,15 +216,16 @@ const AdminSupportTools = () => {
   };
 
 
-  const filteredTickets = tickets.filter(ticket => {
-    const matchesSearch = ticket.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          ticket.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          ticket.userId.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredSubmissions = contactSubmissions.filter(submission => {
+    const matchesSearch = searchTerm === '' || 
+                          submission.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          submission.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          submission.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          submission.message?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesPriority = selectedPriority === 'all' || ticket.priority === selectedPriority;
-    const matchesStatus = selectedStatus === 'all' || ticket.status === selectedStatus;
+    const matchesStatus = selectedStatus === 'all' || submission.status === selectedStatus;
     
-    return matchesSearch && matchesPriority && matchesStatus;
+    return matchesSearch && matchesStatus;
   });
 
   const filteredLogs = logs.filter(log => 
@@ -200,22 +235,23 @@ const AdminSupportTools = () => {
   );
 
 
-  const getPriorityClass = (priority) => {
-    switch (priority) {
-      case 'high': return 'bg-red-500/20 text-red-100';
-      case 'medium': return 'bg-yellow-500/20 text-yellow-100';
-      case 'low': return 'bg-green-500/20 text-green-100';
+  const getStatusClass = (status) => {
+    switch (status) {
+      case 'new': return 'bg-blue-500/20 text-blue-100';
+      case 'reviewing': return 'bg-purple-500/20 text-purple-100';
+      case 'responded': return 'bg-green-500/20 text-green-100';
+      case 'closed': return 'bg-gray-500/20 text-gray-100';
       default: return 'bg-gray-500/20 text-gray-100';
     }
   };
 
-  const getStatusClass = (status) => {
+  const getStatusText = (status) => {
     switch (status) {
-      case 'open': return 'bg-blue-500/20 text-blue-100';
-      case 'in_progress': return 'bg-purple-500/20 text-purple-100';
-      case 'resolved': return 'bg-green-500/20 text-green-100';
-      case 'closed': return 'bg-gray-500/20 text-gray-100';
-      default: return 'bg-gray-500/20 text-gray-100';
+      case 'new': return 'New';
+      case 'reviewing': return 'Reviewing';
+      case 'responded': return 'Responded';
+      case 'closed': return 'Closed';
+      default: return status;
     }
   };
 
@@ -229,10 +265,56 @@ const AdminSupportTools = () => {
     }
   };
 
+  const saveMaintenanceCustomization = async () => {
+    setIsSaving(true);
+    setError('');
+    setSuccess('');
+    try {
+      const token = localStorage.getItem('token') || '';
+      
+      console.log('Saving maintenance customization with message:', maintenanceMessage);
+      console.log('Completion time:', completionTime);
+      
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/support/admin/maintenance-customization`,
+        { 
+          message: maintenanceMessage,
+          completionTime: completionTime ? new Date(completionTime).toISOString() : null
+        },
+        {
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+      
+      console.log('Maintenance customization saved:', response.data);
+      setSuccess('Maintenance customization saved successfully');
+    } catch (error) {
+      console.error('Error saving maintenance customization:', error);
+      setError(error.response?.data?.message || 'Failed to save maintenance customization');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const openResponseModal = (submission) => {
+    setSelectedSubmission(submission);
+    setResponseText('');
+    setShowResponseModal(true);
+  };
+
+  const closeResponseModal = () => {
+    setShowResponseModal(false);
+    setSelectedSubmission(null);
+    setResponseText('');
+  };
+
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-6">
+    <div className="min-h-screen bg-gray-900 text-white p-3 sm:p-6">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-8">
           Support Tools
           <span className="text-blue-500 ml-2">Dashboard</span>
         </h1>
@@ -251,17 +333,17 @@ const AdminSupportTools = () => {
         )}
 
         {/* Navigation tabs */}
-        <div className="flex border-b border-gray-700 mb-6">
+        <div className="flex flex-wrap overflow-x-auto border-b border-gray-700 mb-6">
           <button
-            className={`px-6 py-3 font-medium flex items-center ${
-              activeTab === 'tickets' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-gray-200'
+            className={`px-4 sm:px-6 py-3 font-medium flex items-center whitespace-nowrap ${
+              activeTab === 'contacts' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-gray-200'
             }`}
-            onClick={() => setActiveTab('tickets')}
+            onClick={() => setActiveTab('contacts')}
           >
-            <FaTicketAlt className="mr-2" /> Support Tickets
+            <FaEnvelope className="mr-2" /> Contact Submissions
           </button>
           <button
-            className={`px-6 py-3 font-medium flex items-center ${
+            className={`px-4 sm:px-6 py-3 font-medium flex items-center whitespace-nowrap ${
               activeTab === 'logs' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-gray-200'
             }`}
             onClick={() => setActiveTab('logs')}
@@ -269,7 +351,7 @@ const AdminSupportTools = () => {
             <FaFileAlt className="mr-2" /> System Logs
           </button>
           <button
-            className={`px-6 py-3 font-medium flex items-center ${
+            className={`px-4 sm:px-6 py-3 font-medium flex items-center whitespace-nowrap ${
               activeTab === 'maintenance' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-gray-200'
             }`}
             onClick={() => setActiveTab('maintenance')}
@@ -279,52 +361,48 @@ const AdminSupportTools = () => {
         </div>
 
         {/* Content area */}
-        <div className="bg-gray-800 rounded-xl shadow-lg p-6">
-          {/* Support Tickets Tab */}
-          {activeTab === 'tickets' && (
+        <div className="bg-gray-800 rounded-xl shadow-lg p-4 sm:p-6">
+          {/* Contact Submissions Tab */}
+          {activeTab === 'contacts' && (
             <div>
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 space-y-4 md:space-y-0">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 space-y-4 lg:space-y-0">
                 <h2 className="text-xl font-semibold flex items-center">
-                  <FaTicketAlt className="mr-2 text-blue-400" /> User Support Tickets
+                  <FaEnvelope className="mr-2 text-blue-400" /> Contact Form Submissions
                 </h2>
                 
-                <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-3 w-full md:w-auto">
+                <div className="flex flex-col lg:flex-row space-y-2 lg:space-y-0 lg:space-x-3 w-full lg:w-auto">
                   {/* Search filter */}
                   <div className="relative">
                     <input
                       type="text"
-                      placeholder="Search tickets..."
+                      placeholder="Search submissions..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-9 pr-4 py-2 bg-gray-700 rounded-md w-full md:w-64"
+                      className="pl-9 pr-4 py-2 bg-gray-700 rounded-md w-full"
                     />
                     <FaSearch className="absolute left-3 top-3 text-gray-400" />
                   </div>
-                  
-                  {/* Priority filter */}
-                  <select
-                    value={selectedPriority}
-                    onChange={(e) => setSelectedPriority(e.target.value)}
-                    className="py-2 px-3 bg-gray-700 rounded-md"
-                  >
-                    <option value="all">All Priorities</option>
-                    <option value="high">High Priority</option>
-                    <option value="medium">Medium Priority</option>
-                    <option value="low">Low Priority</option>
-                  </select>
                   
                   {/* Status filter */}
                   <select
                     value={selectedStatus}
                     onChange={(e) => setSelectedStatus(e.target.value)}
-                    className="py-2 px-3 bg-gray-700 rounded-md"
+                    className="py-2 px-3 bg-gray-700 rounded-md w-full lg:w-auto"
                   >
                     <option value="all">All Statuses</option>
-                    <option value="open">Open</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="resolved">Resolved</option>
+                    <option value="new">New</option>
+                    <option value="reviewing">Reviewing</option>
+                    <option value="responded">Responded</option>
                     <option value="closed">Closed</option>
                   </select>
+                  
+                  {/* Refresh button */}
+                  <button
+                    onClick={fetchContactSubmissions}
+                    className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md"
+                  >
+                    Refresh
+                  </button>
                 </div>
               </div>
 
@@ -332,60 +410,52 @@ const AdminSupportTools = () => {
                 <div className="flex justify-center items-center h-64">
                   <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
                 </div>
-              ) : filteredTickets.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="bg-gray-700/50 text-left">
-                        <th className="px-4 py-3 font-medium">ID</th>
-                        <th className="px-4 py-3 font-medium">Title</th>
-                        <th className="px-4 py-3 font-medium">User</th>
-                        <th className="px-4 py-3 font-medium">Priority</th>
-                        <th className="px-4 py-3 font-medium">Status</th>
-                        <th className="px-4 py-3 font-medium">Created</th>
-                        <th className="px-4 py-3 font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredTickets.map((ticket) => (
-                        <tr key={ticket.id} className="border-t border-gray-700 hover:bg-gray-700/30">
-                          <td className="px-4 py-3 font-mono text-sm">{ticket.id.substring(0, 8)}</td>
-                          <td className="px-4 py-3">{ticket.title}</td>
-                          <td className="px-4 py-3">{ticket.userId}</td>
-                          <td className="px-4 py-3">
-                            <span className={`text-xs px-2 py-1 rounded-full ${getPriorityClass(ticket.priority)}`}>
-                              {ticket.priority.charAt(0).toUpperCase() + ticket.priority.slice(1)}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`text-xs px-2 py-1 rounded-full ${getStatusClass(ticket.status)}`}>
-                              {ticket.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-400">
-                            {new Date(ticket.createdAt).toLocaleDateString()}
-                          </td>
-                          <td className="px-4 py-3">
-                            <select
-                              value={ticket.status}
-                              onChange={(e) => updateTicketStatus(ticket.id, e.target.value)}
-                              className="bg-gray-700 text-sm rounded p-1 border border-gray-600"
-                              disabled={isLoading}
-                            >
-                              <option value="open">Open</option>
-                              <option value="in_progress">In Progress</option>
-                              <option value="resolved">Resolved</option>
-                              <option value="closed">Closed</option>
-                            </select>
-                          </td>
+              ) : filteredSubmissions.length > 0 ? (
+                <div className="overflow-x-auto -mx-4 sm:-mx-6">
+                  <div className="inline-block min-w-full align-middle px-4 sm:px-6">
+                    <table className="min-w-full divide-y divide-gray-700">
+                      <thead>
+                        <tr className="bg-gray-700/50 text-left">
+                          <th className="px-3 sm:px-4 py-3 font-medium text-sm">Date</th>
+                          <th className="px-3 sm:px-4 py-3 font-medium text-sm">Name</th>
+                          <th className="px-3 sm:px-4 py-3 font-medium text-sm">Email</th>
+                          <th className="px-3 sm:px-4 py-3 font-medium text-sm">Subject</th>
+                          <th className="px-3 sm:px-4 py-3 font-medium text-sm">Status</th>
+                          <th className="px-3 sm:px-4 py-3 font-medium text-sm">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {filteredSubmissions.map((submission) => (
+                          <tr key={submission._id} className="border-t border-gray-700 hover:bg-gray-700/30">
+                            <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm text-gray-400">
+                              {new Date(submission.createdAt).toLocaleDateString()}
+                            </td>
+                            <td className="px-3 sm:px-4 py-3 text-sm">{submission.name}</td>
+                            <td className="px-3 sm:px-4 py-3 text-sm">{submission.email}</td>
+                            <td className="px-3 sm:px-4 py-3 text-sm">{submission.subject}</td>
+                            <td className="px-3 sm:px-4 py-3">
+                              <span className={`text-xs px-2 py-1 rounded-full ${getStatusClass(submission.status)}`}>
+                                {getStatusText(submission.status)}
+                              </span>
+                            </td>
+                            <td className="px-3 sm:px-4 py-3">
+                              <button
+                                onClick={() => openResponseModal(submission)}
+                                className="bg-blue-500 hover:bg-blue-600 text-white text-xs px-2 py-1 rounded flex items-center"
+                                disabled={submission.status === 'responded'}
+                              >
+                                <FaReply className="mr-1" /> Respond
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-12 text-gray-400">
-                  <p>No support tickets found</p>
+                  <p>No contact submissions found</p>
                 </div>
               )}
             </div>
@@ -394,12 +464,12 @@ const AdminSupportTools = () => {
           {/* System Logs Tab */}
           {activeTab === 'logs' && (
             <div>
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 space-y-4 md:space-y-0">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 space-y-4 lg:space-y-0">
                 <h2 className="text-xl font-semibold flex items-center">
                   <FaFileAlt className="mr-2 text-blue-400" /> System Logs
                 </h2>
                 
-                <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-3 w-full md:w-auto">
+                <div className="flex flex-col lg:flex-row space-y-2 lg:space-y-0 lg:space-x-3 w-full lg:w-auto">
                   {/* Search filter */}
                   <div className="relative">
                     <input
@@ -407,7 +477,7 @@ const AdminSupportTools = () => {
                       placeholder="Search logs..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-9 pr-4 py-2 bg-gray-700 rounded-md w-full md:w-64"
+                      className="pl-9 pr-4 py-2 bg-gray-700 rounded-md w-full"
                     />
                     <FaSearch className="absolute left-3 top-3 text-gray-400" />
                   </div>
@@ -428,35 +498,37 @@ const AdminSupportTools = () => {
                   <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
                 </div>
               ) : filteredLogs.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="bg-gray-700/50 text-left">
-                        <th className="px-4 py-3 font-medium">Time</th>
-                        <th className="px-4 py-3 font-medium">Level</th>
-                        <th className="px-4 py-3 font-medium">Source</th>
-                        <th className="px-4 py-3 font-medium">Message</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredLogs.map((log, index) => (
-                        <tr key={index} className="border-t border-gray-700 hover:bg-gray-700/30">
-                          <td className="px-4 py-3 text-sm text-gray-400 whitespace-nowrap">
-                            {new Date(log.timestamp).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`font-medium ${getLogLevelClass(log.level)}`}>
-                              {log.level.toUpperCase()}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm">{log.source}</td>
-                          <td className="px-4 py-3 font-mono text-sm">
-                            {log.message}
-                          </td>
+                <div className="overflow-x-auto -mx-4 sm:-mx-6">
+                  <div className="inline-block min-w-full align-middle px-4 sm:px-6">
+                    <table className="min-w-full divide-y divide-gray-700">
+                      <thead>
+                        <tr className="bg-gray-700/50 text-left">
+                          <th className="px-3 sm:px-4 py-3 font-medium text-sm">Time</th>
+                          <th className="px-3 sm:px-4 py-3 font-medium text-sm">Level</th>
+                          <th className="px-3 sm:px-4 py-3 font-medium text-sm">Source</th>
+                          <th className="px-3 sm:px-4 py-3 font-medium text-sm">Message</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {filteredLogs.map((log, index) => (
+                          <tr key={index} className="border-t border-gray-700 hover:bg-gray-700/30">
+                            <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm text-gray-400 whitespace-nowrap">
+                              {new Date(log.timestamp).toLocaleString()}
+                            </td>
+                            <td className="px-3 sm:px-4 py-3">
+                              <span className={`font-medium text-xs sm:text-sm ${getLogLevelClass(log.level)}`}>
+                                {log.level.toUpperCase()}
+                              </span>
+                            </td>
+                            <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm">{log.source}</td>
+                            <td className="px-3 sm:px-4 py-3 font-mono text-xs sm:text-sm">
+                              {log.message}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-12 text-gray-400">
@@ -480,8 +552,8 @@ const AdminSupportTools = () => {
                   <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
                 </div>
               ) : (
-                <div className="bg-gray-700/30 rounded-lg p-6">
-                  <div className="flex flex-col items-center text-center mb-8">
+                <div className="bg-gray-700/30 rounded-lg p-4 sm:p-6">
+                  <div className="flex flex-col items-center text-center mb-6 sm:mb-8">
                     <div className={`text-6xl mb-4 ${maintenanceMode ? 'text-yellow-400' : 'text-green-400'}`}>
                       <FaExclamationTriangle className={maintenanceMode ? 'block' : 'hidden'} />
                       <FaTools className={!maintenanceMode ? 'block' : 'hidden'} />
@@ -495,9 +567,21 @@ const AdminSupportTools = () => {
                         : 'Your website is currently accessible to all users.'}
                     </p>
                     
-                    <div className="bg-gray-800 rounded-lg p-6 max-w-lg w-full mb-6">
+                    {maintenanceMode && maintenanceMessage && (
+                      <div className="bg-blue-900/30 border border-blue-800 rounded-lg p-4 sm:p-6 max-w-lg w-full mb-6">
+                        <h4 className="font-semibold mb-2 text-blue-200">Current Maintenance Notice</h4>
+                        <p className="text-white mb-3">{maintenanceMessage}</p>
+                        {completionTime && (
+                          <p className="text-blue-200 font-medium">
+                            Expected return: {new Date(completionTime).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    
+                    <div className="bg-gray-800 rounded-lg p-4 sm:p-6 max-w-lg w-full mb-6">
                       <h4 className="font-semibold mb-2">What happens in maintenance mode?</h4>
-                      <ul className="text-gray-400 text-left space-y-2">
+                      <ul className="text-gray-400 text-left text-sm space-y-2">
                         <li>• Regular users will see a maintenance page</li>
                         <li>• All booking functionality will be disabled</li>
                         <li>• Administrators can still access the admin panel</li>
@@ -508,7 +592,7 @@ const AdminSupportTools = () => {
                     <button
                       onClick={toggleMaintenanceMode}
                       disabled={isToggling}
-                      className={`py-3 px-6 rounded-md font-medium flex items-center justify-center transition-colors ${
+                      className={`w-full md:w-auto py-3 px-6 rounded-md font-medium flex items-center justify-center transition-colors ${
                         maintenanceMode
                           ? 'bg-green-600 hover:bg-green-700 text-white'
                           : 'bg-yellow-600 hover:bg-yellow-700 text-white'
@@ -536,10 +620,11 @@ const AdminSupportTools = () => {
                           Maintenance Message
                         </label>
                         <textarea
-                          className="w-full bg-gray-700 rounded p-3 text-white"
+                          className="w-full bg-gray-700 rounded p-3 text-sm text-white"
                           rows="3"
                           placeholder="We are currently performing scheduled maintenance. Please check back later."
-                          disabled={!maintenanceMode}
+                          value={maintenanceMessage}
+                          onChange={(e) => setMaintenanceMessage(e.target.value)}
                         ></textarea>
                       </div>
                       
@@ -549,18 +634,27 @@ const AdminSupportTools = () => {
                         </label>
                         <input
                           type="datetime-local"
-                          className="w-full bg-gray-700 rounded p-3 text-white"
-                          disabled={!maintenanceMode}
+                          className="w-full bg-gray-700 rounded p-3 text-sm text-white"
+                          value={completionTime}
+                          onChange={(e) => setCompletionTime(e.target.value)}
                         />
                       </div>
                     </div>
                     
                     <div className="mt-4 text-right">
                       <button
-                        className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded disabled:opacity-50"
-                        disabled={!maintenanceMode}
+                        onClick={saveMaintenanceCustomization}
+                        className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded text-sm disabled:opacity-50 flex items-center ml-auto"
+                        disabled={isSaving}
                       >
-                        Save Customization
+                        {isSaving ? (
+                          <>
+                            <div className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                            Saving...
+                          </>
+                        ) : (
+                          'Save Customization'
+                        )}
                       </button>
                     </div>
                   </div>
@@ -570,6 +664,84 @@ const AdminSupportTools = () => {
           )}
         </div>
       </div>
+
+      {/* Response Modal */}
+      {showResponseModal && selectedSubmission && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4">
+          <div className="bg-gray-800 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-gray-700 p-4">
+              <h3 className="text-xl font-semibold">Respond to Contact Submission</h3>
+              <button 
+                onClick={closeResponseModal}
+                className="text-gray-400 hover:text-white"
+              >
+                <FaTimes size={20} />
+              </button>
+            </div>
+            
+            <div className="p-4">
+              <div className="mb-4 bg-gray-700/30 rounded-lg p-3">
+                <h4 className="font-medium text-blue-300 mb-2">Submission Details</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+                  <div>
+                    <span className="text-gray-400">From:</span> {selectedSubmission.name}
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Email:</span> {selectedSubmission.email}
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Date:</span> {new Date(selectedSubmission.createdAt).toLocaleString()}
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Subject:</span> {selectedSubmission.subject}
+                  </div>
+                </div>
+                <div className="mt-2">
+                  <span className="text-gray-400">Message:</span>
+                  <div className="bg-gray-800 p-3 rounded mt-1 whitespace-pre-wrap">{selectedSubmission.message}</div>
+                </div>
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-400 mb-2">
+                  Your Response
+                </label>
+                <textarea
+                  className="w-full bg-gray-700 rounded p-3 text-white min-h-[150px]"
+                  placeholder="Enter your response to this contact submission..."
+                  value={responseText}
+                  onChange={(e) => setResponseText(e.target.value)}
+                ></textarea>
+              </div>
+              
+              <div className="flex justify-end mt-6">
+                <button
+                  onClick={closeResponseModal}
+                  className="px-4 py-2 text-gray-400 hover:text-white mr-3"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={respondToSubmission}
+                  disabled={isSendingResponse || !responseText.trim()}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSendingResponse ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <FaReply className="mr-2" /> Send Response
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

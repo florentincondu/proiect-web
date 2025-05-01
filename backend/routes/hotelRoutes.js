@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const hotelController = require('../controllers/hotelController');
 const { protect, authorize, admin } = require('../middleware/authMiddleware');
+const { hotelImagesUpload } = require('../middleware/uploadMiddleware');
 
 
 router.use((req, res, next) => {
@@ -26,6 +27,9 @@ router.get('/user/my-hotels', hotelController.getUserHotels);
 
 
 router.post('/user-hotel', hotelController.createUserHotel);
+
+
+router.post('/upload-images', hotelImagesUpload, hotelController.uploadHotelImages);
 
 
 router.route('/')

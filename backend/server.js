@@ -7,6 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const connectDB = require('./db');
 const errorHandler = require('./middlewares/errorHandler');
+const maintenanceCheck = require('./middleware/maintenanceMiddleware');
 
 dotenv.config();
 const app = express();
@@ -18,6 +19,16 @@ app.use(cors({
 
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Apply maintenance middleware to all API routes except auth/login
+app.use('/api', (req, res, next) => {
+  // Skip maintenance check for authentication-related paths
+  if (req.path.startsWith('/auth/login') || req.path.startsWith('/support/maintenance-status')) {
+    return next();
+  }
+  // Apply maintenance middleware
+  maintenanceCheck(req, res, next);
+});
 
 app.get('/check-uploads', (req, res) => {
   const uploadsPath = path.join(__dirname, 'uploads');

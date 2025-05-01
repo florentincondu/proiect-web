@@ -33,6 +33,16 @@ const ProfilePage = () => {
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [userHotels, setUserHotels] = useState([]);
   const [hotelsLoading, setHotelsLoading] = useState(false);
+  const [editingHotelId, setEditingHotelId] = useState(null);
+  const [hotelToDelete, setHotelToDelete] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    title: '',
+    description: '',
+    address: '',
+    price: '',
+    amenities: {}
+  });
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -76,6 +86,12 @@ const ProfilePage = () => {
     checkOutTime: '11:00',
     weeklyDiscount: false,
     monthlyDiscount: false,
+    roomTypes: [
+      { type: 'single', count: 2, price: 0, capacity: 1 },
+      { type: 'double', count: 3, price: 0, capacity: 2 },
+      { type: 'triple', count: 2, price: 0, capacity: 3 },
+      { type: 'quad', count: 1, price: 0, capacity: 4 }
+    ]
   });
   
 
@@ -481,21 +497,18 @@ const ProfilePage = () => {
     const { name, value, type, checked } = e.target;
     if (type === 'checkbox') {
       if (name.includes('.')) {
-
         const [parent, child] = name.split('.');
         setAccommodation(prev => ({
           ...prev,
           [parent]: { ...prev[parent], [child]: checked }
         }));
       } else {
-
         setAccommodation(prev => ({
           ...prev,
           amenities: { ...prev.amenities, [name]: checked },
         }));
       }
     } else if (name === 'latitude' || name === 'longitude') {
-
       const updatedValue = value === '' ? '' : parseFloat(value);
       const coordKey = name === 'latitude' ? 'lat' : 'lng';
       
@@ -507,8 +520,62 @@ const ProfilePage = () => {
           [coordKey]: updatedValue || 0 // Use 0 if empty or invalid
         }
       }));
+    } else if (name.startsWith('roomTypes.')) {
+      // Handle room type changes
+      const [_, index, field] = name.split('.');
+      const idx = parseInt(index);
+      
+      setAccommodation(prev => {
+        const updatedRoomTypes = [...prev.roomTypes];
+        
+        // Handle numeric fields
+        if (field === 'count' || field === 'capacity') {
+          updatedRoomTypes[idx] = {
+            ...updatedRoomTypes[idx],
+            [field]: value === '' ? 0 : parseInt(value)
+          };
+        } else if (field === 'price') {
+          updatedRoomTypes[idx] = {
+            ...updatedRoomTypes[idx],
+            [field]: value === '' ? 0 : parseFloat(value)
+          };
+        } else {
+          updatedRoomTypes[idx] = {
+            ...updatedRoomTypes[idx],
+            [field]: value
+          };
+        }
+        
+        // If base price changes, update all room type prices proportionally
+        if (field === 'price' && idx === 1) { // Double room is our reference
+          const basePrice = parseFloat(value) || 0;
+          updatedRoomTypes[0].price = Math.round(basePrice * 0.7); // Single
+          updatedRoomTypes[2].price = Math.round(basePrice * 1.3); // Triple
+          updatedRoomTypes[3].price = Math.round(basePrice * 1.6); // Quad
+        }
+        
+        return {
+          ...prev,
+          roomTypes: updatedRoomTypes
+        };
+      });
     } else {
       setAccommodation(prev => ({ ...prev, [name]: value }));
+      
+      // If base price changes, update room type prices
+      if (name === 'price') {
+        const basePrice = parseFloat(value) || 0;
+        setAccommodation(prev => ({
+          ...prev,
+          roomTypes: prev.roomTypes.map(room => ({
+            ...room,
+            price: room.type === 'single' ? Math.round(basePrice * 0.7) :
+                   room.type === 'double' ? basePrice :
+                   room.type === 'triple' ? Math.round(basePrice * 1.3) :
+                   Math.round(basePrice * 1.6)
+          }))
+        }));
+      }
     }
   };
 
@@ -540,78 +607,79 @@ const ProfilePage = () => {
   };
 
   const uploadPhotos = async (photos) => {
-
-
-    
     try {
       const uploadedUrls = [];
       
+      // Verificăm dacă există fotografii de încărcat
+      if (!photos || photos.length === 0) {
+        console.log('Nu există fotografii de încărcat');
+        return [];
+      }
 
-      for (let i = 0; i < photos.length; i++) {
-        const photo = photos[i];
-        
-        if (photo.file) {
-          try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const token = localStorage.getItem('authToken');
 
-            const formData = new FormData();
-            formData.append('image', photo.file);
-            
-            try {
-
-              const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-              const response = await axios.post(
-                `${API_BASE_URL}/api/upload/accommodation`, 
-                formData,
-                {
-                  headers: {
-                    'Content-Type': 'multipart/form-data',
-                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-                  }
-                }
-              );
-              
-              if (response.data && response.data.url) {
-                uploadedUrls.push(response.data.url);
-                continue;
+      // Încercăm să încărcăm toate fișierele într-o singură cerere
+      const filesToUpload = photos.filter(photo => photo.file).map(photo => photo.file);
+      
+      if (filesToUpload.length > 0) {
+        try {
+          // Pregătim FormData pentru cererea de upload
+          const formData = new FormData();
+          
+          // Adăugăm fiecare fișier cu numele hotelImages (trebuie să corespundă cu configurația middleware-ului)
+          filesToUpload.forEach(file => {
+            formData.append('hotelImages', file);
+          });
+          
+          // Facem cererea de upload către noua rută API
+          const response = await axios.post(
+            `${API_BASE_URL}/api/hotels/upload-images`, 
+            formData,
+            {
+              headers: {
+                'Content-Type': 'multipart/form-data',
+                'Authorization': `Bearer ${token}`
               }
-            } catch (apiError) {
-              console.error('API upload error:', apiError);
-
             }
-            
-
-
-            if (photo.url && photo.url.startsWith('blob:')) {
-
-              uploadedUrls.push(`https://placehold.co/800x600/172a45/ffffff?text=Accommodation+Image+${i+1}`);
-            } else {
-              uploadedUrls.push(photo.url);
-            }
-          } catch (uploadError) {
-            console.error('Error uploading file:', uploadError);
-
+          );
+          
+          if (response.data && response.data.success && response.data.imageUrls) {
+            console.log('Imagini încărcate cu succes:', response.data.imageUrls);
+            // Adăugăm URL-urile primite de la server
+            uploadedUrls.push(...response.data.imageUrls);
+          } else {
+            throw new Error('Răspuns invalid de la server la încărcarea imaginilor');
+          }
+        } catch (uploadError) {
+          console.error('Eroare la încărcarea imaginilor:', uploadError);
+          
+          // În caz de eroare, adăugăm imagini placeholder pentru fișierele care nu s-au putut încărca
+          for (let i = 0; i < filesToUpload.length; i++) {
             uploadedUrls.push(`https://placehold.co/800x600/172a45/ffffff?text=Upload+Failed+${i+1}`);
           }
-        } else if (photo.url) {
-
-          if (photo.url.startsWith('blob:')) {
-
-            uploadedUrls.push(`https://placehold.co/800x600/172a45/ffffff?text=Accommodation+Image+${i+1}`);
-          } else {
-
-            uploadedUrls.push(photo.url);
-          }
-        } else {
-
-          uploadedUrls.push(`https://placehold.co/800x600/172a45/ffffff?text=Image+${i+1}`);
         }
       }
       
+      // Adăugăm orice URL-uri existente care nu sunt fișiere
+      photos.forEach((photo, index) => {
+        if (!photo.file && photo.url) {
+          // Păstrăm doar URL-urile valide, nu cele care încep cu blob:
+          if (!photo.url.startsWith('blob:')) {
+            uploadedUrls.push(photo.url);
+          } else {
+            // Pentru URL-uri blob, folosim placeholder
+            uploadedUrls.push(`https://placehold.co/800x600/172a45/ffffff?text=Accommodation+Image+${index+1}`);
+          }
+        }
+      });
+      
+      console.log('URL-uri finale pentru imagini:', uploadedUrls);
       return uploadedUrls;
     } catch (error) {
-      console.error('Error uploading photos:', error);
+      console.error('Eroare generală la încărcarea fotografiilor:', error);
       
-
+      // Fallback în caz de eroare
       return photos.map((_, index) => 
         `https://placehold.co/800x600/172a45/ffffff?text=Fallback+Image+${index+1}`
       );
@@ -653,87 +721,94 @@ const ProfilePage = () => {
 
   const handleAccommodationSubmit = async (e) => {
     e.preventDefault();
-    
-
-    if (!accommodation.title || !accommodation.description || !accommodation.address || !accommodation.price) {
-      showNotification('Completați toate câmpurile obligatorii', 'error');
-      return;
-    }
+    setLoading(true);
     
     try {
-
-      setLoading(true);
-      
-
-      showNotification('Procesăm plata...', 'info');
-      let paymentToken;
-      try {
-        paymentToken = await processPayment(accommodation.paymentMethod);
-      } catch (paymentError) {
-        console.error('Payment failed:', paymentError);
-        showNotification('Procesarea plății a eșuat. Vom continua fără plată.', 'warning');
-        paymentToken = 'mock-payment-token';
-      }
-      
-
-      showNotification('Încărcăm fotografiile...', 'info');
-      let photoUrls;
-      try {
-        photoUrls = await uploadPhotos(accommodation.photos);
-      } catch (photoError) {
-        console.error('Photo upload failed:', photoError);
-        showNotification('Încărcarea fotografiilor a eșuat. Vom continua fără fotografii.', 'warning');
-        photoUrls = [];
-      }
-      
-
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
       
-
+      // Process uploaded photos
+      const formData = new FormData();
+      const photoUrls = [];
+      
+      for (const photoObj of accommodation.photos) {
+        if (photoObj.file) {
+          formData.append('photos', photoObj.file);
+        }
+      }
+      
+      if (accommodation.photos.length > 0) {
+        const uploadResponse = await axios.post(
+          `${API_BASE_URL}/api/upload/photos`,
+          formData,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+              'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            }
+          }
+        );
+        
+        if (uploadResponse.data && uploadResponse.data.success) {
+          photoUrls.push(...uploadResponse.data.urls);
+        }
+      }
+      
+      // Prepare payment data
       const paymentData = {
-        paymentMethod: accommodation.paymentMethod,
-        paymentToken: paymentToken,
-        cardDetails: accommodation.paymentMethod === 'card' ? {
-          cardNumber: cardDetails.cardNumber.replace(/\s/g, ''),
-          expiryDate: cardDetails.expiryDate,
-          cardholderName: cardDetails.cardholderName || user?.name || 'Card Holder',
-          cvc: cardDetails.cvc
-        } : null
+        isPaid: true,
+        paymentDate: new Date().toISOString(),
+        paymentMethod: accommodation.paymentMethod || 'card',
+        amount: 10,
+        currency: 'EUR',
+        cardDetails: {
+          cardNumber: cardDetails.cardNumber ? cardDetails.cardNumber.replace(/\s/g, '') : '****',
+          expiryDate: cardDetails.expiryDate || '**/**',
+          cardholderName: profile?.firstName && profile?.lastName 
+            ? `${profile.firstName} ${profile.lastName}`
+            : 'Card Owner'
+        }
       };
+      
+      // Clean up and prepare room configuration to ensure number values
+      const roomsConfig = accommodation.roomTypes.map(room => ({
+        type: String(room.type || 'double'),
+        capacity: Number(parseInt(room.capacity) || 1),
+        price: Number(parseFloat(room.price) || 0),
+        count: Number(parseInt(room.count) || 0)
+      }));
+      
+      // Ensure coordinates are properly formatted
+      const coords = accommodation.coordinates || { lat: 0, lng: 0 };
+      if (typeof coords.lat !== 'number') coords.lat = parseFloat(coords.lat) || 0;
+      if (typeof coords.lng !== 'number') coords.lng = parseFloat(coords.lng) || 0;
       
       const accommodationData = {
         title: accommodation.title,
         description: accommodation.description,
-        propertyType: accommodation.propertyType,
-        maxGuests: accommodation.maxGuests,
-        bedrooms: accommodation.bedrooms,
-        bathrooms: accommodation.bathrooms,
-        amenities: accommodation.amenities,
+        propertyType: accommodation.propertyType || 'apartment',
+        maxGuests: parseInt(accommodation.maxGuests) || 2,
+        bedrooms: parseInt(accommodation.bedrooms) || 1,
+        bathrooms: parseInt(accommodation.bathrooms) || 1,
+        amenities: accommodation.amenities || {},
         address: accommodation.address,
-        price: accommodation.price,
-        currency: accommodation.currency,
-        phoneNumber: accommodation.phoneNumber,
-        houseRules: accommodation.houseRules,
-        cancellationPolicy: accommodation.cancellationPolicy,
+        price: parseFloat(accommodation.price) || 0,
+        currency: accommodation.currency || 'RON',
+        phoneNumber: accommodation.phoneNumber || '',
+        houseRules: accommodation.houseRules || '',
+        cancellationPolicy: accommodation.cancellationPolicy || 'moderate',
         checkInTime: accommodation.checkInTime || '14:00',
         checkOutTime: accommodation.checkOutTime || '11:00',
-        coordinates: accommodation.coordinates || { lat: 0, lng: 0 },
+        coordinates: coords,
         photos: photoUrls,
         payment: paymentData,
-
-        status: 'pending',
-
-        isHotel: true,
-        rating: 0,
-        reviews: [],
         weeklyDiscount: accommodation.weeklyDiscount || false,
-        monthlyDiscount: accommodation.monthlyDiscount || false
+        monthlyDiscount: accommodation.monthlyDiscount || false,
+        roomsConfig: roomsConfig
       };
       
+      console.log('Sending accommodation data:', accommodationData);
+      
       try {
-        console.log('Sending data to API:', accommodationData);
-        
-
         const response = await axios.post(
           `${API_BASE_URL}/api/hotels/user-hotel`,
           accommodationData,
@@ -745,11 +820,10 @@ const ProfilePage = () => {
           }
         );
         
-
-        showNotification('Cazarea a fost adăugată cu succes și este în așteptare pentru aprobare!', 'success');
-        
-
         if (response.data && response.data.success) {
+          showNotification('Cazarea a fost adăugată cu succes și este activă!', 'success');
+          
+          // Refresh hotel list
           try {
             const hotelsResponse = await axios.get(
               `${API_BASE_URL}/api/hotels/user/my-hotels`,
@@ -766,102 +840,74 @@ const ProfilePage = () => {
           } catch (refreshError) {
             console.error('Error refreshing hotel list:', refreshError);
           }
+          
+          // Reset form
+          setAccommodation({
+            title: '',
+            description: '',
+            propertyType: 'apartment',
+            maxGuests: 1,
+            bedrooms: 1,
+            bathrooms: 1,
+            amenities: {
+              wifi: false,
+              parking: false,
+              ac: false,
+              tv: false,
+              coffeeMaker: false,
+              pool: false,
+              kitchen: false,
+              washer: false,
+              balcony: false
+            },
+            address: '',
+            latitude: '',
+            longitude: '',
+            coordinates: { lat: 0, lng: 0 },
+            photos: [],
+            cancellationPolicy: 'moderate',
+            houseRules: '',
+            paymentMethod: 'card',
+            price: '',
+            currency: 'RON',
+            phoneNumber: '',
+            checkInTime: '14:00',
+            checkOutTime: '11:00',
+            weeklyDiscount: false,
+            monthlyDiscount: false,
+            roomTypes: [
+              { type: 'single', count: 2, price: 0, capacity: 1 },
+              { type: 'double', count: 3, price: 0, capacity: 2 },
+              { type: 'triple', count: 2, price: 0, capacity: 3 },
+              { type: 'quad', count: 1, price: 0, capacity: 4 }
+            ]
+          });
+          
+          setCardDetails({
+            cardNumber: '',
+            expiryDate: '',
+            cvc: ''
+          });
+          
+          // Switch to "My Accommodations" tab
+          setActiveTab('myaccommodations');
+        } else {
+          console.error('Error in server response:', response.data);
+          showNotification('Eroare la adăugarea cazării. Vă rugăm să încercați din nou.', 'error');
         }
       } catch (submitError) {
         console.error('Error submitting accommodation:', submitError);
         
-
         if (submitError.response) {
           console.error('Server response:', submitError.response.status, submitError.response.data);
-          
-          if (submitError.response.status === 404) {
-            console.log('Using mock response since API endpoint is not available');
-
-            showNotification('Cazarea a fost adăugată cu succes și este în așteptare pentru aprobare! (Simulare)', 'success');
-            
-
-            console.log('Accommodation data that would be submitted:', accommodationData);
-            
-
-
-            const savedAccommodations = JSON.parse(localStorage.getItem('userAccommodations') || '[]');
-            savedAccommodations.push({
-              ...accommodationData,
-              id: `mock-${Date.now()}`,
-              createdAt: new Date().toISOString(),
-
-              status: 'approved'
-            });
-            localStorage.setItem('userAccommodations', JSON.stringify(savedAccommodations));
-            
-
-            const mockHotels = JSON.parse(localStorage.getItem('mockHotels') || '[]');
-            mockHotels.push({
-              ...accommodationData,
-              id: `mock-${Date.now()}`,
-              createdAt: new Date().toISOString(),
-              status: 'approved'
-            });
-            localStorage.setItem('mockHotels', JSON.stringify(mockHotels));
-            
-
-            setUserHotels(savedAccommodations);
-          } else {
-
-            showNotification(`Eroare la trimiterea datelor către server (${submitError.response.status}): ${submitError.response.data.message || 'Vă rugăm să încercați din nou.'}`, 'error');
-          }
+          showNotification(`Eroare la trimiterea datelor (${submitError.response.status}): ${submitError.response.data?.message || 'Vă rugăm să încercați din nou.'}`, 'error');
         } else {
-
-          showNotification('Eroare de rețea la trimiterea datelor. Verificați conexiunea și încercați din nou.', 'error');
+          showNotification('Eroare de rețea. Verificați conexiunea și încercați din nou.', 'error');
         }
       }
-      
-
-      setAccommodation({
-        title: '',
-        description: '',
-        propertyType: 'apartment',
-        maxGuests: 1,
-        bedrooms: 1,
-        bathrooms: 1,
-        amenities: {
-          wifi: false,
-          parking: false,
-          ac: false,
-          tv: false,
-          coffeeMaker: false,
-          pool: false,
-          kitchen: false,
-          washer: false,
-          balcony: false
-        },
-        address: '',
-        latitude: '',
-        longitude: '',
-        coordinates: { lat: 0, lng: 0 },
-        photos: [],
-        cancellationPolicy: 'moderate',
-        houseRules: '',
-        paymentMethod: 'card',
-        price: '',
-        currency: 'RON',
-        phoneNumber: '',
-        checkInTime: '14:00',
-        checkOutTime: '11:00',
-        weeklyDiscount: false,
-        monthlyDiscount: false,
-      });
-      
-
-      setCardDetails({
-        cardNumber: '',
-        expiryDate: '',
-        cvc: ''
-      });
-      
     } catch (error) {
-      console.error('Error submitting accommodation:', error);
-      showNotification('A apărut o eroare. Vă rugăm să încercați din nou.', 'error');
+      console.error('Error preparing accommodation data:', error);
+      showNotification('A apărut o eroare la pregătirea datelor. Vă rugăm să încercați din nou.', 'error');
     } finally {
       setLoading(false);
     }
@@ -983,6 +1029,215 @@ const ProfilePage = () => {
     } finally {
       setIsChangingPassword(false);
     }
+  };
+
+  // Add this function to handle editing a hotel
+  const handleEditHotel = (hotel) => {
+    setEditingHotelId(hotel.id || hotel._id);
+    setEditFormData({
+      title: hotel.title || hotel.name,
+      description: hotel.description,
+      address: hotel.address || hotel.location,
+      price: hotel.price,
+      amenities: hotel.amenities
+    });
+  };
+
+  // Add this function to cancel editing
+  const handleCancelEdit = () => {
+    setEditingHotelId(null);
+    setEditFormData({
+      title: '',
+      description: '',
+      address: '',
+      price: '',
+      amenities: {}
+    });
+  };
+
+  // Add this function to handle input changes in edit form
+  const handleEditFormChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    
+    if (type === 'checkbox') {
+      setEditFormData(prev => ({
+        ...prev,
+        amenities: {
+          ...prev.amenities,
+          [name.replace('amenities.', '')]: checked
+        }
+      }));
+    } else {
+      setEditFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+  };
+
+  // Add this function to save hotel changes
+  const handleSaveHotel = async (hotelId) => {
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      
+      const updatedHotelData = {
+        name: editFormData.title,
+        description: editFormData.description,
+        location: editFormData.address,
+        price: parseFloat(editFormData.price),
+        amenities: Object.entries(editFormData.amenities)
+          .filter(([_, value]) => value === true)
+          .map(([key]) => key)
+      };
+      
+      const response = await axios.put(
+        `${API_BASE_URL}/api/hotels/${hotelId}`,
+        updatedHotelData,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+          }
+        }
+      );
+      
+      if (response.data && response.data.success) {
+        showNotification('Cazarea a fost actualizată cu succes!', 'success');
+        
+        // Update the hotel in the list
+        setUserHotels(prevHotels => 
+          prevHotels.map(hotel => 
+            (hotel.id === hotelId || hotel._id === hotelId) 
+              ? {
+                  ...hotel,
+                  title: editFormData.title,
+                  name: editFormData.title,
+                  description: editFormData.description,
+                  address: editFormData.address,
+                  location: editFormData.address,
+                  price: editFormData.price,
+                  amenities: editFormData.amenities
+                }
+              : hotel
+          )
+        );
+        
+        setEditingHotelId(null);
+      }
+    } catch (error) {
+      console.error('Error updating hotel:', error);
+      
+      // Fallback to localStorage if API call fails
+      try {
+        const mockHotels = JSON.parse(localStorage.getItem('mockHotels') || '[]');
+        const updatedMockHotels = mockHotels.map(hotel => {
+          if (hotel.id === hotelId || hotel._id === hotelId) {
+            return {
+              ...hotel,
+              title: editFormData.title,
+              description: editFormData.description,
+              address: editFormData.address,
+              price: editFormData.price,
+              amenities: editFormData.amenities,
+              updatedAt: new Date().toISOString()
+            };
+          }
+          return hotel;
+        });
+        
+        localStorage.setItem('mockHotels', JSON.stringify(updatedMockHotels));
+        
+        // Update the hotel in the list
+        setUserHotels(prevHotels => 
+          prevHotels.map(hotel => 
+            (hotel.id === hotelId || hotel._id === hotelId) 
+              ? {
+                  ...hotel,
+                  title: editFormData.title,
+                  name: editFormData.title,
+                  description: editFormData.description,
+                  address: editFormData.address,
+                  location: editFormData.address,
+                  price: editFormData.price,
+                  amenities: editFormData.amenities
+                }
+              : hotel
+          )
+        );
+        
+        showNotification('Cazarea a fost actualizată cu succes! (mock)', 'success');
+        setEditingHotelId(null);
+      } catch (localStorageError) {
+        console.error('Error updating localStorage:', localStorageError);
+        showNotification('A apărut o eroare la actualizarea cazării', 'error');
+      }
+    }
+  };
+
+  // Add this function to show delete confirmation
+  const handleDeleteClick = (hotel) => {
+    setHotelToDelete(hotel);
+    setShowDeleteModal(true);
+  };
+
+  // Add this function to delete a hotel
+  const handleDeleteHotel = async () => {
+    if (!hotelToDelete) return;
+    
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      
+      const response = await axios.delete(
+        `${API_BASE_URL}/api/hotels/${hotelToDelete.id || hotelToDelete._id}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+          }
+        }
+      );
+      
+      if (response.data && response.data.success) {
+        showNotification('Cazarea a fost ștearsă cu succes!', 'success');
+        
+        // Remove the hotel from the list
+        setUserHotels(prevHotels => 
+          prevHotels.filter(hotel => 
+            hotel.id !== (hotelToDelete.id || hotelToDelete._id) && 
+            hotel._id !== (hotelToDelete.id || hotelToDelete._id)
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error deleting hotel:', error);
+      
+      // Fallback to localStorage if API call fails
+      try {
+        const mockHotels = JSON.parse(localStorage.getItem('mockHotels') || '[]');
+        const filteredMockHotels = mockHotels.filter(hotel => 
+          hotel.id !== (hotelToDelete.id || hotelToDelete._id) && 
+          hotel._id !== (hotelToDelete.id || hotelToDelete._id)
+        );
+        
+        localStorage.setItem('mockHotels', JSON.stringify(filteredMockHotels));
+        
+        // Remove the hotel from the list
+        setUserHotels(prevHotels => 
+          prevHotels.filter(hotel => 
+            hotel.id !== (hotelToDelete.id || hotelToDelete._id) && 
+            hotel._id !== (hotelToDelete.id || hotelToDelete._id)
+          )
+        );
+        
+        showNotification('Cazarea a fost ștearsă cu succes! (mock)', 'success');
+      } catch (localStorageError) {
+        console.error('Error updating localStorage:', localStorageError);
+        showNotification('A apărut o eroare la ștergerea cazării', 'error');
+      }
+    }
+    
+    // Close the modal
+    setShowDeleteModal(false);
+    setHotelToDelete(null);
   };
 
   if (loading) return (
@@ -1441,7 +1696,6 @@ const ProfilePage = () => {
             Basic Information
           </span>
         </h3>
-        
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div className="group">
             <label className="block text-sm font-medium text-gray-300 mb-2 group-hover:text-blue-400 transition-colors">
@@ -1462,7 +1716,6 @@ const ProfilePage = () => {
               </div>
             </div>
           </div>
-          
           <div className="group">
             <label className="block text-sm font-medium text-gray-300 mb-2 group-hover:text-blue-400 transition-colors">
               Property Type
@@ -1485,7 +1738,6 @@ const ProfilePage = () => {
             </div>
           </div>
         </div>
-        
         <div className="mt-6 group">
           <label className="block text-sm font-medium text-gray-300 mb-2 group-hover:text-blue-400 transition-colors">
             Description
@@ -1500,7 +1752,6 @@ const ProfilePage = () => {
             required
           />
         </div>
-        
         <div className="mt-6 group">
           <label className="block text-sm font-medium text-gray-300 mb-2 group-hover:text-blue-400 transition-colors">
             Phone Number
@@ -1532,7 +1783,6 @@ const ProfilePage = () => {
             Pricing
           </span>
         </h3>
-        
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div className="group">
             <label className="block text-sm font-medium text-gray-300 mb-2 group-hover:text-purple-400 transition-colors">
@@ -1554,7 +1804,6 @@ const ProfilePage = () => {
               />
             </div>
           </div>
-          
           <div className="group">
             <label className="block text-sm font-medium text-gray-300 mb-2 group-hover:text-purple-400 transition-colors">
               Currency
@@ -1576,7 +1825,6 @@ const ProfilePage = () => {
             </div>
           </div>
         </div>
-        
         <div className="mt-6">
           <label className="block text-sm font-medium text-gray-300 mb-3 group-hover:text-purple-400 transition-colors">
             Special Offers
@@ -1595,7 +1843,6 @@ const ProfilePage = () => {
                 <p className="text-xs text-gray-400 mt-1">Save 10% on weekly bookings</p>
               </div>
             </div>
-            
             <div className="flex items-center bg-gray-800/30 p-4 rounded-xl border border-gray-700 hover:border-purple-500/50 transition-all cursor-pointer">
               <input
                 type="checkbox"
@@ -1623,7 +1870,6 @@ const ProfilePage = () => {
             Property Details
           </span>
         </h3>
-        
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
           <div className="group">
             <label className="block text-sm font-medium text-gray-300 mb-2 group-hover:text-teal-400 transition-colors">
@@ -1644,7 +1890,6 @@ const ProfilePage = () => {
               />
             </div>
           </div>
-          
           <div className="group">
             <label className="block text-sm font-medium text-gray-300 mb-2 group-hover:text-teal-400 transition-colors">
               Bedrooms
@@ -1664,7 +1909,6 @@ const ProfilePage = () => {
               />
             </div>
           </div>
-          
           <div className="group">
             <label className="block text-sm font-medium text-gray-300 mb-2 group-hover:text-teal-400 transition-colors">
               Bathrooms
@@ -1697,7 +1941,6 @@ const ProfilePage = () => {
             Location
           </span>
         </h3>
-        
         <div className="mb-6 group">
           <label className="block text-sm font-medium text-gray-300 mb-2 group-hover:text-green-400 transition-colors">
             Full Address
@@ -1716,7 +1959,6 @@ const ProfilePage = () => {
             Address is automatically populated based on the latitude and longitude provided above.
           </p>
         </div>
-        
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div className="group">
             <label className="block text-sm font-medium text-gray-300 mb-2 group-hover:text-green-400 transition-colors">
@@ -1738,7 +1980,6 @@ const ProfilePage = () => {
               />
             </div>
           </div>
-          
           <div className="group">
             <label className="block text-sm font-medium text-gray-300 mb-2 group-hover:text-green-400 transition-colors">
               Longitude
@@ -1760,7 +2001,6 @@ const ProfilePage = () => {
             </div>
           </div>
         </div>
-        
         <div className="flex justify-center mt-2 mb-4">
           <button
             type="button"
@@ -1769,28 +2009,21 @@ const ProfilePage = () => {
                 console.log("Update Map button clicked");
                 const lat = parseFloat(accommodation.latitude);
                 const lng = parseFloat(accommodation.longitude);
-                
                 if (isNaN(lat) || isNaN(lng)) {
                   console.log("Invalid coordinates detected");
                   showNotification('Te rog să introduci coordonate valide (doar numere)', 'error');
                   return;
                 }
-                
                 if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
                   console.log("Coordinates out of valid range");
                   showNotification('Coordonate în afara intervalului valid (lat: -90 to 90, lng: -180 to 180)', 'error');
                   return;
                 }
-                
-
                 getAddressFromCoordinates(lat, lng);
-                
-
                 setAccommodation(prev => ({
                   ...prev,
                   coordinates: { lat, lng }
                 }));
-                
                 console.log("Map updated with coordinates:", { lat, lng });
                 showNotification('Locația a fost actualizată cu succes!', 'success');
               } catch (error) {
@@ -1803,7 +2036,6 @@ const ProfilePage = () => {
             <FaMap className="text-white" /> Actualizează Harta
           </button>
         </div>
-        
         <div className="mt-2 p-4 bg-gray-800/40 rounded-xl border border-gray-700">
           <div className="flex items-center mb-3">
             <FaInfoCircle className="text-green-400 mr-2" />
@@ -1814,10 +2046,8 @@ const ProfilePage = () => {
               }
             </span>
           </div>
-          
           {accommodation.latitude && accommodation.longitude ? (
             <div className="bg-gray-700/50 rounded-lg h-64 flex items-center justify-center overflow-hidden relative">
-              {/* Using OpenStreetMap which doesn't require API key */}
               <iframe 
                 title="Location Map"
                 width="100%" 
@@ -1845,7 +2075,6 @@ const ProfilePage = () => {
               </div>
             </div>
           )}
-          
           <div className="mt-3 text-xs text-gray-400 flex items-start">
             <FaInfoCircle className="text-green-400 mr-2 mt-0.5 shrink-0" />
             <span>
@@ -1867,7 +2096,6 @@ const ProfilePage = () => {
             Amenities
           </span>
         </h3>
-        
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           {[
             { name: 'wifi', label: 'Wi-Fi', icon: <FaWifi /> },
@@ -1916,13 +2144,11 @@ const ProfilePage = () => {
             Property Photos
           </span>
         </h3>
-        
         <div className="mb-6">
           <div className="flex items-center mb-3">
             <FaInfoCircle className="text-pink-400 mr-2" />
             <span className="text-sm text-gray-300">Upload at least 5 high-quality photos of your property</span>
           </div>
-          
           <div 
             className="border-2 border-dashed border-gray-700 rounded-xl p-8 text-center hover:border-pink-500/50 transition-all"
             onClick={() => photoInputRef.current?.click()}
@@ -1956,8 +2182,6 @@ const ProfilePage = () => {
             </div>
           </div>
         </div>
-        
-        {/* Image Preview Area */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-6">
           {accommodation.photos.length > 0 ? (
             accommodation.photos.map((photo, index) => (
@@ -1987,7 +2211,7 @@ const ProfilePage = () => {
           )}
         </div>
       </div>
-      
+
       {/* Rules and Policies Card */}
       <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 p-8 rounded-2xl border border-indigo-500/30 shadow-xl backdrop-blur-sm hover:border-indigo-400/50 transition-all duration-300">
         <h3 className="text-xl font-semibold mb-6 flex items-center">
@@ -1998,7 +2222,6 @@ const ProfilePage = () => {
             Rules & Policies
           </span>
         </h3>
-        
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div className="group">
             <label className="block text-sm font-medium text-gray-300 mb-2 group-hover:text-indigo-400 transition-colors">
@@ -2025,7 +2248,6 @@ const ProfilePage = () => {
               </div>
             </div>
           </div>
-          
           <div className="group">
             <label className="block text-sm font-medium text-gray-300 mb-2 group-hover:text-indigo-400 transition-colors">
               Check-out Time
@@ -2050,7 +2272,6 @@ const ProfilePage = () => {
             </div>
           </div>
         </div>
-        
         <div className="mt-6 group">
           <label className="block text-sm font-medium text-gray-300 mb-2 group-hover:text-indigo-400 transition-colors">
             Cancellation Policy
@@ -2072,7 +2293,6 @@ const ProfilePage = () => {
             </div>
           </div>
         </div>
-        
         <div className="mt-6 group">
           <label className="block text-sm font-medium text-gray-300 mb-2 group-hover:text-indigo-400 transition-colors">
             House Rules
@@ -2083,48 +2303,78 @@ const ProfilePage = () => {
             onChange={handleAccommodationChange}
             className="block w-full rounded-xl border-gray-700 bg-gray-800/50 shadow-inner focus:border-indigo-500 focus:ring focus:ring-indigo-500/30 transition-all text-white px-4 py-3"
             rows="4"
-    placeholder="Enter any special rules or requirements for guests..."
-  />
-</div>
+            placeholder="Enter any special rules or requirements for guests..."
+          />
+        </div>
       </div>
 
-      {/* This is the connecting element - a visual divider with summary information */}
-      <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 p-6 rounded-2xl border border-blue-400/30 shadow-xl backdrop-blur-sm transition-all duration-300">
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div className="flex items-center">
-            <div className="p-2 bg-blue-500/20 rounded-lg mr-3">
-              <FaCheckCircle className="text-blue-400" />
+      {/* Room Types Configuration Card */}
+      <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 p-8 rounded-2xl border border-purple-500/30 shadow-xl backdrop-blur-sm hover:border-purple-400/50 transition-all duration-300">
+        <h3 className="text-xl font-semibold mb-6 flex items-center">
+          <div className="p-2 bg-purple-500/20 rounded-lg mr-3">
+            <FaBed className="text-purple-400" />
+          </div>
+          <span className="bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">
+            Configurare Camere
+          </span>
+        </h3>
+        <p className="text-gray-300 mb-4">
+          Specificați câte camere de fiecare tip sunt disponibile pentru rezervare
+        </p>
+        <div className="space-y-6">
+          {accommodation.roomTypes.map((room, index) => (
+            <div key={index} className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
+              <h4 className="font-medium mb-3 text-purple-300">
+                {room.type.charAt(0).toUpperCase() + room.type.slice(1)} 
+                {room.type === 'single' && ' (Pat individual)'}
+                {room.type === 'double' && ' (Pat matrimonial)'}
+                {room.type === 'triple' && ' (Pat matrimonial + pat individual)'}
+                {room.type === 'quad' && ' (2 paturi matrimoniale)'}
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="group">
+                  <label className="block text-sm font-medium text-gray-300 mb-2 group-hover:text-purple-400 transition-colors">
+                    Număr de camere
+                  </label>
+                  <input
+                    type="number"
+                    name={`roomTypes.${index}.count`}
+                    value={room.count}
+                    onChange={handleAccommodationChange}
+                    className="block w-full rounded-xl border-gray-700 bg-gray-800/50 shadow-inner focus:border-purple-500 focus:ring focus:ring-purple-500/30 transition-all text-white px-4 py-3"
+                    min="0"
+                  />
+                </div>
+                <div className="group">
+                  <label className="block text-sm font-medium text-gray-300 mb-2 group-hover:text-purple-400 transition-colors">
+                    Capacitate (persoane)
+                  </label>
+                  <input
+                    type="number"
+                    name={`roomTypes.${index}.capacity`}
+                    value={room.capacity}
+                    onChange={handleAccommodationChange}
+                    className="block w-full rounded-xl border-gray-700 bg-gray-800/50 shadow-inner focus:border-purple-500 focus:ring focus:ring-purple-500/30 transition-all text-white px-4 py-3"
+                    min="1"
+                    max="10"
+                  />
+                </div>
+                <div className="group">
+                  <label className="block text-sm font-medium text-gray-300 mb-2 group-hover:text-purple-400 transition-colors">
+                    Preț pe noapte
+                  </label>
+                  <input
+                    type="number"
+                    name={`roomTypes.${index}.price`}
+                    value={room.price}
+                    onChange={handleAccommodationChange}
+                    className="block w-full rounded-xl border-gray-700 bg-gray-800/50 shadow-inner focus:border-purple-500 focus:ring focus:ring-purple-500/30 transition-all text-white px-4 py-3"
+                    min="0"
+                  />
+                </div>
+              </div>
             </div>
-            <div>
-              <h3 className="text-lg font-semibold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                Almost Done!
-              </h3>
-              <p className="text-sm text-gray-300">Complete payment to publish your accommodation</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center bg-gray-800/50 px-4 py-2 rounded-lg">
-            <div className="flex flex-col items-end mr-4">
-              <span className="text-xs text-gray-400">Publishing Fee</span>
-              <span className="text-lg font-semibold text-white">10.00 EUR</span>
-            </div>
-            <FaArrowRight className="text-blue-400" />
-          </div>
-        </div>
-        
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
-          <div className="bg-gray-800/30 rounded-lg p-3">
-            <h4 className="text-sm font-medium text-gray-300 mb-1">Property Type</h4>
-            <p className="text-white capitalize">{accommodation.propertyType || 'Not specified'}</p>
-          </div>
-          <div className="bg-gray-800/30 rounded-lg p-3">
-            <h4 className="text-sm font-medium text-gray-300 mb-1">Location</h4>
-            <p className="text-white truncate">{accommodation.address || 'Not specified'}</p>
-          </div>
-          <div className="bg-gray-800/30 rounded-lg p-3">
-            <h4 className="text-sm font-medium text-gray-300 mb-1">Base Price</h4>
-            <p className="text-white">{accommodation.price || '0'} {accommodation.currency || 'RON'}</p>
-          </div>
+          ))}
         </div>
       </div>
 
@@ -2138,7 +2388,6 @@ const ProfilePage = () => {
             Payment & Publishing
           </span>
         </h3>
-
         <div className="p-5 bg-orange-500/10 border border-orange-500/20 rounded-xl mb-6">
           <div className="flex items-start">
             <div className="p-2 bg-orange-500/20 rounded-lg mr-3">
@@ -2147,35 +2396,29 @@ const ProfilePage = () => {
             <div>
               <h4 className="font-medium text-white mb-1">Publication Fee Required</h4>
               <p className="text-gray-300 text-sm">
-                Publishing your accommodation requires a one-time fee of <span className="font-semibold text-orange-400">10 EUR</span> per listing.
+                Publishing your accommodation requires a one-time fee of <span className="font-semibold text-orange-400">199.99 RON</span> per listing.
                 Your property will be visible to all users after payment is processed.
               </p>
             </div>
           </div>
         </div>
-        
         <div className="bg-gray-800/50 p-6 rounded-lg mb-6">
           <h4 className="text-lg font-medium text-white mb-4">Order Summary</h4>
-          
           <div className="flex justify-between py-2 border-b border-gray-700">
             <span className="text-gray-300">Property Listing Fee</span>
-            <span className="font-medium text-white">10.00 EUR</span>
+            <span className="font-medium text-white">199.99 RON</span>
           </div>
-          
           <div className="flex justify-between py-2 border-b border-gray-700">
             <span className="text-gray-300">Service Fee</span>
-            <span className="font-medium text-white">0.00 EUR</span>
+            <span className="font-medium text-white">0.00 RON</span>
           </div>
-          
           <div className="flex justify-between py-3 mt-1">
             <span className="text-lg text-white font-medium">Total</span>
-            <span className="text-lg font-bold text-orange-400">10.00 EUR</span>
+            <span className="text-lg font-bold text-orange-400">199.99 RON</span>
           </div>
         </div>
-        
         <div className="mb-6">
           <h4 className="text-md font-medium text-white mb-4">Payment Method</h4>
-          
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <label className="flex items-center p-4 bg-gray-800/30 rounded-xl border border-gray-700 hover:border-orange-500/50 transition-all cursor-pointer group">
               <input
@@ -2191,7 +2434,6 @@ const ProfilePage = () => {
                 <span className="text-gray-300 group-hover:text-white transition-colors">Credit Card</span>
               </div>
             </label>
-            
             <label className="flex items-center p-4 bg-gray-800/30 rounded-xl border border-gray-700 hover:border-orange-500/50 transition-all cursor-pointer group">
               <input
                 type="radio"
@@ -2206,7 +2448,6 @@ const ProfilePage = () => {
                 <span className="text-gray-300 group-hover:text-white transition-colors">PayPal</span>
               </div>
             </label>
-            
             <label className="flex items-center p-4 bg-gray-800/30 rounded-xl border border-gray-700 hover:border-orange-500/50 transition-all cursor-pointer group">
               <input
                 type="radio"
@@ -2223,11 +2464,9 @@ const ProfilePage = () => {
             </label>
           </div>
         </div>
-        
         {paymentMethod === 'card' && (
           <div className="bg-gray-800/50 p-6 rounded-lg mb-6">
             <h4 className="text-md font-medium text-white mb-4">Card Details</h4>
-            
             <div className="space-y-4">
               <div className="group">
                 <label className="block text-sm font-medium text-gray-300 mb-2 group-hover:text-orange-400 transition-colors">
@@ -2248,7 +2487,6 @@ const ProfilePage = () => {
                   />
                 </div>
               </div>
-              
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="group">
                   <label className="block text-sm font-medium text-gray-300 mb-2 group-hover:text-orange-400 transition-colors">
@@ -2264,7 +2502,6 @@ const ProfilePage = () => {
                     maxLength={5}
                   />
                 </div>
-                
                 <div className="group">
                   <label className="block text-sm font-medium text-gray-300 mb-2 group-hover:text-orange-400 transition-colors">
                     CVC
@@ -2288,37 +2525,39 @@ const ProfilePage = () => {
             </div>
           </div>
         )}
-        
         {paymentMethod === 'paypal' && (
           <div className="bg-gray-800/50 p-6 rounded-lg mb-6 text-center">
             <FaPaypal className="text-blue-400 text-4xl mx-auto mb-3" />
             <p className="text-gray-300 mb-4">You will be redirected to PayPal to complete your payment.</p>
           </div>
         )}
-        
         {paymentMethod === 'bankTransfer' && (
           <div className="bg-gray-800/50 p-6 rounded-lg mb-6">
             <h4 className="text-md font-medium text-white mb-4">Bank Transfer Details</h4>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-400">Bank:</span>
-                <span className="text-white">Euro Central Bank</span>
+                <span className="text-white">Banca Transilvania</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Account Holder:</span>
-                <span className="text-white">Travel Explorer SRL</span>
+                <span className="text-white">Boksy Travel SRL</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">IBAN:</span>
-                <span className="text-white">RO29 BACX 0000 0012 3456 7890</span>
+                <span className="text-white">RO29 BTRL 0000 0012 3456 7890</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">SWIFT:</span>
-                <span className="text-white">BACXROBU</span>
+                <span className="text-white">BTRLRO22</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Reference:</span>
                 <span className="text-white">ACC-{Math.floor(Math.random() * 10000)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Amount:</span>
+                <span className="text-white font-semibold">199.99 RON</span>
               </div>
             </div>
             <div className="mt-4 p-3 bg-gray-700/30 rounded-lg">
@@ -2329,7 +2568,6 @@ const ProfilePage = () => {
             </div>
           </div>
         )}
-        
         <div className="mt-8 flex items-center justify-between">
           <label className="flex items-center cursor-pointer group">
             <input 
@@ -2345,33 +2583,79 @@ const ProfilePage = () => {
         </div>
       </div>
 
-      <div className="mt-8 flex flex-col sm:flex-row justify-between gap-4">
+      <div className="my-6 flex justify-end space-x-4">
         <button
           type="button"
-          className="order-2 sm:order-1 px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-medium flex items-center justify-center transition-all"
+          onClick={() => {
+            setActiveTab('profile');
+            setAccommodation({
+              title: '',
+              description: '',
+              propertyType: 'apartment',
+              maxGuests: 1,
+              bedrooms: 1,
+              bathrooms: 1,
+              amenities: {
+                wifi: false,
+                parking: false,
+                ac: false,
+                tv: false,
+                coffeeMaker: false,
+                pool: false,
+                kitchen: false,
+                washer: false,
+                balcony: false
+              },
+              address: '',
+              latitude: '',
+              longitude: '',
+              coordinates: { lat: 0, lng: 0 },
+              photos: [],
+              cancellationPolicy: 'moderate',
+              houseRules: '',
+              paymentMethod: 'card',
+              price: '',
+              currency: 'RON',
+              phoneNumber: '',
+              checkInTime: '14:00',
+              checkOutTime: '11:00',
+              weeklyDiscount: false,
+              monthlyDiscount: false,
+              roomTypes: [
+                { type: 'single', count: 2, price: 0, capacity: 1 },
+                { type: 'double', count: 3, price: 0, capacity: 2 },
+                { type: 'triple', count: 2, price: 0, capacity: 3 },
+                { type: 'quad', count: 1, price: 0, capacity: 4 }
+              ]
+            });
+          }}
+          className="px-6 py-2 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-800 transition-colors"
         >
-          <FaSave className="mr-2" />
-          Save as Draft
+          Anulează
         </button>
-        
         <button
           type="submit"
-          disabled={!agreeTerms}
-          className={`order-1 sm:order-2 px-8 py-3 rounded-xl font-medium flex items-center justify-center transition-all ${
-            agreeTerms 
-              ? 'bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white' 
-              : 'bg-gray-700 text-gray-400 cursor-not-allowed'
-          }`}
+          disabled={loading}
+          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <FaCreditCard className="mr-2" />
-          Pay & Publish Accommodation
+          {loading ? (
+            <>
+              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Procesare...
+            </>
+          ) : (
+            'Trimite'
+          )}
         </button>
       </div>
     </form>
   </div>
 )}
-        
-        {activeTab === 'password' && (
+
+{activeTab === 'password' && (
   <div className="space-y-10">
     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-8">
       <h2 className="text-2xl sm:text-3xl font-bold text-white relative">
@@ -2503,144 +2787,265 @@ const ProfilePage = () => {
 )}
 
         {activeTab === 'myaccommodations' && (
-  <div className="space-y-10">
-    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-      <h2 className="text-2xl sm:text-3xl font-bold text-white relative">
-        <span className="relative">
-          Cazările Mele
-          <span className="absolute -bottom-2 left-0 w-1/2 h-1 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full"></span>
-        </span>
-      </h2>
-      <button
-        onClick={() => setActiveTab('accommodation')}
-        className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-2 transition-colors"
-      >
-        <FaHome /> Adaugă Cazare Nouă
-      </button>
-    </div>
+  <div className="bg-[#172a45] rounded-lg p-6 mt-6">
+    <h3 className="text-xl font-bold mb-4 flex items-center">
+      <FaBed className="mr-2" /> Cazările mele
+    </h3>
     
     {hotelsLoading ? (
-      <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
+      <div className="flex justify-center p-6">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     ) : userHotels.length === 0 ? (
-      <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 p-8 rounded-2xl border border-blue-500/30 shadow-xl text-center">
-        <div className="p-3 bg-blue-500/20 rounded-full inline-block mb-4">
-          <FaHome className="text-blue-400 text-2xl" />
-        </div>
-        <h3 className="text-xl font-semibold text-white mb-3">Nu aveți cazări adăugate încă</h3>
-        <p className="text-gray-400 max-w-md mx-auto mb-6">
-          Adăugați prima dvs. cazare pentru a o face vizibilă potențialilor clienți. Procesul este simplu și rapid.
-        </p>
+      <div className="text-center py-6 text-gray-400">
+        <FaBuilding className="mx-auto text-4xl mb-3 opacity-30" />
+        <p>Nu aveți încă nicio cazare adăugată.</p>
         <button
-          onClick={() => setActiveTab('accommodation')}
-          className="px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors inline-flex items-center gap-2"
+          onClick={() => setActiveTab('addaccommodation')}
+          className="mt-4 bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition"
         >
-          <FaHome /> Adaugă Prima Cazare
+          Adăugați o cazare
         </button>
       </div>
     ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {userHotels.map(hotel => (
+        {userHotels.map((hotel) => (
           <div 
-            key={hotel._id || hotel.id}
-            className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 rounded-2xl border border-blue-500/30 hover:border-blue-400/60 shadow-xl overflow-hidden transition-all duration-300"
+            key={hotel.id || hotel._id} 
+            className="bg-[#1e3a5f] rounded-lg overflow-hidden shadow-lg"
           >
-            {/* Accommodation Image */}
-            <div className="h-48 bg-gray-700 relative">
-              {hotel.photos && hotel.photos.length > 0 ? (
-                <img 
-                  src={typeof hotel.photos[0] === 'string' ? hotel.photos[0] : hotel.photos[0].url || '/default-hotel.jpg'} 
+            {editingHotelId === (hotel.id || hotel._id) ? (
+              <div className="p-4">
+                <h4 className="text-lg font-bold mb-3">Editare cazare</h4>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Titlu</label>
+                    <input
+                      type="text"
+                      name="title"
+                      value={editFormData.title}
+                      onChange={handleEditFormChange}
+                      className="w-full bg-[#0a192f] border border-gray-600 rounded p-2 text-white"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Descriere</label>
+                    <textarea
+                      name="description"
+                      value={editFormData.description}
+                      onChange={handleEditFormChange}
+                      rows="3"
+                      className="w-full bg-[#0a192f] border border-gray-600 rounded p-2 text-white"
+                    ></textarea>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Adresă</label>
+                    <input
+                      type="text"
+                      name="address"
+                      value={editFormData.address}
+                      onChange={handleEditFormChange}
+                      className="w-full bg-[#0a192f] border border-gray-600 rounded p-2 text-white"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Preț</label>
+                    <input
+                      type="number"
+                      name="price"
+                      value={editFormData.price}
+                      onChange={handleEditFormChange}
+                      className="w-full bg-[#0a192f] border border-gray-600 rounded p-2 text-white"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Facilități</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          name="amenities.wifi"
+                          checked={editFormData.amenities?.wifi || false}
+                          onChange={handleEditFormChange}
+                          className="form-checkbox"
+                        />
+                        <span>WiFi</span>
+                      </label>
+                      
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          name="amenities.parking"
+                          checked={editFormData.amenities?.parking || false}
+                          onChange={handleEditFormChange}
+                          className="form-checkbox"
+                        />
+                        <span>Parcare</span>
+                      </label>
+                      
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          name="amenities.ac"
+                          checked={editFormData.amenities?.ac || false}
+                          onChange={handleEditFormChange}
+                          className="form-checkbox"
+                        />
+                        <span>Aer condiționat</span>
+                      </label>
+                      
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          name="amenities.pool"
+                          checked={editFormData.amenities?.pool || false}
+                          onChange={handleEditFormChange}
+                          className="form-checkbox"
+                        />
+                        <span>Piscină</span>
+                      </label>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end space-x-3 mt-4">
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="bg-gray-600 text-white py-2 px-4 rounded hover:bg-gray-700 transition"
+                    >
+                      Anulare
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => handleSaveHotel(hotel.id || hotel._id)}
+                      className="bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600 transition"
+                    >
+                      Salvare
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="relative h-40">
+                  <img
+                    src={
+                      hotel.photos && hotel.photos.length > 0
+                        ? typeof hotel.photos[0] === 'string'
+                          ? hotel.photos[0]
+                          : (hotel.photos[0].name && typeof hotel.photos[0].name === 'string')
+                            ? (hotel.photos[0].name.startsWith('http') ? hotel.photos[0].name : `${API_BASE_URL}/api/places/media/${encodeURIComponent(hotel.photos[0].name)}?maxWidthPx=400`)
+                            : 'https://placehold.co/600x400/172a45/ffffff?text=No+Image'
+                        : 'https://placehold.co/600x400/172a45/ffffff?text=No+Image'
+                    }
                   alt={hotel.title || hotel.name} 
                   className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full">
-                  <FaHome className="text-gray-500 text-4xl" />
-                </div>
-              )}
-              
-              {/* Status Badge */}
-              <div className={`absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-medium
-                ${hotel.status === 'approved' ? 'bg-green-500/80 text-white' : 
-                  hotel.status === 'pending' ? 'bg-yellow-500/80 text-white' : 
-                  'bg-red-500/80 text-white'}`}
-              >
-                {hotel.status === 'approved' ? 'Aprobată' : 
-                 hotel.status === 'pending' ? 'În așteptare' : 
-                 hotel.status === 'rejected' ? 'Respinsă' : 'Necunoscută'}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = 'https://placehold.co/600x400/172a45/ffffff?text=Image+Error';
+                    }}
+                  />
+                  <div className="absolute top-2 right-2 flex space-x-2">
+                    <button
+                      onClick={() => handleEditHotel(hotel)}
+                      className="bg-blue-500 p-2 rounded-full text-white hover:bg-blue-600 transition"
+                      title="Edit"
+                    >
+                      <FaEdit size={14} />
+                    </button>
+                    
+                    <button
+                      onClick={() => handleDeleteClick(hotel)}
+                      className="bg-red-500 p-2 rounded-full text-white hover:bg-red-600 transition"
+                      title="Delete"
+                    >
+                      <FaTrash size={14} />
+                    </button>
               </div>
             </div>
             
-            {/* Accommodation Details */}
-            <div className="p-5">
-              <h3 className="text-lg font-semibold text-white mb-2 truncate">
-                {hotel.title || hotel.name}
-              </h3>
-              <p className="text-gray-400 text-sm mb-3 flex items-start">
-                <FaMapMarkerAlt className="text-blue-400 mr-1 mt-1 shrink-0" />
-                <span className="line-clamp-2">{hotel.address || hotel.location || 'Locație nedisponibilă'}</span>
-              </p>
-              
-              <div className="flex justify-between items-center mb-4">
+                <div className="p-4">
+                  <h4 className="text-lg font-bold mb-1">{hotel.title || hotel.name}</h4>
+                  <p className="text-sm text-gray-300 mb-2">{hotel.address || hotel.location}</p>
+                  
+                  <div className="flex items-center mb-3">
                 <div className="flex items-center">
-                  {hotel.price && (
-                    <span className="text-white font-semibold mr-1">
-                      {hotel.price} {hotel.currency || 'RON'}
-                    </span>
-                  )}
-                  <span className="text-gray-400 text-sm">/noapte</span>
+                      <FaStar className="text-yellow-400 mr-1" />
+                      <span>{hotel.rating?.toFixed(1) || '0.0'}</span>
                 </div>
-                
-                {hotel.rating && (
-                  <div className="flex items-center bg-blue-500/20 text-blue-400 px-2 py-1 rounded-lg text-sm">
-                    <FaStar className="mr-1" /> {hotel.rating}
-                  </div>
-                )}
+                    <span className="mx-2 text-gray-400">|</span>
+                    <span className="text-lg font-bold">{hotel.price} RON</span>
               </div>
               
-              {/* Amenities */}
-              {hotel.amenities && (
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {typeof hotel.amenities === 'object' && !Array.isArray(hotel.amenities) ? (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {(hotel.amenities && typeof hotel.amenities === 'object' && !Array.isArray(hotel.amenities)) ? (
                     Object.entries(hotel.amenities)
                       .filter(([_, value]) => value === true)
                       .map(([key]) => (
-                        <span key={key} className="bg-gray-700 text-gray-300 px-2 py-1 rounded-md text-xs">
-                          {key === 'wifi' ? 'Wi-Fi' : 
-                           key === 'parking' ? 'Parking' : 
-                           key === 'ac' ? 'A/C' : 
-                           key === 'tv' ? 'TV' : 
-                           key === 'pool' ? 'Pool' : 
-                           key === 'coffeeMaker' ? 'Coffee' : 
-                           key.charAt(0).toUpperCase() + key.slice(1)
-                          }
+                          <span key={key} className="bg-[#0a192f] text-xs px-2 py-1 rounded">
+                            {key.charAt(0).toUpperCase() + key.slice(1)}
                         </span>
                       ))
-                  ) : (
-                    Array.isArray(hotel.amenities) && hotel.amenities.map((amenity, index) => (
-                      <span key={index} className="bg-gray-700 text-gray-300 px-2 py-1 rounded-md text-xs">
-                        {amenity}
+                    ) : (Array.isArray(hotel.amenities) ? (
+                      hotel.amenities.map((amenity, index) => (
+                        <span key={index} className="bg-[#0a192f] text-xs px-2 py-1 rounded">
+                          {amenity.charAt(0).toUpperCase() + amenity.slice(1)}
                       </span>
                     ))
-                  )}
+                    ) : null)}
                 </div>
-              )}
-              
-              {/* Actions */}
-              <div className="flex gap-2 pt-3 border-t border-gray-700">
-                <button className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex-1 flex items-center justify-center">
-                  <FaEdit className="mr-1" /> Edit
-                </button>
-                <button className="bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 px-3 py-1.5 rounded-lg text-sm transition-colors">
-                  <FaTrash />
+                  
+                  <button
+                    onClick={() => navigate(`/hotel/${hotel.id || hotel._id}`)}
+                    className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 transition"
+                  >
+                    Vezi detalii
                 </button>
               </div>
-            </div>
+              </>
+            )}
           </div>
         ))}
       </div>
     )}
+  </div>
+)}
+
+{/* Delete confirmation modal */}
+{showDeleteModal && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-[#172a45] rounded-lg p-6 max-w-md w-full">
+      <h3 className="text-xl font-bold mb-4">Confirmare ștergere</h3>
+      <p className="mb-6">
+        Sunteți sigur că doriți să ștergeți cazarea "{hotelToDelete?.title || hotelToDelete?.name}"? 
+        Această acțiune nu poate fi anulată.
+      </p>
+      
+      <div className="flex justify-end space-x-3">
+        <button
+          onClick={() => {
+            setShowDeleteModal(false);
+            setHotelToDelete(null);
+          }}
+          className="bg-gray-600 text-white py-2 px-4 rounded hover:bg-gray-700 transition"
+        >
+          Anulare
+        </button>
+        
+        <button
+          onClick={handleDeleteHotel}
+          className="bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600 transition"
+        >
+          Ștergere
+        </button>
+      </div>
+    </div>
   </div>
 )}
         </div>

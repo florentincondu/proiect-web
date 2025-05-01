@@ -51,8 +51,14 @@ const hotelSchema = new mongoose.Schema({
   availability: [{
     date: Date,
     rooms: [{
-      type: String,
-      count: Number
+      type: {
+        type: String,
+        required: true
+      },
+      count: {
+        type: Number,
+        default: 0
+      }
     }]
   }],
   isRestricted: {
@@ -93,7 +99,7 @@ const hotelSchema = new mongoose.Schema({
       default: 'EUR'
     },
     cardDetails: {
-      cardNumber: String, // Ultimele 4 cifre
+      cardNumber: String, 
       expiryDate: String,
       cardholderName: String
     }
@@ -170,22 +176,39 @@ const hotelSchema = new mongoose.Schema({
   timestamps: true
 });
 
-hotelSchema.methods.checkAvailability = async function(startDate, endDate, guests) {
+hotelSchema.methods.checkAvailability = async function(startDate, endDate, roomType, guests) {
   const start = new Date(startDate);
   const end = new Date(endDate);
   
-  const roomType = this.getRoomTypeForGuests(guests);
+  // If no specific room type is provided, try to determine it from guests count
+  if (!roomType && guests) {
+    roomType = this.getRoomTypeForGuests(guests);
+  }
+  
   if (!roomType) return false;
 
+  // Find the room configuration to check how many rooms of this type exist
+  const roomConfig = this.rooms.find(r => r.type === roomType);
+  if (!roomConfig) return false;
+  
+  // The total count of this room type available
+  const totalRoomCount = roomConfig.count;
+  if (!totalRoomCount || totalRoomCount <= 0) return false;
+
+  // Check each day in the range
   for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
+    const dateString = date.toISOString().split('T')[0];
     const availability = this.availability.find(a => 
-      a.date.toDateString() === date.toDateString()
+      a.date.toISOString().split('T')[0] === dateString
     );
 
     if (availability) {
       const roomAvailability = availability.rooms.find(r => r.type === roomType);
-      if (!roomAvailability || roomAvailability.count <= 0) {
-        return false;
+      if (roomAvailability) {
+        // If booked count is equal to or exceeds total count, no rooms available
+        if (roomAvailability.count >= totalRoomCount) {
+          return false;
+        }
       }
     }
   }
@@ -194,25 +217,94 @@ hotelSchema.methods.checkAvailability = async function(startDate, endDate, guest
 };
 
 hotelSchema.methods.getRoomTypeForGuests = function(guests) {
+  // For hotels added through the system with defined room types
+  if (this.rooms && this.rooms.length > 0) {
+    // Find the smallest capacity room that can accommodate the guests
+    const sortedRooms = [...this.rooms].sort((a, b) => a.capacity - b.capacity);
+    for (const room of sortedRooms) {
+      if (room.capacity >= guests) {
+        return room.type;
+      }
+    }
+    // If no room is big enough, return the largest capacity room
+    return sortedRooms[sortedRooms.length - 1].type;
+  }
+
+  // Default behavior for hotels without specific room configurations
   if (guests <= 1) return 'single';
   if (guests === 2) return 'double';
   if (guests === 3) return 'triple';
   if (guests >= 4) return 'quad';
-  return null;
+  return 'double'; // Default fallback
 };
 
-hotelSchema.methods.calculateTotalPrice = function(startDate, endDate, guests) {
+hotelSchema.methods.calculateTotalPrice = function(startDate, endDate, roomType, guests) {
   const start = new Date(startDate);
   const end = new Date(endDate);
-  const roomType = this.getRoomTypeForGuests(guests);
+  
+  // If no room type specified, try to determine from guests
+  if (!roomType && guests) {
+    roomType = this.getRoomTypeForGuests(guests);
+  }
   
   if (!roomType) return 0;
 
+  // Find the room with matching type
   const room = this.rooms.find(r => r.type === roomType);
-  if (!room) return 0;
+  if (!room) return this.price; // Fallback to base hotel price
 
   const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
   return room.price * days;
+};
+
+// Add a new method to update availability when a booking is made
+hotelSchema.methods.bookRoom = async function(startDate, endDate, roomType, guests = 1) {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  // If room type not specified, determine from guests
+  if (!roomType) {
+    roomType = this.getRoomTypeForGuests(guests);
+  }
+  
+  // Check if the room is available first
+  const isAvailable = await this.checkAvailability(startDate, endDate, roomType);
+  if (!isAvailable) {
+    throw new Error(`No availability for room type ${roomType} in the selected date range`);
+  }
+  
+  // Update availability for each day in the range
+  for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
+    const dateString = date.toISOString().split('T')[0];
+    
+    // Find or create availability entry for this date
+    let dateAvailability = this.availability.find(a => 
+      a.date.toISOString().split('T')[0] === dateString
+    );
+    
+    if (!dateAvailability) {
+      // Create new availability entry for this date
+      dateAvailability = { 
+        date: new Date(date),
+        rooms: []
+      };
+      this.availability.push(dateAvailability);
+    }
+    
+    // Find or create room entry in availability
+    let roomAvailability = dateAvailability.rooms.find(r => r.type === roomType);
+    if (!roomAvailability) {
+      roomAvailability = { type: roomType, count: 0 };
+      dateAvailability.rooms.push(roomAvailability);
+    }
+    
+    // Increment the count (booked rooms)
+    roomAvailability.count += 1;
+  }
+  
+  // Save the updated availability
+  await this.save();
+  return true;
 };
 
 const Hotel = mongoose.model('Hotel', hotelSchema);

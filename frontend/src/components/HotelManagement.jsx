@@ -118,7 +118,7 @@ const HotelManagement = () => {
 
         const response = await axios.post(
           PLACES_SEARCH_TEXT_URL,
-          { textQuery: "hotels in Bucharest Romania" },
+          { textQuery: "Hoteluri populare in Romania" },
           {
             headers: {
               'Authorization': `Bearer ${token}`
@@ -129,6 +129,7 @@ const HotelManagement = () => {
         if (response.data && response.data.places) {
           const placesData = response.data.places;
           console.log('Fetched initial hotels:', placesData.length);
+          console.log("Place price:")
           
 
           const processedHotels = placesData.map(place => {
@@ -492,6 +493,40 @@ const HotelManagement = () => {
           console.log('Creating new hotel:', hotel);
           const photoUrls = hotel.photos ? hotel.photos.map(photo => photo.name || '').filter(name => name) : [];
           
+          // Define room types
+          const rooms = [
+            {
+              type: 'single',
+              capacity: 1,
+              price: parseFloat((hotel.price || hotel.estimatedPrice || 100) * 0.7),
+              count: 2
+            },
+            {
+              type: 'double',
+              capacity: 2,
+              price: parseFloat(hotel.price || hotel.estimatedPrice || 100),
+              count: 3
+            }
+          ];
+          
+          // Initialize availability data for the next 90 days
+          const availability = [];
+          const today = new Date();
+          for (let i = 0; i < 90; i++) {
+            const date = new Date(today);
+            date.setDate(today.getDate() + i);
+            
+            const roomsAvailability = rooms.map(room => ({
+              type: room.type,
+              count: 0 // Start with zero bookings for this date
+            }));
+            
+            availability.push({
+              date,
+              rooms: roomsAvailability
+            });
+          }
+          
           const createResponse = await axios.post(
             HOTELS_API_URL,
             {
@@ -499,29 +534,17 @@ const HotelManagement = () => {
               location: hotel.location,
               description: hotel.description || '',
               rating: hotel.rating || 0,
-              price: parseFloat(hotel.price || hotel.estimatedPrice || 100), // Ensure we have a numeric price
-              placeId: hotel.id, // Store the Google Places ID for reference
-              photos: photoUrls, // Send array of photo URLs instead of objects
+              price: parseFloat(hotel.price || hotel.estimatedPrice || 100), 
+              placeId: hotel.id, 
+              photos: photoUrls, 
               amenities: [],
-              propertyType: 'apartment', // Default property type
+              propertyType: 'apartment', 
               maxGuests: 2,
               bedrooms: 1,
               bathrooms: 1,
               status: 'active',
-              rooms: [
-                {
-                  type: 'single',
-                  capacity: 1,
-                  price: parseFloat((hotel.price || hotel.estimatedPrice || 100) * 0.7),
-                  count: 2
-                },
-                {
-                  type: 'double',
-                  capacity: 2,
-                  price: parseFloat(hotel.price || hotel.estimatedPrice || 100),
-                  count: 3
-                }
-              ],
+              rooms: rooms,
+              availability: availability, 
               coordinates: {
                 lat: hotel.coordinates?.lat || 0,
                 lng: hotel.coordinates?.lng || 0
@@ -819,7 +842,7 @@ const HotelManagement = () => {
                     <td className="px-4 py-4 whitespace-nowrap text-gray-300">
                       <span className="text-sm font-medium flex items-center">
                         <span className="text-green-500 mr-1">RON</span>
-                        {generateHotelPrice(hotel).toFixed(2)}
+                        {hotel.estimatedPrice}
                       </span>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">

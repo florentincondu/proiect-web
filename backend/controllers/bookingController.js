@@ -279,14 +279,82 @@ exports.createHotelBooking = async (req, res) => {
       guests, totalAmount, extras, notes 
     } = req.body;
 
+    console.log('Booking request received:', JSON.stringify({
+      hotelId: hotel?.id,
+      hotelName: hotel?.name,
+      roomType,
+      checkIn,
+      checkOut,
+      guests
+    }, null, 2));
 
     if (!hotel || !roomDetails || !checkIn || !checkOut || !totalAmount) {
+      console.error('Missing required booking information:', {
+        hasHotel: !!hotel,
+        hasRoomDetails: !!roomDetails,
+        hasCheckIn: !!checkIn,
+        hasCheckOut: !!checkOut,
+        hasTotalAmount: !!totalAmount
+      });
       return res.status(400).json({ message: 'Missing required booking information' });
     }
     
-
     console.log('Received hotel data:', JSON.stringify(hotel, null, 2));
     
+    // Check if this is a hotel from our database
+    let dbHotel = null;
+    if (hotel.id) {
+      try {
+        dbHotel = await Hotel.findById(hotel.id);
+        console.log(`Hotel found in database: ${dbHotel ? 'Yes' : 'No'}`);
+      } catch (dbError) {
+        console.error('Error finding hotel in database:', dbError.message);
+      }
+    }
+    
+    // If we found the hotel in our database, check availability
+    if (dbHotel) {
+      try {
+        // Check if the requested room type is available for the selected dates
+        const guestCount = typeof guests === 'number' ? guests : 
+                          (guests?.adults || 0) + (guests?.children || 0);
+        
+        console.log(`Checking availability for room type ${roomType}, dates ${checkIn} to ${checkOut}, guests: ${guestCount}`);
+        
+        const isAvailable = await dbHotel.checkAvailability(
+          checkIn, 
+          checkOut, 
+          roomType, 
+          guestCount
+        );
+        
+        if (!isAvailable) {
+          console.error(`Room type ${roomType} not available for dates ${checkIn} to ${checkOut}`);
+          return res.status(400).json({ 
+            success: false,
+            message: 'This room type is not available for the selected dates'
+          });
+        }
+        
+        // Update hotel availability by booking the room
+        await dbHotel.bookRoom(
+          checkIn,
+          checkOut,
+          roomType,
+          guestCount
+        );
+        
+        console.log(`Room ${roomType} successfully booked in hotel ${dbHotel.name} for dates ${checkIn} to ${checkOut}`);
+      } catch (error) {
+        console.error('Error checking/updating availability:', error);
+        return res.status(400).json({
+          success: false,
+          message: error.message
+        });
+      }
+    } else {
+      console.log('Hotel not found in local database, assuming external hotel');
+    }
 
     const hotelData = {
       id: hotel.id || null,
@@ -302,13 +370,32 @@ exports.createHotelBooking = async (req, res) => {
       console.warn('Creating booking with fixed hotel information:', hotelData);
     }
 
+    // Make sure we have a valid user ID
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'User not authenticated or invalid user ID'
+      });
+    }
+
+    // Ensure valid date objects
+    const checkInDate = new Date(checkIn);
+    const checkOutDate = new Date(checkOut);
+    
+    if (isNaN(checkInDate.getTime()) || isNaN(checkOutDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid check-in or check-out dates'
+      });
+    }
+
     const booking = new Booking({
       user: req.user._id,
       hotel: hotelData,
       roomType,
       roomDetails,
-      checkIn: new Date(checkIn),
-      checkOut: new Date(checkOut),
+      checkIn: checkInDate,
+      checkOut: checkOutDate,
       guests,
       totalAmount,
       extras: extras || [],
@@ -317,10 +404,18 @@ exports.createHotelBooking = async (req, res) => {
       paymentStatus: 'pending',
       date: new Date()
     });
+    
+    console.log('Creating booking with data:', JSON.stringify({
+      user: req.user._id,
+      hotel: hotelData.name,
+      roomType,
+      checkIn: checkInDate,
+      checkOut: checkOutDate,
+      totalAmount
+    }, null, 2));
 
     const createdBooking = await booking.save();
     
-
     if (global.logToFile) {
       global.logToFile(`Booking created successfully:
         User: ${req.user._id}
@@ -333,13 +428,17 @@ exports.createHotelBooking = async (req, res) => {
       `);
     }
 
+    console.log(`Booking created successfully with ID: ${createdBooking._id}`);
     res.status(201).json(createdBooking);
   } catch (error) {
     console.error('Create hotel booking error:', error);
     if (global.logToFile) {
       global.logToFile(`ERROR creating booking: ${error.message}`);
     }
-    res.status(500).json({ message: 'Failed to create booking' });
+    res.status(500).json({ 
+      message: 'Failed to create booking', 
+      error: error.message 
+    });
   }
 };
 

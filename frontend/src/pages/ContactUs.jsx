@@ -1,6 +1,6 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { 
   FaAngleDown, 
   FaAngleUp, 
@@ -16,23 +16,40 @@ import {
   FaHotel,
   FaQuestion,
   FaBookmark,
-  FaArrowLeft
+  FaArrowLeft,
+  FaCheckCircle,
+  FaExclamationCircle
 } from 'react-icons/fa';
 import '../styles/ContactUs.css';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 const ContactUs = () => {
   const navigate = useNavigate();
 
   const [activeSection, setActiveSection] = useState('bookings');
-
   const [expandedFaq, setExpandedFaq] = useState(null);
 
+  // Form state
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    subject: '',
+    category: '',
+    message: '',
+    bookingId: '',
+    isPrivacyAgreed: false
+  });
+
+  // Loading and alert states
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const changeSection = (section) => {
     setActiveSection(section);
     setExpandedFaq(null); // Reset expanded FAQ when changing section
   };
-
 
   const toggleFaq = (index) => {
     if (expandedFaq === index) {
@@ -42,11 +59,56 @@ const ContactUs = () => {
     }
   };
 
-
   const goBackToHome = () => {
     navigate('/');
   };
 
+  // Handle input changes
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData({
+      ...formData,
+      [name]: type === 'checkbox' ? checked : value
+    });
+  };
+
+  // Handle form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setSubmitSuccess(false);
+    setSubmitError('');
+
+    try {
+      const response = await axios.post(`${API_BASE_URL}/api/support/contact`, formData);
+      
+      if (response.data.success) {
+        // Reset form on success
+        setFormData({
+          name: '',
+          email: '',
+          subject: '',
+          category: '',
+          message: '',
+          bookingId: '',
+          isPrivacyAgreed: false
+        });
+        
+        setSubmitSuccess(true);
+        window.scrollTo(0, document.getElementById('contact-form').offsetTop - 50);
+      } else {
+        setSubmitError(response.data.message || 'A apărut o eroare la trimiterea formularului.');
+      }
+    } catch (error) {
+      console.error('Error submitting contact form:', error);
+      setSubmitError(
+        error.response?.data?.message || 
+        'A apărut o eroare la trimiterea formularului. Te rugăm să încerci din nou.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const faqSections = {
     bookings: {
@@ -349,13 +411,40 @@ const ContactUs = () => {
             </p>
           </div>
           
+          {/* Success message */}
+          {submitSuccess && (
+            <div className="mb-8 bg-green-500/20 border border-green-500/30 rounded-lg p-4 text-center animate-fade-in">
+              <div className="flex items-center justify-center mb-2">
+                <FaCheckCircle className="text-green-400 mr-2" size={24} />
+                <h3 className="text-xl font-semibold text-green-400">Mesaj trimis cu succes!</h3>
+              </div>
+              <p className="text-gray-300">
+                Îți mulțumim pentru mesaj. Echipa noastră îți va răspunde în cel mai scurt timp posibil.
+              </p>
+            </div>
+          )}
+          
+          {/* Error message */}
+          {submitError && (
+            <div className="mb-8 bg-red-500/20 border border-red-500/30 rounded-lg p-4 text-center animate-fade-in">
+              <div className="flex items-center justify-center mb-2">
+                <FaExclamationCircle className="text-red-400 mr-2" size={24} />
+                <h3 className="text-xl font-semibold text-red-400">Eroare!</h3>
+              </div>
+              <p className="text-gray-300">{submitError}</p>
+            </div>
+          )}
+          
           <div className="bg-gradient-to-br from-gray-800/90 to-gray-900/90 backdrop-blur-sm rounded-2xl p-8 shadow-2xl border border-gray-700/30">
-            <form className="space-y-6">
+            <form className="space-y-6" onSubmit={handleSubmit}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="relative">
                   <input
                     type="text"
                     id="name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
                     className="peer w-full bg-gray-700/50 border border-gray-600 rounded-lg py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-transparent"
                     placeholder="Numele tău"
                     required
@@ -372,6 +461,9 @@ const ContactUs = () => {
                   <input
                     type="email"
                     id="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
                     className="peer w-full bg-gray-700/50 border border-gray-600 rounded-lg py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-transparent"
                     placeholder="Email-ul tău"
                     required
@@ -389,6 +481,9 @@ const ContactUs = () => {
                 <input
                   type="text"
                   id="subject"
+                  name="subject"
+                  value={formData.subject}
+                  onChange={handleInputChange}
                   className="peer w-full bg-gray-700/50 border border-gray-600 rounded-lg py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-transparent"
                   placeholder="Subiectul mesajului"
                   required
@@ -404,9 +499,13 @@ const ContactUs = () => {
               <div className="relative">
                 <select
                   id="category"
+                  name="category"
+                  value={formData.category}
+                  onChange={handleInputChange}
                   className="w-full bg-gray-700/50 border border-gray-600 rounded-lg py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
                 >
-                  <option value="" disabled selected>Selectează categoria</option>
+                  <option value="" disabled>Selectează categoria</option>
                   <option value="booking">Probleme cu rezervarea</option>
                   <option value="payment">Plăți și rambursări</option>
                   <option value="account">Cont și profil</option>
@@ -419,6 +518,9 @@ const ContactUs = () => {
               <div className="relative">
                 <textarea
                   id="message"
+                  name="message"
+                  value={formData.message}
+                  onChange={handleInputChange}
                   rows={6}
                   className="peer w-full bg-gray-700/50 border border-gray-600 rounded-lg py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-transparent"
                   placeholder="Detaliile mesajului tău"
@@ -436,6 +538,9 @@ const ContactUs = () => {
                 <input
                   type="text"
                   id="booking-id"
+                  name="bookingId"
+                  value={formData.bookingId}
+                  onChange={handleInputChange}
                   className="peer w-full bg-gray-700/50 border border-gray-600 rounded-lg py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-transparent"
                   placeholder="ID Rezervare (opțional)"
                 />
@@ -450,8 +555,10 @@ const ContactUs = () => {
               <div className="flex items-start">
                 <input
                   id="privacy"
-                  name="privacy"
+                  name="isPrivacyAgreed"
                   type="checkbox"
+                  checked={formData.isPrivacyAgreed}
+                  onChange={handleInputChange}
                   className="h-5 w-5 text-blue-500 focus:ring-blue-400 border-gray-300 rounded mt-1"
                   required
                 />
@@ -463,9 +570,12 @@ const ContactUs = () => {
               <div className="text-center">
                 <button 
                   type="submit" 
-                  className="px-8 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg font-medium hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-blue-500/50"
+                  className={`px-8 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg font-medium transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-blue-500/50 ${
+                    isSubmitting ? 'opacity-70 cursor-not-allowed' : 'hover:from-blue-600 hover:to-blue-700'
+                  }`}
+                  disabled={isSubmitting}
                 >
-                  Trimite Mesajul
+                  {isSubmitting ? 'Se trimite...' : 'Trimite Mesajul'}
                 </button>
               </div>
             </form>

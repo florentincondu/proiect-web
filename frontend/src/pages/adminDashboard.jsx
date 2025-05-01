@@ -339,6 +339,7 @@ const AdminDashboard = () => {
                     </thead>
                     <tbody className="divide-y divide-gray-700">
                       {dashboardData.recentBookings.map((booking, index) => (
+                        
                         <tr key={index} className="hover:bg-gray-750">
                           <td className="px-4 py-3 whitespace-nowrap">
                             <div className="text-sm font-medium">{booking.user?.name || 'User'}</div>
@@ -346,8 +347,10 @@ const AdminDashboard = () => {
                           <td className="px-4 py-3 whitespace-nowrap">
                             <div className="text-sm">{booking.hotel?.name || 'Hotel'}</div>
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <div className="text-sm">{new Date(booking.date).toLocaleDateString()}</div>
+                          <td className="px-4 py-3 whitespace-wrap">
+                          <div className="text-sm">
+    {new Date(booking.checkIn).toLocaleDateString()} : {new Date(booking.checkOut).toLocaleDateString()}
+  </div>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <span className={`px-2 py-1 text-xs rounded-full

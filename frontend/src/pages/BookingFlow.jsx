@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { FaCalendarAlt, FaListAlt, FaCreditCard, FaCheckCircle, FaArrowRight, FaArrowLeft, FaStar, FaParking, FaWifi, FaUtensils, FaWineGlass, FaPaw } from 'react-icons/fa';
+import { FaCalendarAlt, FaListAlt, FaCreditCard, FaCheckCircle, FaArrowRight, FaArrowLeft, FaStar, FaParking, FaWifi, FaUtensils, FaWineGlass, FaPaw, FaMapMarkerAlt } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createHotelBooking } from '../api/bookings';
 import { useAuth } from '../context/authContext';
@@ -56,7 +56,18 @@ const BookingFlow = () => {
     if (location.state?.selectedRoom && !selectedRoom) {
       console.log('Selected room data received:', location.state.selectedRoom);
       console.log('Room price from selected room:', location.state.selectedRoom.price);
-      setSelectedRoom(location.state.selectedRoom);
+      
+      const roomData = location.state.selectedRoom;
+      setSelectedRoom(roomData);
+      
+      // Auto-fill adults count based on room capacity
+      if (roomData.capacity) {
+        console.log('Setting adults count based on room capacity:', roomData.capacity);
+        setBookingDetails(prev => ({
+          ...prev,
+          adults: roomData.capacity > 4 ? 4 : roomData.capacity // Cap at 4 adults max for UI dropdown
+        }));
+      }
     }
   }, [hotelData, navigate, selectedRoom, location.state]);
   
@@ -138,54 +149,97 @@ const BookingFlow = () => {
   
 
   const handleSubmitBooking = async (paymentDetails) => {
-    if (!isAuthenticated) {
-      setError('You must be logged in to complete a booking');
-      return;
-    }
+    if (isLoading) return;
     
-    setIsLoading(true);
     setError(null);
+    setIsLoading(true);
     
     try {
+      if (!selectedRoom) {
+        throw new Error('No room selected. Please select a room to continue.');
+      }
+      
+      if (!bookingDetails.checkIn || !bookingDetails.checkOut) {
+        throw new Error('Check-in and check-out dates are required.');
+      }
+      
+      const checkIn = new Date(bookingDetails.checkIn);
+      const checkOut = new Date(bookingDetails.checkOut);
+      
+      if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
+        throw new Error('Invalid check-in or check-out dates.');
+      }
+      
+      if (!hotelData || !hotelData.id) {
+        console.warn('Hotel data missing or incomplete', hotelData);
+      }
 
-      const bookingData = {
-        hotel: {
-          id: hotelData.id,
-          name: hotelData.name || 'Hotel', // Ensure name has a default
-          location: hotelData.location || 'Location not available', // Ensure location has a default
-          image: hotelData.image || '' // Ensure image field exists even if empty
-        },
-        roomType: selectedRoom.type,
-        roomDetails: {
-          name: selectedRoom.name,
-          price: selectedRoom.price,
-          capacity: selectedRoom.capacity || 2,
-          amenities: selectedRoom.amenities || []
-        },
-        checkIn: bookingDetails.checkIn,
-        checkOut: bookingDetails.checkOut,
-        guests: {
-          adults: bookingDetails.adults,
-          children: bookingDetails.children
-        },
-        totalAmount: bookingDetails.totalPrice,
-        subtotal: bookingDetails.subtotal,
-        tax: bookingDetails.tax,
-        taxRate: 12, // 12% tax rate
-        extras: selectedExtras,
-        notes: bookingDetails.notes || '',
-
-
+      // Format guests data correctly
+      const guests = {
+        adults: parseInt(bookingDetails.adults || 1),
+        children: parseInt(bookingDetails.children || 0)
       };
       
-      console.log('Submitting booking with hotel data:', bookingData.hotel);
-      console.log('Price details: Subtotal:', bookingDetails.subtotal, 'Tax:', bookingDetails.tax, 'Total:', bookingDetails.totalPrice);
+      // Calculate total amount
+      const roomPrice = selectedRoom.price || 0;
+      const nightsCount = getDaysDifference(bookingDetails.checkIn, bookingDetails.checkOut);
+      const extrasTotal = selectedExtras.reduce((sum, extra) => sum + extra.price, 0);
+      const subtotal = roomPrice * nightsCount + extrasTotal;
+      const tax = subtotal * 0.12; // 12% tax
+      const totalAmount = subtotal + tax;
       
-
+      console.log('Submitting booking with hotel data:', hotelData);
+      console.log('Price details: Subtotal:', subtotal, 'Tax:', tax, 'Total:', totalAmount);
+      
+      // Ensure roomDetails is properly structured
+      const roomDetails = {
+        name: selectedRoom.name || selectedRoom.type,
+        price: roomPrice,
+        capacity: selectedRoom.capacity || 2,
+        amenities: selectedRoom.amenities || []
+      };
+      
+      // Create a clean version of the payment details to avoid circular references
+      const cleanPaymentDetails = {
+        cardNumber: paymentDetails.cardNumber || '',
+        expiry: paymentDetails.expiry || '',
+        name: paymentDetails.name || '',
+        paymentMethod: paymentDetails.paymentMethod || 'creditCard',
+        amount: totalAmount,
+        currency: 'RON'
+      };
+      
+      // Create a more complete booking object
+      const bookingData = {
+        hotel: {
+          id: hotelData?.id,
+          name: hotelData?.name,
+          location: hotelData?.location,
+          image: hotelData?.image
+        },
+        roomType: selectedRoom.type,
+        roomDetails,
+        checkIn: bookingDetails.checkIn,
+        checkOut: bookingDetails.checkOut,
+        guests,
+        totalAmount,
+        extras: selectedExtras,
+        notes: bookingDetails.notes || '',
+        paymentDetails: cleanPaymentDetails
+      };
+      
+      try {
+        console.log('Full booking data being sent:', JSON.stringify(bookingData, null, 2));
+      } catch (jsonError) {
+        console.error('Error stringifying booking data:', jsonError);
+        // Continue with the request even if logging fails
+      }
+      
       const response = await createHotelBooking(bookingData);
-      console.log('Booking created:', response);
       
-
+      console.log('Booking created successfully:', response);
+      
+      // Move to confirmation step
       setCurrentStep(4);
     } catch (err) {
       console.error('Booking error:', err);
@@ -221,6 +275,7 @@ const BookingFlow = () => {
                  onBack={() => setCurrentStep(1)}
                  selectedExtras={selectedExtras}
                  onExtraToggle={handleExtraToggle}
+                 bookingDetails={bookingDetails}
                />;
       case 3:
         return <PaymentStep 
@@ -408,23 +463,41 @@ const DatesAndRoomsStep = ({ onNext, bookingDetails, onInputChange, selectedRoom
   };
   
   const renderRoomImage = (room) => {
-    const imageUrl = room.image || hotelData?.image;
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+    let imageUrl = room.image || hotelData?.image;
     
+    // Process the image URL
     if (imageUrl) {
-    return (
-        <img 
-          src={imageUrl} 
-          alt={room.name} 
-          className="w-full h-full object-cover rounded-md transform hover:scale-105 transition-transform duration-300"
-        />
-      );
+      // Handle different image URL formats
+      if (typeof imageUrl === 'object' && imageUrl.name) {
+        // Google Places API format
+        imageUrl = `${API_BASE_URL}/api/places/media/${encodeURIComponent(imageUrl.name)}?maxWidthPx=400`;
+      } else if (typeof imageUrl === 'string') {
+        if (imageUrl.startsWith('/uploads/')) {
+          // Local uploaded image with relative path
+          imageUrl = `${API_BASE_URL}${imageUrl}`;
+        } else if (!imageUrl.startsWith('http') && !imageUrl.includes('placehold.co')) {
+          // Local file name or path - extract filename and build URL
+          const fileName = imageUrl.split(/[\/\\]/).pop();
+          imageUrl = `${API_BASE_URL}/uploads/hotels/${fileName}`;
+        }
+        // HTTP URLs and placeholder URLs remain unchanged
+      }
+    } else {
+      // Default placeholder
+      imageUrl = 'https://placehold.co/600x400/172a45/ffffff?text=No+Room+Image';
     }
     
-
     return (
-      <div className="w-full h-full bg-gray-600 rounded-md flex items-center justify-center text-center p-4">
-        <span className="text-white">{room.name}</span>
-      </div>
+      <img 
+        src={imageUrl} 
+        alt={room.name || room.type} 
+        className="w-full h-full object-cover rounded-md transform hover:scale-105 transition-transform duration-300"
+        onError={(e) => {
+          e.target.onerror = null;
+          e.target.src = 'https://placehold.co/600x400/172a45/ffffff?text=Image+Error';
+        }}
+      />
     );
   };
 
@@ -439,17 +512,44 @@ const DatesAndRoomsStep = ({ onNext, bookingDetails, onInputChange, selectedRoom
       {hotelData && (
         <div className="bg-gray-700 rounded-lg p-4 mb-6 flex flex-col sm:flex-row items-start sm:items-center">
           <div className="sm:mr-4 mb-3 sm:mb-0 w-full sm:w-32 h-24 overflow-hidden rounded-md">
-            {hotelData.image ? (
-              <img 
-                src={hotelData.image} 
-                alt={hotelData.name} 
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full bg-gray-600 flex items-center justify-center">
-                <span className="text-white text-center">{hotelData.name}</span>
-              </div>
-            )}
+            {(() => {
+              const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+              let imageUrl = hotelData.image;
+              
+              // Process the image URL
+              if (imageUrl) {
+                // Handle different image URL formats
+                if (typeof imageUrl === 'object' && imageUrl.name) {
+                  // Google Places API format
+                  imageUrl = `${API_BASE_URL}/api/places/media/${encodeURIComponent(imageUrl.name)}?maxWidthPx=400`;
+                } else if (typeof imageUrl === 'string') {
+                  if (imageUrl.startsWith('/uploads/')) {
+                    // Local uploaded image with relative path
+                    imageUrl = `${API_BASE_URL}${imageUrl}`;
+                  } else if (!imageUrl.startsWith('http') && !imageUrl.includes('placehold.co')) {
+                    // Local file name or path - extract filename and build URL
+                    const fileName = imageUrl.split(/[\/\\]/).pop();
+                    imageUrl = `${API_BASE_URL}/uploads/hotels/${fileName}`;
+                  }
+                  // HTTP URLs and placeholder URLs remain unchanged
+                }
+              } else {
+                // Default placeholder
+                imageUrl = 'https://placehold.co/600x400/172a45/ffffff?text=No+Hotel+Image';
+              }
+              
+              return (
+                <img 
+                  src={imageUrl} 
+                  alt={hotelData.name} 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = 'https://placehold.co/600x400/172a45/ffffff?text=Image+Error';
+                  }}
+                />
+              );
+            })()}
           </div>
           <div className="flex-1">
             <h3 className="font-semibold text-lg mb-1">{hotelData.name}</h3>
@@ -506,9 +606,15 @@ const DatesAndRoomsStep = ({ onNext, bookingDetails, onInputChange, selectedRoom
                 onChange={onInputChange}
                 className="w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-white appearance-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
               >
-                {[1,2,3,4,5].map(num => (
-                  <option key={num} value={num}>{num}</option>
-                ))}
+                {(() => {
+                  // Get max capacity from selected room or default to 8
+                  const maxCapacity = selectedRoom?.capacity || 8;
+                  const options = [];
+                  for (let i = 1; i <= Math.min(maxCapacity, 8); i++) {
+                    options.push(<option key={i} value={i}>{i}</option>);
+                  }
+                  return options;
+                })()}
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
                 <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
@@ -662,7 +768,7 @@ const DatesAndRoomsStep = ({ onNext, bookingDetails, onInputChange, selectedRoom
 };
 
 
-const ExtrasStep = ({ onNext, onBack, selectedExtras, onExtraToggle }) => {
+const ExtrasStep = ({ onNext, onBack, selectedExtras, onExtraToggle, bookingDetails }) => {
   const extras = [
     {
       id: 1,
@@ -710,12 +816,31 @@ const ExtrasStep = ({ onNext, onBack, selectedExtras, onExtraToggle }) => {
     return selectedExtras.some(extra => extra.id === extraId);
   };
 
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const options = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
+    return date.toLocaleDateString('en-US', options);
+  };
+
   return (
     <div>
       <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 flex items-center">
         <FaListAlt className="mr-2 sm:mr-3 text-blue-500" />
         Add Extras to Your Stay
       </h2>
+      
+      {/* Hotel info summary */}
+      <div className="mb-6 sm:mb-8 bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <h3 className="text-lg font-semibold mb-2">{bookingDetails.hotelName}</h3>
+        <p className="flex items-center text-gray-300 text-sm mb-3">
+          <FaMapMarkerAlt className="mr-2 text-blue-400" />
+          {bookingDetails.hotelLocation}
+        </p>
+        <p className="text-sm text-gray-400">
+          {formatDate(bookingDetails.checkIn)} - {formatDate(bookingDetails.checkOut)}
+        </p>
+      </div>
       
       <div className="mb-6 sm:mb-8 space-y-3 sm:space-y-4">
         {extras.map(extra => (
@@ -813,6 +938,12 @@ const PaymentStep = ({ onNext, onBack, bookingDetails, selectedRoom, selectedExt
     return true;
   };
   
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const options = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
+    return date.toLocaleDateString('en-US', options);
+  };
 
   const formatCardNumber = (value) => {
     if (!value) return '';
@@ -865,12 +996,45 @@ const PaymentStep = ({ onNext, onBack, bookingDetails, selectedRoom, selectedExt
   
   const summary = calculateSummary();
 
+  // Create a clean payment details object to pass to the booking function
+  const handleCompleteBooking = () => {
+    const cleanPaymentDetails = {
+      cardNumber: cardDetails.cardNumber,
+      expiry: cardDetails.expiry,
+      cvv: cardDetails.cvv,
+      name: cardDetails.name,
+      paymentMethod: paymentMethod
+    };
+    
+    onNext(cleanPaymentDetails);
+  };
+
   return (
     <div>
       <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 flex items-center">
         <FaCreditCard className="mr-2 sm:mr-3 text-blue-500" />
         Payment Details
       </h2>
+      
+      {/* Hotel info summary */}
+      <div className="mb-6 sm:mb-8 bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <h3 className="text-lg font-semibold mb-2">{bookingDetails.hotelName}</h3>
+        <p className="flex items-center text-gray-300 text-sm mb-3">
+          <FaMapMarkerAlt className="mr-2 text-blue-400" />
+          {bookingDetails.hotelLocation}
+        </p>
+        <div className="flex flex-wrap gap-2 text-sm text-gray-400">
+          <span className="bg-gray-700 px-2 py-1 rounded-md">
+            {nights} {nights === 1 ? 'night' : 'nights'}
+          </span>
+          <span className="bg-gray-700 px-2 py-1 rounded-md">
+            {formatDate(bookingDetails.checkIn)} - {formatDate(bookingDetails.checkOut)}
+          </span>
+          <span className="bg-gray-700 px-2 py-1 rounded-md">
+            {bookingDetails.adults + bookingDetails.children} {(bookingDetails.adults + bookingDetails.children) === 1 ? 'guest' : 'guests'}
+          </span>
+        </div>
+      </div>
       
       {/* Payment method selection */}
       <div className="mb-6 sm:mb-8">
@@ -1095,7 +1259,7 @@ const PaymentStep = ({ onNext, onBack, bookingDetails, selectedRoom, selectedExt
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          onClick={onNext}
+          onClick={handleCompleteBooking}
           disabled={!isFormValid()}
           className={`flex items-center py-2 sm:py-3 px-4 sm:px-6 rounded-lg text-sm sm:text-base font-medium transition ${
             isFormValid()
@@ -1135,7 +1299,10 @@ const ConfirmationStep = ({ onFinish, bookingDetails, selectedRoom }) => {
       <div className="bg-gradient-to-r from-blue-900 to-blue-800 rounded-lg p-4 sm:p-6 border border-blue-700 mb-6 sm:mb-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 pb-3 sm:pb-4 border-b border-blue-700">
           <div>
-            <h3 className="font-bold text-lg sm:text-xl mb-1">{selectedRoom.name}</h3>
+            <h3 className="font-bold text-lg sm:text-xl mb-1">{bookingDetails.hotelName}</h3>
+            <p className="text-blue-300 text-sm sm:text-base mb-2">
+              <FaMapMarkerAlt className="inline-block mr-1" /> {bookingDetails.hotelLocation}
+            </p>
             <p className="text-blue-300 text-sm sm:text-base">
               {formatDate(bookingDetails.checkIn)} - {formatDate(bookingDetails.checkOut)}
             </p>
@@ -1146,6 +1313,10 @@ const ConfirmationStep = ({ onFinish, bookingDetails, selectedRoom }) => {
         </div>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 pb-3 sm:pb-4 border-b border-blue-700">
+          <div>
+            <h4 className="text-blue-300 text-xs sm:text-sm mb-1">Room Type</h4>
+            <p className="text-sm sm:text-base">{selectedRoom.name}</p>
+          </div>
           <div>
             <h4 className="text-blue-300 text-xs sm:text-sm mb-1">Check-in</h4>
             <p className="text-sm sm:text-base">{formatDate(bookingDetails.checkIn)}, from 3:00 PM</p>

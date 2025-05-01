@@ -18,7 +18,7 @@ router.post('/search-nearby', async (req, res) => {
         headers: {
           'Content-Type': 'application/json',
           'X-Goog-Api-Key': process.env.API_KEY,
-          'X-Goog-FieldMask': req.headers['x-goog-fieldmask'] || 'places.id,places.displayName,places.photos,places.formattedAddress,places.rating,places.types,places.websiteUri,places.priceLevel'
+          'X-Goog-FieldMask': req.headers['x-goog-fieldmask'] || 'places.id,places.displayName,places.photos,places.formattedAddress,places.rating,places.types,places.websiteUri,places.priceLevel,places.phone'
         }
       }
     );
@@ -53,7 +53,7 @@ router.post('/search-text', async (req, res) => {
         headers: {
           'Content-Type': 'application/json',
           'X-Goog-Api-Key': process.env.API_KEY,
-          'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.photos,places.rating,places.userRatingCount,places.priceLevel,places.id'
+          'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.photos,places.rating,places.userRatingCount,places.priceLevel,places.id,places.internationalPhoneNumber,places.nationalPhoneNumber,places.websiteUri'
         }
       }
     );

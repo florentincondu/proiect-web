@@ -41,6 +41,8 @@ const NotificationsPage = () => {
         return <FaBell className="text-blue-400" />;
       case 'support':
         return <FaEnvelope className="text-green-400" />;
+      case 'contact':
+        return <FaEnvelope className="text-purple-400" />;
       default:
         return <FaBell className="text-gray-400" />;
     }

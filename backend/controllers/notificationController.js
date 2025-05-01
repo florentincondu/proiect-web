@@ -174,8 +174,8 @@ const createBookingNotification = async (booking, user, action = 'confirmed') =>
     
     switch (action) {
       case 'confirmed':
-        title = 'Booking Confirmed';
-        message = `Your booking at ${hotelName} has been confirmed.`;
+        title = 'Rezervare confirmată';
+        message = `Rezervarea ta la ${hotelName} a fost confirmată.`;
         break;
       case 'updated':
         title = 'Booking Updated';
@@ -237,6 +237,43 @@ const createSupportResponseNotification = async (ticket, user) => {
     return true;
   } catch (error) {
     console.error('Error creating support notification:', error);
+    return false;
+  }
+};
+
+/**
+ * @desc    Create notification for contact form submission response
+ * @param   {Object} submission - The contact submission object
+ * @param   {Object} user - The user object who submitted the contact form (if registered)
+ * @param   {String} response - The admin response to the contact form
+ * @access  Private/Internal
+ */
+const createContactResponseNotification = async (submission, user, response) => {
+  try {
+    if (!user || !user._id) {
+      console.log('No user provided for contact response notification');
+      return false;
+    }
+    
+    console.log(`Creating contact response notification for user: ${user._id}, submission: ${submission._id}`);
+    
+    const subject = submission.subject || 'your contact inquiry';
+    const shortResponse = response.length > 50 ? `${response.substring(0, 50)}...` : response;
+    
+    const notification = await Notification.createNotification({
+      userId: user._id,
+      type: 'contact',
+      title: 'Răspuns la solicitarea ta',
+      message: `Solicitarea ta "${subject}" a primit un răspuns: "${shortResponse}"`,
+      referenceId: submission._id,
+      referenceModel: 'ContactSubmission',
+      data: { responseContent: response }
+    });
+    
+    console.log(`Contact response notification created with ID: ${notification._id}`);
+    return true;
+  } catch (error) {
+    console.error('Error creating contact response notification:', error);
     return false;
   }
 };
@@ -304,5 +341,6 @@ module.exports = {
   deleteNotification,
   createBookingNotification,
   createSupportResponseNotification,
+  createContactResponseNotification,
   generateTestNotification
 }; 

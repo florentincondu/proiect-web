@@ -8,6 +8,7 @@ import { useAuth } from '../context/authContext';
 import { generateHotelPrice } from '../utils/priceUtils';
 import { RESULTS_PER_PAGE, getDefaultHeaders } from '../config/api';
 import { IoArrowForward } from 'react-icons/io5';
+import HotelCard from '../components/HotelCard';
 
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
@@ -80,7 +81,11 @@ const SearchResults = () => {
 
   const [searchQuery, setSearchQuery] = useState(location.state?.searchQuery || '');
   const [searchResultsFromHomePage, setSearchResultsFromHomePage] = useState(location.state?.results || []);
+  const [checkInDate, setCheckInDate] = useState(location.state?.checkInDate || new Date().toISOString().split('T')[0]);
+  const [checkOutDate, setCheckOutDate] = useState(location.state?.checkOutDate || new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+  const [guestCount, setGuestCount] = useState(location.state?.guestCount || 2);
   
+
   const [hotels, setHotels] = useState([]);
   const [filteredHotels, setFilteredHotels] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -89,6 +94,7 @@ const SearchResults = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [currentImageIndexes, setCurrentImageIndexes] = useState({});
   const [dataProcessed, setDataProcessed] = useState(false);
+  const [roomAvailability, setRoomAvailability] = useState({});
   
 
   const [newSearchQuery, setNewSearchQuery] = useState(searchQuery);
@@ -133,7 +139,6 @@ const SearchResults = () => {
   ];
   
   useEffect(() => {
-
     if (dataProcessed) {
       console.log('Data already processed, skipping');
       return;
@@ -142,11 +147,9 @@ const SearchResults = () => {
     if (searchResultsFromHomePage.length > 0) {
       console.log('Using search results passed from HomePage:', searchResultsFromHomePage.length);
       
-
       const processedHotels = searchResultsFromHomePage.map(hotel => {
         let processedAmenities = [];
         
-
         if (hotel.amenities && typeof hotel.amenities === 'object' && !Array.isArray(hotel.amenities)) {
           processedAmenities = Object.entries(hotel.amenities)
             .filter(([key, value]) => value === true)
@@ -166,10 +169,8 @@ const SearchResults = () => {
       setHotels(processedHotels);
       setFilteredHotels(processedHotels);
       
-
       setTotalPages(Math.ceil(processedHotels.length / RESULTS_PER_PAGE));
       
-
       const initialIndexes = {};
       processedHotels.forEach(hotel => {
         initialIndexes[hotel.id] = 0;
@@ -180,19 +181,18 @@ const SearchResults = () => {
       return;
     }
     
+    // If no search query, don't fetch anything - just show the search prompt
     if (!searchQuery) {
-      setError('No search query provided');
-      setLoading(false);
-      setDataProcessed(true);
+      
       return;
     }
 
 
     fetchHotelsOnce();
+    setLoading(false);
     
-  }, [searchQuery, searchResultsFromHomePage.length, dataProcessed]); // Only rerun if these values change
-
-
+  }, [searchQuery, searchResultsFromHomePage.length, dataProcessed]);
+  
   const fetchHotelsOnce = async () => {
 
     setHotels([]);
@@ -371,30 +371,54 @@ const SearchResults = () => {
   
 
   const getPhotoUrl = (photo, maxWidth = 400) => {
-
-    console.log('Getting photo URL for:', photo);
+    // Dacă nu avem nicio imagine, returnăm imaginea implicită
+    if (!photo) return backgr;
     
-
+    // Dacă avem un obiect cu proprietatea name (cazul API-ului Google Places)
+    if (typeof photo === 'object' && photo.name) {
+      return `${API_BASE_URL}/api/places/media/${encodeURIComponent(photo.name)}?maxWidthPx=${maxWidth}`;
+    }
+    
+    // Dacă avem un string, procesăm diferitele tipuri de URL-uri
     if (typeof photo === 'string') {
-      return photo;
+      // 1. Pentru URL-uri relative încărcate de utilizator (încep cu /uploads/)
+      if (photo.startsWith('/uploads/')) {
+        return `${API_BASE_URL}${photo}`;
+      }
+      
+      // 2. Pentru URL-uri absolute externe (încep cu http)
+      if (photo.startsWith('http')) {
+        return photo;
+      }
+      
+      // 3. Pentru imagini placeholder
+      if (photo.includes('placehold.co')) {
+        return photo;
+      }
+      
+      // 4. Pentru alte stringuri (presupunem că sunt ID-uri pentru media sau file paths)
+      try {
+        // Check if the string might be a file path
+        if (photo.includes('/') || photo.includes('\\')) {
+          // This could be a file path - try to construct a URL based on backend
+          const fileName = photo.split(/[\/\\]/).pop(); // Get the filename
+          return `${API_BASE_URL}/uploads/hotels/${fileName}`;
+        }
+        
+        return `${API_BASE_URL}/api/places/media/${encodeURIComponent(photo)}?maxWidthPx=${maxWidth}`;
+      } catch (error) {
+        console.error('Error formatting image URL string:', error);
+        return backgr;
+      }
     }
     
-
-    if (photo && photo.name) {
-      const url = `${API_BASE_URL}/api/places/media/${encodeURIComponent(photo.name)}?maxWidthPx=${maxWidth}`;
-      console.log('Generated photo URL:', url);
-      return url;
-    }
-    
-
+    // 5. Pentru photo_reference din Google Places API
     if (photo && photo.photo_reference) {
-      const url = `${API_BASE_URL}/api/places/photo?photo_reference=${encodeURIComponent(photo.photo_reference)}&maxwidth=${maxWidth}`;
-      console.log('Generated photo URL from photo_reference:', url);
-      return url;
+      return `${API_BASE_URL}/api/places/photo?photo_reference=${encodeURIComponent(photo.photo_reference)}&maxwidth=${maxWidth}`;
     }
     
-
-    console.log('Using fallback image');
+    // Pentru orice alt tip de date, returnăm imaginea implicită
+    console.warn('Unsupported image URL format:', photo);
     return backgr;
   };
   
@@ -466,76 +490,95 @@ const SearchResults = () => {
 
   const handleNewSearch = (e) => {
     e.preventDefault();
+
+    setLoading(true);
     
+    // Show an error message if the search query is empty
     if (!newSearchQuery.trim()) {
+      setError('Please enter a location to search for hotels');
       return;
     }
     
-
-    setHotels([]);
-    setFilteredHotels([]);
-    setCurrentPage(1);
-    
-
-    setLoading(true);
+    // Reset all search-related state
+    resetSearchState();
     setError(null);
     
-
-    pricesCache = null;
-    restrictionsCache = null;
-    setDataProcessed(false);
+    // Reset availability data to avoid stale data
+    setHotelAvailability({});
+    setNextAvailableDates({});
+    setRoomAvailability({});
     
-
-    const formattedQuery = newSearchQuery.toLowerCase().includes('hotel') 
-      ? newSearchQuery.trim()
-      : `hotels in ${newSearchQuery.trim()}`;
-    console.log('Searching for:', formattedQuery);
-    
-
-    axios.post(`${API_BASE_URL}/api/places/search-text`, {
-      textQuery: formattedQuery
-    }, {
-      headers: getDefaultHeaders()
-    })
-    .then(response => {
-      if (response.data.places && response.data.places.length > 0) {
-        console.log(`Found ${response.data.places.length} hotels`);
+    const performNewSearch = async () => {
+      try {
+        // Fetch from API
+        const queryResponse = await axios.post(
+          `${API_BASE_URL}/api/places/search-text`,
+          { textQuery: `hotels in ${newSearchQuery}` },
+          { headers }
+        );
         
-        const hotelsWithPrices = response.data.places.map(hotel => ({
-          ...hotel,
-
-          id: hotel.id,
-          estimatedPrice: generateHotelPrice(hotel),
-          amenities: generateRandomAmenities()
-        }));
-        
-
-        setSearchQuery(newSearchQuery.trim());
-        setHotels(hotelsWithPrices);
-        setFilteredHotels(hotelsWithPrices);
-        setTotalPages(Math.ceil(hotelsWithPrices.length / RESULTS_PER_PAGE));
-        
-
-        const initialIndexes = {};
-        hotelsWithPrices.forEach(hotel => {
-          initialIndexes[hotel.id] = 0;
-        });
-        setCurrentImageIndexes(initialIndexes);
-        setDataProcessed(true);
-      } else {
-        console.log('No results found for search query:', formattedQuery);
-        setError(`No hotels found for "${newSearchQuery.trim()}". Please try a different search term.`);
-        setHotels([]);
-        setFilteredHotels([]);
+        if (queryResponse.data && queryResponse.data.places) {
+          console.log('API search results:', queryResponse.data.places.length);
+          await processNewResults(queryResponse.data.places);
+        } else {
+          await searchInDatabase(newSearchQuery);
+        }
+      } catch (error) {
+        console.error('Error performing new search:', error);
+        await searchInDatabase(newSearchQuery);
       }
-    })
-    .catch(error => {
-      console.error('Search error:', error);
-      setError('Failed to search hotels. Please try again later.');
-    })
-    .finally(() => {
+    };
+    
+    performNewSearch();
+  };
+
+  // Process new search results
+  const processNewResults = async (places) => {
+    try {
+      console.log('Processing new search results, count:', places.length);
+      
+      if (!places || places.length === 0) {
+        setError(`No hotels found for "${newSearchQuery}". Please try a different search term.`);
+        setLoading(false);
+        return;
+      }
+      
+      // Process the places similar to searchInDatabase
+      const hotelsWithPrices = places.map(hotel => {
+        return {
+          ...hotel,
+          id: hotel.id, // Ensure ID is preserved
+          estimatedPrice: generateHotelPrice(hotel),
+          amenities: {
+            wifi: Math.random() > 0.2,
+            pool: Math.random() > 0.5,
+            pets: Math.random() > 0.7,
+            breakfast: Math.random() > 0.6,
+            parking: Math.random() > 0.4,
+          }
+        };
+      });
+      
+      // Update state with new search results
+      setSearchQuery(newSearchQuery.trim());
+      setNewSearchQuery(newSearchQuery.trim());
+      setHotels(hotelsWithPrices);
+      setFilteredHotels(hotelsWithPrices);
+      setTotalPages(Math.ceil(hotelsWithPrices.length / RESULTS_PER_PAGE));
+      
+      // Initialize image indexes for the hotels
+      const initialIndexes = {};
+      hotelsWithPrices.forEach(hotel => {
+        initialIndexes[hotel.id] = 0;
+      });
+      setCurrentImageIndexes(initialIndexes);
+      setDataProcessed(true);
       setLoading(false);
-    });
+    } catch (err) {
+      console.error('Error processing search results:', err);
+      setError('Failed to process search results. Please try again.');
+      setLoading(false);
+    }
   };
 
 
@@ -719,161 +762,24 @@ const SearchResults = () => {
   };
   
 
-  const HotelCard = ({ hotel, index, handleClick }) => {
-
-    let displayAmenities = [];
-    
-    if (hotel.amenities) {
-
-      if (typeof hotel.amenities === 'object' && !Array.isArray(hotel.amenities)) {
-        displayAmenities = Object.entries(hotel.amenities)
-          .filter(([key, value]) => value === true)
-          .map(([key]) => key);
-      }
-
-      else if (Array.isArray(hotel.amenities)) {
-        displayAmenities = hotel.amenities;
-      }
-    } else {
-
-      displayAmenities = generateRandomAmenities();
-    }
-    
-
-
-    console.log('Hotel object in HotelCard:', hotel);
-    
-
-    const hotelId = hotel.id || hotel._id || null;
-    console.log('Extracted hotel ID:', hotelId);
-    
-
-    const hotelName = hotel.name || (hotel.displayName?.text || 'Unnamed Hotel');
-    
-
-    const location = hotel.location || hotel.formattedAddress || 'Location not available';
-    
-
-    const price = hotel.currentPrice || hotel.estimatedPrice || 'Price not available';
-    
-
-    const currentImageIndex = currentImageIndexes[hotelId] || 0;
-    
-    return (
-      <div 
-        onClick={() => {
-          console.log('Hotel card clicked with ID:', hotelId);
-          if (hotelId) handleClick(hotelId);
-        }}
-        className="backdrop-blur-lg bg-[#172a45]/80 rounded-xl overflow-hidden cursor-pointer transition-transform hover:scale-[1.02] hover:shadow-lg border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.2)]"
-      >
-        <div className="relative h-48 overflow-hidden">
-          {hotel.photos && hotel.photos.length > 0 ? (
-            <img 
-              src={getPhotoUrl(hotel.photos[currentImageIndex])} 
-              alt={hotelName} 
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = backgr;
-              }}
-            />
-          ) : (
-            <div className="w-full h-full bg-[#0a192f] flex items-center justify-center">
-              <span className="text-gray-400">No image available</span>
-            </div>
-          )}
-          
-          {/* Image navigation buttons if multiple photos exist */}
-          {hotel.photos && hotel.photos.length > 1 && (
-            <>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation(); // Prevent card click
-                  navigateImage(hotelId, 'prev', e);
-                }}
-                className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1 rounded-full"
-              >
-                <ChevronLeft size={20} />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation(); // Prevent card click
-                  navigateImage(hotelId, 'next', e);
-                }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1 rounded-full"
-              >
-                <ChevronRight size={20} />
-              </button>
-            </>
-          )}
-          
-          {hotel.rating && (
-            <div className="absolute top-2 right-2 bg-white px-2 py-1 rounded-lg flex items-center shadow-md">
-              <Star size={16} className="text-yellow-500 mr-1" fill="currentColor" />
-              <span className="text-gray-800 font-medium">
-                {typeof hotel.rating === 'number' ? hotel.rating.toFixed(1) : hotel.rating}
-              </span>
-            </div>
-          )}
-        </div>
-        
-        <div className="p-4 text-white">
-          <h3 className="font-bold text-lg mb-1">{hotelName}</h3>
-          <p className="text-gray-300 text-sm mb-2">{location}</p>
-          
-          {/* Amenities */}
-          <div className="flex flex-wrap gap-1 mb-3">
-            {displayAmenities.slice(0, 3).map(amenityId => {
-              const amenity = amenitiesOptions.find(a => a.id === amenityId);
-              return amenity ? (
-                <span key={amenityId} className="bg-blue-500/20 text-blue-300 px-2 py-1 rounded text-xs">
-                  {amenity.label}
-                </span>
-              ) : (
-                <span key={amenityId} className="bg-blue-500/20 text-blue-300 px-2 py-1 rounded text-xs">
-                  {amenityId.charAt(0).toUpperCase() + amenityId.slice(1)}
-                </span>
-              );
-            })}
-            </div>
-          
-          <div className="flex justify-between items-center mt-2">
-            <div>
-              <span className="font-bold text-lg text-blue-400">{price} RON</span>
-              <span className="text-gray-400 text-xs block">per night</span>
-            </div>
-            <button 
-              className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg text-sm transition-colors"
-              onClick={(e) => {
-                e.stopPropagation(); // Prevent card click
-                console.log('View Details button clicked with ID:', hotelId);
-                if (hotelId) handleClick(hotelId);
-              }}
-            >
-              View Details
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-  
-
   const resetSearchState = () => {
-
+    // Clear session storage
     sessionStorage.removeItem('searchResults');
     sessionStorage.removeItem('searchQuery');
     
-
+    // Reset all state variables
     setDataProcessed(false);
     setHotels([]);
     setFilteredHotels([]);
     setSearchQuery('');
-    setNewSearchQuery('');
+    //setNewSearchQuery(''); // Don't reset this since the user is typing a new query
     setSearchResultsFromHomePage([]);
     setCurrentPage(1);
     setError(null);
+    setCurrentImageIndexes({});
+    setHotelAvailability({});
+    setNextAvailableDates({});
+    setRoomAvailability({});
   };
   
 
@@ -891,18 +797,242 @@ const SearchResults = () => {
     setNewSearchQuery(searchQuery);
   }, [searchQuery]);
   
+
+  // Add state variables for search parameters
+  const [hotelAvailability, setHotelAvailability] = useState({});
+  const [nextAvailableDates, setNextAvailableDates] = useState({});
+
+  // Function to find the next available date for a hotel
+  const findNextAvailableDate = (hotelId) => {
+    // In a real application, this would query the backend for availability
+    // Here we'll generate a random future date for demonstration
+    const today = new Date();
+    // Add a random number of days (1-30) to current date
+    const randomDays = Math.floor(Math.random() * 30) + 1;
+    const nextAvailableDate = new Date(today);
+    nextAvailableDate.setDate(nextAvailableDate.getDate() + randomDays);
+    
+    // Format the date as YYYY-MM-DD
+    return nextAvailableDate.toISOString().split('T')[0];
+  };
+
+  // Function to check if a hotel has rooms that can accommodate the specified number of guests
+  const canAccommodateGuests = (hotel) => {
+    if (!hotel) return false;
+    
+    // For hotels with explicit room data
+    if (hotel.rooms && Array.isArray(hotel.rooms)) {
+      return hotel.rooms.some(room => {
+        const capacity = room.capacity || room.persons || 0;
+        return capacity >= guestCount;
+      });
+    }
+    
+    // For hotels without explicit room data, use maxGuests if available
+    if (hotel.maxGuests) {
+      return hotel.maxGuests >= guestCount;
+    }
+    
+    // Default - assume standard hotels can accommodate up to 4 guests
+    return guestCount <= 4;
+  };
+
+  // Function to check hotel availability for the selected dates
+  const checkHotelAvailability = async (hotel) => {
+    if (!hotel || !hotel.id) return false;
+    
+    try {
+      // For internal hotels, query the database
+      if (hotel.source === 'internal') {
+        const response = await axios.post(`${API_BASE_URL}/api/hotels/check-availability`, {
+          hotelId: hotel.id,
+          startDate: checkInDate,
+          endDate: checkOutDate
+        });
+        
+        return {
+          available: response.data.available,
+          roomsAvailable: response.data.availableRooms || 0
+        };
+      } 
+      // For external hotels, use a deterministic approach based on hotel properties
+      else {
+        // Use localStorage to track simulated bookings for external hotels
+        const bookings = JSON.parse(localStorage.getItem('hotelBookings') || '{}');
+        const hotelBookings = bookings[hotel.id] || {};
+        
+        // Calculate a base availability score using hotel rating and price
+        const rating = parseFloat(hotel.rating || hotel.averageRating || 4.0);
+        const basePrice = parseFloat(hotel.price || hotel.estimatedPrice || 500);
+        
+        // Higher ratings and prices typically mean more rooms
+        let roomsAvailable = Math.floor((rating / 5) * 10);
+        
+        // Adjust based on price (more expensive hotels might have fewer rooms but more exclusivity)
+        roomsAvailable += basePrice < 300 ? 2 : basePrice > 800 ? -2 : 0;
+        
+        // Ensure minimum of 0 rooms
+        roomsAvailable = Math.max(0, roomsAvailable);
+        
+        // Reduce by existing "bookings" if any
+        const bookedRooms = hotelBookings[checkInDate] || 0;
+        roomsAvailable = Math.max(0, roomsAvailable - bookedRooms);
+        
+        return {
+          available: roomsAvailable > 0,
+          roomsAvailable
+        };
+      }
+    } catch (error) {
+      console.error(`Error checking availability for hotel ${hotel.id}:`, error);
+      return { available: false, roomsAvailable: 0 };
+    }
+  };
+
+  // Modified useEffect to check availability for all hotels
+  useEffect(() => {
+    const checkAllHotelsAvailability = async () => {
+      if (!dataProcessed || hotels.length === 0) return;
+      
+      const availabilityInfo = {};
+      const nextDatesInfo = {};
+      
+      // Check availability for each hotel
+      for (const hotel of hotels) {
+        if (!hotel.id) continue;
+        
+        // Check if hotel can accommodate the requested number of guests
+        const canAccommodate = canAccommodateGuests(hotel);
+        
+        // If the hotel can't accommodate the guests, mark as unavailable
+        if (!canAccommodate) {
+          availabilityInfo[hotel.id] = { available: false, roomsAvailable: 0, canAccommodateGuests: false };
+          continue;
+        }
+        
+        // Check availability for the selected dates
+        const availability = await checkHotelAvailability(hotel);
+        availabilityInfo[hotel.id] = { 
+          ...availability, 
+          canAccommodateGuests: canAccommodate 
+        };
+        
+        // If hotel is not available, find the next available date
+        if (!availability.available) {
+          nextDatesInfo[hotel.id] = findNextAvailableDate(hotel.id);
+        }
+      }
+      
+      setHotelAvailability(availabilityInfo);
+      setNextAvailableDates(nextDatesInfo);
+      
+      // Update roomAvailability state for display in hotel cards
+      const roomAvailabilityData = {};
+      hotels.forEach(hotel => {
+        const availability = availabilityInfo[hotel.id];
+        if (availability) {
+          roomAvailabilityData[hotel.id] = {
+            hasAvailableRooms: availability.available,
+            totalAvailableRooms: availability.roomsAvailable,
+            canAccommodateGuests: availability.canAccommodateGuests,
+            availableRoomTypes: hotel.rooms ? 
+              hotel.rooms
+                .filter(room => {
+                  const capacity = room.capacity || room.persons || 0;
+                  return capacity >= guestCount;
+                })
+                .map(room => room.type) 
+              : ['Standard', 'Deluxe']
+          };
+        }
+      });
+      setRoomAvailability(roomAvailabilityData);
+      
+      // Apply filters based on availability and guest capacity
+      applyFiltersWithAvailability(availabilityInfo);
+    };
+    
+    checkAllHotelsAvailability();
+  }, [hotels, checkInDate, checkOutDate, guestCount, dataProcessed]);
+
+  // Function to apply filters including availability
+  const applyFiltersWithAvailability = (availabilityInfo) => {
+    if (!hotels || hotels.length === 0) return;
+    
+    let filtered = [...hotels];
+    
+    // Apply filters for rating, price, amenities
+    if (filters.minRating > 0) {
+      filtered = filtered.filter(hotel => 
+        parseFloat(hotel.rating || 0) >= filters.minRating
+      );
+    }
+    
+    if (filters.maxPrice < 5000) {
+      filtered = filtered.filter(hotel => {
+        const price = parseFloat(hotel.price || hotel.estimatedPrice || 0);
+        return price <= filters.maxPrice;
+      });
+    }
+    
+    if (filters.minPrice > 0) {
+      filtered = filtered.filter(hotel => {
+        const price = parseFloat(hotel.price || hotel.estimatedPrice || 0);
+        return price >= filters.minPrice;
+      });
+    }
+    
+    if (filters.amenities && filters.amenities.length > 0) {
+      filtered = filtered.filter(hotel => {
+        // Handle different amenities data structures
+        if (hotel.amenities) {
+          if (Array.isArray(hotel.amenities)) {
+            return filters.amenities.every(amenity => 
+              hotel.amenities.includes(amenity)
+            );
+          } else {
+            return filters.amenities.every(amenity => 
+              hotel.amenities[amenity]
+            );
+          }
+        }
+        return false;
+      });
+    }
+    
+    // Sort by selected criteria
+    if (filters.sortBy) {
+      filtered.sort((a, b) => {
+        switch (filters.sortBy) {
+          case 'priceAsc':
+            return (parseFloat(a.price || a.estimatedPrice || 0) - parseFloat(b.price || b.estimatedPrice || 0));
+          case 'priceDesc':
+            return (parseFloat(b.price || b.estimatedPrice || 0) - parseFloat(a.price || a.estimatedPrice || 0));
+          case 'ratingDesc':
+            return (parseFloat(b.rating || 0) - parseFloat(a.rating || 0));
+          default: // recommended
+            return 0; // No specific sorting
+        }
+      });
+    }
+    
+    // Don't filter out hotels based on availability - we'll show all hotels but mark unavailable ones
+    setFilteredHotels(filtered);
+    setTotalPages(Math.ceil(filtered.length / RESULTS_PER_PAGE));
+  };
+
   return (
     <div className="min-h-screen bg-[#0a192f] text-white">
       {/* Header */}
-      <header className="bg-[#0a192f]/90 shadow-lg p-4 md:p-6 border-b border-blue-500/30">
-        <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <div className="flex items-center">
+      <header className="bg-[#0a192f]/90 shadow-lg p-3 sm:p-4 md:p-6 border-b border-blue-500/30">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center">
+          <div className="flex items-center w-full sm:w-auto justify-between sm:justify-start mb-3 sm:mb-0">
             <button 
               onClick={() => { 
                 resetSearchState(); 
                 navigate('/'); 
               }}
-              className="mr-4 p-2 bg-[#172a45] hover:bg-[#1e3a5f] rounded-full flex items-center justify-center transition-colors"
+              className="p-2 bg-[#172a45] hover:bg-[#1e3a5f] rounded-full flex items-center justify-center transition-colors"
               aria-label="Back to home"
             >
               <IoArrowForward className="text-white transform rotate-180" size={16} />
@@ -910,23 +1040,156 @@ const SearchResults = () => {
             <div onClick={() => navigate('/')} className="text-xl md:text-2xl font-bold cursor-pointer">
               <span className="text-blue-400 mr-1">B</span>oksy
             </div>
+            
+            <button 
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex sm:hidden items-center bg-blue-500 hover:bg-blue-600 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <SlidersHorizontal size={18} className="mr-1.5" />
+              <span className="hidden xs:inline">Filters</span>
+              {filters.minRating > 0 || filters.amenities.length > 0 || filters.sortBy !== 'recommended' || 
+                filters.minPrice > 0 || filters.maxPrice < 5000 ? (
+                <span className="ml-1.5 bg-white text-blue-600 text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  {(filters.minRating > 0 ? 1 : 0) + 
+                   (filters.amenities.length > 0 ? 1 : 0) + 
+                   (filters.sortBy !== 'recommended' ? 1 : 0) +
+                   ((filters.minPrice > 0 || filters.maxPrice < 5000) ? 1 : 0)}
+                </span>
+              ) : null}
+            </button>
           </div>
           
           {/* Search form */}
-          <form onSubmit={handleNewSearch} className="hidden md:flex items-center bg-[#172a45] rounded-lg px-3 py-2 flex-1 max-w-md mx-8 border border-blue-500/30">
+          <form onSubmit={handleNewSearch} className="hidden md:flex flex-col lg:flex-row items-stretch lg:items-center bg-[#172a45] rounded-lg p-3 flex-1 max-w-5xl mx-2 lg:mx-8 border border-blue-500/30">
+            <div className="flex items-center flex-1">
             <input
               type="text"
               value={newSearchQuery}
               onChange={(e) => setNewSearchQuery(e.target.value)}
               placeholder="Search for a destination"
-              className="bg-transparent border-none outline-none w-full text-white"
+              className={`bg-transparent border-none outline-none w-full text-white ${error && !newSearchQuery.trim() ? 'placeholder-red-400' : ''}`}
+              required
             />
-            <button type="submit" className="ml-2 text-gray-300 hover:text-white">
+              <span className="mx-2 text-gray-500">|</span>
+            </div>
+            
+            <div className="flex flex-1 lg:ml-2 mt-2 lg:mt-0">
+              <div className="flex flex-col mr-2 flex-1">
+                <label className="text-xs text-gray-400 mb-1">Check-in</label>
+                <input
+                  type="date"
+                  value={checkInDate}
+                  onChange={(e) => setCheckInDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="bg-transparent border border-gray-700 rounded p-1 text-white text-sm"
+                />
+              </div>
+              
+              <div className="flex flex-col mr-2 flex-1">
+                <label className="text-xs text-gray-400 mb-1">Check-out</label>
+                <input
+                  type="date"
+                  value={checkOutDate}
+                  onChange={(e) => setCheckOutDate(e.target.value)}
+                  min={checkInDate}
+                  className="bg-transparent border border-gray-700 rounded p-1 text-white text-sm"
+                />
+              </div>
+              
+              <div className="flex flex-col flex-1">
+                <label className="text-xs text-gray-400 mb-1">Guests</label>
+                <select
+                  value={guestCount}
+                  onChange={(e) => setGuestCount(parseInt(e.target.value))}
+                  className="bg-transparent border border-gray-700 rounded p-1 text-white text-sm"
+                >
+                  <option value="1">1 guest</option>
+                  <option value="2">2 guests</option>
+                  <option value="3">3 guests</option>
+                  <option value="4">4 guests</option>
+                  <option value="5">5 guests</option>
+                  <option value="6">6+ guests</option>
+                </select>
+              </div>
+            </div>
+            
+            <button type="submit" className="ml-2 bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-lg transition-colors flex items-center justify-center">
               <Search size={20} />
             </button>
           </form>
           
-          <div className="text-lg">
+          {/* Mobile search form */}
+          <form onSubmit={handleNewSearch} className="w-full md:hidden bg-[#172a45] rounded-lg px-3 py-2 border border-blue-500/30">
+            <div className="flex items-center">
+              <input
+                type="text"
+                value={newSearchQuery}
+                onChange={(e) => setNewSearchQuery(e.target.value)}
+                placeholder="Search for a destination"
+                className={`bg-transparent border-none outline-none w-full text-white ${error && !newSearchQuery.trim() ? 'placeholder-red-400' : ''}`}
+                required
+              />
+              <button type="submit" className="ml-2 text-gray-300 hover:text-white">
+                <Search size={20} />
+              </button>
+            </div>
+            
+            <div className="flex mt-2 items-center space-x-2">
+              <div className="flex flex-col flex-1">
+                <label className="text-xs text-gray-400 mb-1">Check-in</label>
+                <input
+                  type="date"
+                  value={checkInDate}
+                  onChange={(e) => setCheckInDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="bg-transparent border border-gray-700 rounded p-1 text-white text-xs w-full"
+                />
+              </div>
+              
+              <div className="flex flex-col flex-1">
+                <label className="text-xs text-gray-400 mb-1">Check-out</label>
+                <input
+                  type="date"
+                  value={checkOutDate}
+                  onChange={(e) => setCheckOutDate(e.target.value)}
+                  min={checkInDate}
+                  className="bg-transparent border border-gray-700 rounded p-1 text-white text-xs w-full"
+                />
+              </div>
+              
+              <div className="flex flex-col flex-1">
+                <label className="text-xs text-gray-400 mb-1">Guests</label>
+                <select
+                  value={guestCount}
+                  onChange={(e) => setGuestCount(parseInt(e.target.value))}
+                  className="bg-transparent border border-gray-700 rounded p-1 text-white text-xs w-full"
+                >
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                  <option value="6">6+</option>
+                </select>
+              </div>
+            </div>
+            
+            {/* Error message for empty search on mobile */}
+            {error && error.includes('Please enter a location') && (
+              <div className="text-red-400 text-sm mt-2 px-2">
+                {error}
+              </div>
+            )}
+          </form>
+          
+          {/* Error message for empty search on desktop */}
+          {error && error.includes('Please enter a location') && (
+            <div className="text-red-400 text-sm mt-2 max-w-5xl mx-8 px-4 hidden md:block">
+              {error}
+            </div>
+          )}
+          
+          <div className="hidden sm:block text-lg">
             <button 
               onClick={() => setShowFilters(!showFilters)}
               className="flex items-center bg-blue-500 hover:bg-blue-600 px-3 py-1.5 rounded-lg transition-colors"
@@ -945,26 +1208,12 @@ const SearchResults = () => {
             </button>
           </div>
         </div>
-        
-        {/* Mobile search form */}
-        <form onSubmit={handleNewSearch} className="mt-4 flex md:hidden items-center bg-[#172a45] rounded-lg px-3 py-2 border border-blue-500/30">
-          <input
-            type="text"
-            value={newSearchQuery}
-            onChange={(e) => setNewSearchQuery(e.target.value)}
-            placeholder="Search for a destination"
-            className="bg-transparent border-none outline-none w-full text-white"
-          />
-          <button type="submit" className="ml-2 text-gray-300 hover:text-white">
-            <Search size={20} />
-          </button>
-        </form>
       </header>
       
       {/* Filter panel */}
       {showFilters && (
         <div className="bg-[#0a192f]/90 border-t border-b border-blue-500/30 py-4">
-          <div className="max-w-6xl mx-auto px-4">
+          <div className="max-w-6xl mx-auto px-3 sm:px-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-4">
               <h3 className="text-lg font-semibold mb-2 md:mb-0 flex items-center">
                 <Filter size={18} className="mr-2 text-blue-400" /> 
@@ -987,13 +1236,13 @@ const SearchResults = () => {
               </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
               {/* Price range filter */}
-              <div className="backdrop-blur-lg bg-[#172a45]/80 p-4 rounded-lg border border-blue-500/30 shadow-md">
-                <h4 className="font-medium mb-3 text-blue-400">Price Range</h4>
-                <div className="flex flex-col space-y-4">
+              <div className="backdrop-blur-lg bg-[#172a45]/80 p-3 sm:p-4 rounded-lg border border-blue-500/30 shadow-md">
+                <h4 className="font-medium mb-2 sm:mb-3 text-blue-400">Price Range</h4>
+                <div className="flex flex-col space-y-3 sm:space-y-4">
                   <div>
-                    <label className="text-sm mb-1 block">Min Price (RON)</label>
+                    <label className="text-xs sm:text-sm mb-1 block">Min Price (RON)</label>
                     <input
                       type="range"
                       min="0"
@@ -1003,11 +1252,11 @@ const SearchResults = () => {
                       onChange={(e) => handleFilterChange('minPrice', parseInt(e.target.value))}
                       className="w-full accent-blue-500"
                     />
-                    <div className="mt-1 text-sm text-right">{filters.minPrice} RON</div>
+                    <div className="mt-1 text-xs sm:text-sm text-right">{filters.minPrice} RON</div>
                   </div>
                   
                   <div>
-                    <label className="text-sm mb-1 block">Max Price (RON)</label>
+                    <label className="text-xs sm:text-sm mb-1 block">Max Price (RON)</label>
                     <input
                       type="range"
                       min="0"
@@ -1017,64 +1266,74 @@ const SearchResults = () => {
                       onChange={(e) => handleFilterChange('maxPrice', parseInt(e.target.value))}
                       className="w-full accent-blue-500"
                     />
-                    <div className="mt-1 text-sm text-right">{filters.maxPrice} RON</div>
+                    <div className="mt-1 text-xs sm:text-sm text-right">{filters.maxPrice} RON</div>
                   </div>
                 </div>
               </div>
               
-              {/* Rating filter */}
-              <div className="backdrop-blur-lg bg-[#172a45]/80 p-4 rounded-lg border border-blue-500/30 shadow-md">
-                <h4 className="font-medium mb-3 text-blue-400">Minimum Rating</h4>
-                <div className="flex items-center space-x-2">
-                  {[0, 1, 2, 3, 4].map(rating => (
+              {/* Star rating filter */}
+              <div className="backdrop-blur-lg bg-[#172a45]/80 p-3 sm:p-4 rounded-lg border border-blue-500/30 shadow-md">
+                <h4 className="font-medium mb-2 sm:mb-3 text-blue-400">Star Rating</h4>
+                <div className="flex flex-wrap gap-2">
+                  {[0, 1, 2, 3, 4, 5].map(rating => (
                     <button
                       key={rating}
-                      onClick={() => handleFilterChange('minRating', rating + 1)}
-                      className={`flex items-center justify-center p-2 rounded ${
-                        filters.minRating === rating + 1 ? 'bg-blue-500' : 'bg-[#0a192f]'
+                      onClick={() => handleFilterChange('minRating', rating)}
+                      className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg flex items-center transition ${
+                        filters.minRating === rating
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-[#0a192f] border border-blue-500/30 hover:border-blue-400'
                       }`}
                     >
-                      <div className="flex items-center">
-                        <Star size={16} className="text-yellow-400" />
-                        <span className="ml-1">{rating + 1}+</span>
-                      </div>
+                      {rating === 0
+                        ? 'Any'
+                        : (
+                          <>
+                            {rating}
+                            <Star size={14} className="ml-1 text-yellow-400" fill={rating > 0 ? "currentColor" : "none"} />
+                            {rating === 1 ? '+' : '+'}
+                          </>
+                        )
+                      }
                     </button>
                   ))}
-                  {filters.minRating > 0 && (
-                    <button
-                      onClick={() => handleFilterChange('minRating', 0)}
-                      className="text-sm text-gray-400 hover:text-white"
-                    >
-                      Clear
-                    </button>
-                  )}
                 </div>
               </div>
               
               {/* Amenities filter */}
-              <div className="backdrop-blur-lg bg-[#172a45]/80 p-4 rounded-lg border border-blue-500/30 shadow-md">
-                <h4 className="font-medium mb-3 text-blue-400">Amenities</h4>
+              <div className="backdrop-blur-lg bg-[#172a45]/80 p-3 sm:p-4 rounded-lg border border-blue-500/30 shadow-md">
+                <h4 className="font-medium mb-2 sm:mb-3 text-blue-400">Amenities</h4>
                 <div className="grid grid-cols-2 gap-2">
                   {amenitiesOptions.map(amenity => (
-                    <div key={amenity.id} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id={amenity.id}
-                        checked={filters.amenities.includes(amenity.id)}
-                        onChange={() => toggleAmenity(amenity.id)}
-                        className="mr-2 accent-blue-500"
-                      />
-                      <label htmlFor={amenity.id} className="text-sm cursor-pointer">
-                        {amenity.label}
-                      </label>
-                    </div>
+                    <button
+                      key={amenity.id}
+                      onClick={() => toggleAmenity(amenity.id)}
+                      className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs text-left flex items-center transition ${
+                        filters.amenities.includes(amenity.id)
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-[#0a192f] border border-blue-500/30 hover:border-blue-400'
+                      }`}
+                    >
+                      <div className={`w-3 h-3 sm:w-4 sm:h-4 rounded-sm border mr-1 sm:mr-2 flex items-center justify-center flex-shrink-0 ${
+                        filters.amenities.includes(amenity.id)
+                          ? 'bg-white border-white'
+                          : 'border-gray-400'
+                      }`}>
+                        {filters.amenities.includes(amenity.id) && (
+                          <svg className="w-2 h-2 sm:w-3 sm:h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                      <span className="truncate">{amenity.label}</span>
+                    </button>
                   ))}
                 </div>
               </div>
               
               {/* Sort options */}
-              <div className="backdrop-blur-lg bg-[#172a45]/80 p-4 rounded-lg border border-blue-500/30 shadow-md">
-                <h4 className="font-medium mb-3 text-blue-400">Sort By</h4>
+              <div className="backdrop-blur-lg bg-[#172a45]/80 p-3 sm:p-4 rounded-lg border border-blue-500/30 shadow-md">
+                <h4 className="font-medium mb-2 sm:mb-3 text-blue-400">Sort By</h4>
                 <select
                   value={filters.sortBy}
                   onChange={(e) => handleFilterChange('sortBy', e.target.value)}
@@ -1093,7 +1352,7 @@ const SearchResults = () => {
       )}
       
       {/* Main content */}
-      <main className="max-w-6xl mx-auto p-4 md:p-8">
+      <main className="max-w-6xl mx-auto p-3 sm:p-4 md:p-6 lg:p-8">
         {/* Loading state */}
         {loading && (
           <div className="flex justify-center items-center py-20">
@@ -1103,31 +1362,67 @@ const SearchResults = () => {
         
         {/* Error state */}
         {error && !loading && (
-          <div className="text-center py-12 backdrop-blur-lg bg-[#172a45]/80 rounded-xl p-8 border border-blue-500/30 shadow-lg">
+          <div className="text-center py-8 sm:py-12 backdrop-blur-lg bg-[#172a45]/80 rounded-xl p-4 border border-blue-500/30 shadow-lg">
             <div className="text-red-400 text-lg mb-4">{error}</div>
             <button 
               onClick={() => { 
                 resetSearchState(); 
                 navigate('/'); 
               }}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg transition-colors"
+              className="bg-blue-500 hover:bg-blue-600 text-white px-4 sm:px-6 py-2 rounded-lg transition-colors"
             >
               Return to Home
             </button>
           </div>
         )}
         
+        {/* No search query prompt */}
+        {!loading && !error && !searchQuery && (
+          <div className="text-center py-8 sm:py-12 backdrop-blur-lg bg-[#172a45]/80 rounded-xl p-4 border border-blue-500/30 shadow-lg">
+            <h2 className="text-xl sm:text-2xl font-bold mb-4">Search for Hotels</h2>
+            <p className="text-gray-400 mb-6">Enter a destination to find available hotels</p>
+            <form onSubmit={handleNewSearch} className="max-w-md mx-auto px-4">
+              <div className="flex">
+                <input
+                  type="text"
+                  value={newSearchQuery}
+                  onChange={(e) => setNewSearchQuery(e.target.value)}
+                  placeholder="e.g., București, Cluj, Brașov..."
+                  className="bg-[#0a192f] border border-blue-500/30 rounded-l-lg px-4 py-2 flex-grow focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button 
+                  type="submit" 
+                  className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-r-lg transition-colors"
+                >
+                  <Search size={20} />
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+        
         {/* Results count and active filters summary */}
         {!loading && !error && filteredHotels.length > 0 && (
-          <div className="mb-6">
-            <h1 className="text-2xl md:text-3xl font-bold mb-2">Hotels in <span className="text-blue-400">{searchQuery}</span></h1>
+          <div className="mb-4 sm:mb-6">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2">Hotels in <span className="text-blue-400">{searchQuery}</span></h1>
             <div className="flex flex-wrap items-center">
-              <p className="text-gray-400 mr-4">Found {filteredHotels.length} results</p>
+              <p className="text-gray-400 mr-4 text-sm sm:text-base">Found {filteredHotels.length} results</p>
               
               {/* Active filters display */}
               <div className="flex flex-wrap mt-2 gap-2">
+                {/* Date filter */}
+                <div className="bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full text-xs flex items-center">
+                  {new Date(checkInDate).toLocaleDateString('ro-RO', {day: 'numeric', month: 'short'})} - 
+                  {new Date(checkOutDate).toLocaleDateString('ro-RO', {day: 'numeric', month: 'short'})}
+                </div>
+                
+                {/* Guest count filter */}
+                <div className="bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full text-xs flex items-center">
+                  {guestCount} {guestCount === 1 ? 'guest' : 'guests'}
+                </div>
+                
                 {filters.minRating > 0 && (
-                  <div className="bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full text-sm flex items-center">
+                  <div className="bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full text-xs flex items-center">
                     {filters.minRating}+ Stars
                     <button 
                       onClick={() => handleFilterChange('minRating', 0)}
@@ -1139,7 +1434,7 @@ const SearchResults = () => {
                 )}
                 
                 {(filters.minPrice > 0 || filters.maxPrice < 5000) && (
-                  <div className="bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full text-sm flex items-center">
+                  <div className="bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full text-xs flex items-center">
                     {filters.minPrice} - {filters.maxPrice} RON
                     <button 
                       onClick={() => {
@@ -1156,11 +1451,11 @@ const SearchResults = () => {
                 {filters.amenities.map(amenityId => {
                   const amenity = amenitiesOptions.find(a => a.id === amenityId);
                   return (
-                    <div key={amenityId} className="bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full text-sm flex items-center">
-                      {amenity?.label}
+                    <div key={amenityId} className="bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full text-xs flex items-center truncate max-w-[100px] sm:max-w-none">
+                      <span className="truncate">{amenity?.label}</span>
                       <button 
                         onClick={() => toggleAmenity(amenityId)}
-                        className="ml-1 hover:text-white"
+                        className="ml-1 flex-shrink-0 hover:text-white"
                       >
                         <X size={14} />
                       </button>
@@ -1169,7 +1464,7 @@ const SearchResults = () => {
                 })}
                 
                 {filters.sortBy !== 'recommended' && (
-                  <div className="bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full text-sm flex items-center">
+                  <div className="bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full text-xs flex items-center">
                     Sort: {sortOptions.find(option => option.value === filters.sortBy)?.label}
                     <button 
                       onClick={() => handleFilterChange('sortBy', 'recommended')}
@@ -1186,8 +1481,8 @@ const SearchResults = () => {
         
         {/* No results state */}
         {!loading && !error && filteredHotels.length === 0 && hotels.length > 0 && (
-          <div className="text-center py-12 backdrop-blur-lg bg-[#172a45]/80 rounded-xl p-8 border border-blue-500/30 shadow-lg">
-            <h2 className="text-2xl font-bold mb-4">No hotels match your filters</h2>
+          <div className="text-center py-8 sm:py-12 backdrop-blur-lg bg-[#172a45]/80 rounded-xl p-4 border border-blue-500/30 shadow-lg">
+            <h2 className="text-xl sm:text-2xl font-bold mb-4">No hotels match your filters</h2>
             <p className="text-gray-400 mb-6">Try adjusting your filters to see more results</p>
             <button 
               onClick={resetFilters}
@@ -1199,9 +1494,9 @@ const SearchResults = () => {
         )}
         
         {/* No hotels found at all */}
-        {!loading && !error && hotels.length === 0 && (
-          <div className="text-center py-12 backdrop-blur-lg bg-[#172a45]/80 rounded-xl p-8 border border-blue-500/30 shadow-lg">
-            <h2 className="text-2xl font-bold mb-4">No hotels found</h2>
+        {!loading && !error && hotels.length === 0 && searchQuery && (
+          <div className="text-center py-8 sm:py-12 backdrop-blur-lg bg-[#172a45]/80 rounded-xl p-4 border border-blue-500/30 shadow-lg">
+            <h2 className="text-xl sm:text-2xl font-bold mb-4">No hotels found</h2>
             <p className="text-gray-400 mb-6">We couldn't find any hotels matching your search for "<span className="text-blue-400">{searchQuery}</span>"</p>
             <button 
               onClick={() => { 
@@ -1217,20 +1512,18 @@ const SearchResults = () => {
         
         {/* Results grid */}
         {!loading && !error && filteredHotels.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
             {getCurrentPageHotels().map((hotel) => {
-
               const hotelId = hotel.id || hotel._id;
-              console.log('Rendering hotel card for hotel:', hotel);
-              console.log('Using hotel ID:', hotelId);
-              
               return (
-              <HotelCard 
+                <HotelCard 
                   key={hotelId} 
-                hotel={hotel}
-                  index={hotelId}
-                handleClick={handleHotelClick}
-              />
+                  hotel={hotel}
+                  currentImageIndex={currentImageIndexes[hotelId] || 0}
+                  onImageNavigate={navigateImage}
+                  onClick={handleHotelClick}
+                  roomAvailability={roomAvailability}
+                />
               );
             })}
           </div>
@@ -1238,19 +1531,19 @@ const SearchResults = () => {
         
         {/* Pagination */}
         {!loading && !error && filteredHotels.length > RESULTS_PER_PAGE && (
-          <div className="mt-8 flex justify-center">
-            <div className="flex items-center space-x-2">
+          <div className="mt-4 sm:mt-6 flex justify-center">
+            <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
               {/* Previous page button */}
               <button
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
-                className={`px-3 py-2 rounded-lg ${
+                className={`px-2 py-1 sm:py-2 rounded-lg ${
                   currentPage === 1 
                     ? 'bg-[#172a45]/50 text-gray-500 cursor-not-allowed' 
                     : 'bg-[#172a45] hover:bg-[#172a45]/80 border border-blue-500/30'
                 }`}
               >
-                <ChevronLeft size={18} />
+                <ChevronLeft size={16} />
               </button>
               
               {/* Page numbers */}
@@ -1259,7 +1552,7 @@ const SearchResults = () => {
                   key={`page-${page}-${index}`}
                   onClick={() => typeof page === 'number' && handlePageChange(page)}
                   disabled={page === '...'}
-                  className={`px-3 py-1 rounded-lg ${
+                  className={`px-2 py-1 rounded-lg text-xs ${
                     page === currentPage 
                       ? 'bg-blue-500 text-white' 
                       : page === '...' 
@@ -1275,13 +1568,13 @@ const SearchResults = () => {
               <button
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className={`px-3 py-2 rounded-lg ${
+                className={`px-2 py-1 sm:py-2 rounded-lg ${
                   currentPage === totalPages 
                     ? 'bg-[#172a45]/50 text-gray-500 cursor-not-allowed' 
                     : 'bg-[#172a45] hover:bg-[#172a45]/80 border border-blue-500/30'
                 }`}
               >
-                <ChevronRight size={18} />
+                <ChevronRight size={16} />
               </button>
             </div>
           </div>

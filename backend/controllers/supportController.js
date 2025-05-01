@@ -1,10 +1,11 @@
-const SupportTicket = require('../models/SupportTicket');
+const { SupportTicket, ContactSubmission } = require('../models/SupportTicket');
 const SystemLog = require('../models/SystemLog');
 const Setting = require('../models/Setting');
 const User = require('../models/User');
 const fs = require('fs');
 const path = require('path');
-const { createSupportResponseNotification } = require('./notificationController');
+const { createSupportResponseNotification, createContactResponseNotification } = require('./notificationController');
+const { sendEmail } = require('../utils/emailSender');
 
 
 const supportTickets = [
@@ -668,9 +669,8 @@ exports.getMaintenanceStatus = async (req, res) => {
   try {
     console.log('Maintenance status requested');
     
-
+    // Get the maintenance mode status
     let maintenanceMode = false;
-    
     try {
       const setting = await Setting.findOne({ key: 'system.maintenanceMode' });
       if (setting) {
@@ -678,12 +678,30 @@ exports.getMaintenanceStatus = async (req, res) => {
       }
     } catch (dbError) {
       console.error('Error fetching maintenance mode from database:', dbError);
-
     }
     
-
+    // Get maintenance message and completion time
+    let maintenanceMessage = '';
+    let completionTime = null;
+    
+    try {
+      const messageSetting = await Setting.findOne({ key: 'system.maintenanceMessage' });
+      if (messageSetting) {
+        maintenanceMessage = messageSetting.value;
+      }
+      
+      const timeSetting = await Setting.findOne({ key: 'system.maintenanceCompletionTime' });
+      if (timeSetting) {
+        completionTime = timeSetting.value;
+      }
+    } catch (dbError) {
+      console.error('Error fetching maintenance details from database:', dbError);
+    }
+    
     const maintenanceStatus = {
-      maintenanceMode: maintenanceMode
+      maintenanceMode,
+      message: maintenanceMessage,
+      completionTime
     };
     
     console.log('Returning maintenance status:', maintenanceStatus);
@@ -697,9 +715,9 @@ exports.getMaintenanceStatus = async (req, res) => {
 
 exports.toggleMaintenanceMode = async (req, res) => {
   try {
-    const { enabled } = req.body;
+    const { enabled, maintenanceMessage, completionTime } = req.body;
     
-
+    // Set the main maintenance mode
     await Setting.setSetting('system.maintenanceMode', enabled, {
       group: 'system',
       description: 'Maintenance mode status',
@@ -707,7 +725,26 @@ exports.toggleMaintenanceMode = async (req, res) => {
       lastUpdatedBy: req.user._id
     });
     
-
+    // If maintenance message is provided, save it
+    if (maintenanceMessage !== undefined) {
+      await Setting.setSetting('system.maintenanceMessage', maintenanceMessage, {
+        group: 'system',
+        description: 'Maintenance mode message',
+        isPublic: true,
+        lastUpdatedBy: req.user._id
+      });
+    }
+    
+    // If completion time is provided, save it
+    if (completionTime !== undefined) {
+      await Setting.setSetting('system.maintenanceCompletionTime', completionTime, {
+        group: 'system',
+        description: 'Estimated maintenance completion time',
+        isPublic: true,
+        lastUpdatedBy: req.user._id
+      });
+    }
+    
     SystemLog.logInfo(`Maintenance mode ${enabled ? 'enabled' : 'disabled'}`, 'supportController', {
       userId: req.user._id
     });
@@ -820,5 +857,336 @@ exports.addMessageToTicket = async (req, res) => {
       ticketId: req.params.id
     });
     res.status(500).json({ message: 'Failed to add message to ticket' });
+  }
+};
+
+
+exports.createContactSubmission = async (req, res) => {
+  try {
+    const { name, email, subject, category, message, bookingId, isPrivacyAgreed } = req.body;
+    
+    // Validate required fields
+    if (!name || !email || !subject || !message || !isPrivacyAgreed) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Numele, email-ul, subiectul, mesajul și acordul de confidențialitate sunt obligatorii' 
+      });
+    }
+    
+    // Create the contact submission
+    const contactSubmission = await ContactSubmission.create({
+      name,
+      email,
+      subject,
+      category: category || 'other',
+      message,
+      bookingId: bookingId || null,
+      isPrivacyAgreed,
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+    
+    // Log the submission
+    SystemLog.logInfo('Contact form submission received', 'supportController', {
+      submissionId: contactSubmission._id,
+      email
+    });
+    
+    console.log('Contact submission created with ID:', contactSubmission._id);
+    
+    // Return success response
+    res.status(201).json({
+      success: true,
+      message: 'Mesajul tău a fost trimis cu succes. Te vom contacta în curând.',
+      submissionId: contactSubmission._id
+    });
+  } catch (error) {
+    console.error('Error processing contact form submission:', error);
+    SystemLog.logError('Error processing contact form submission', 'supportController', { 
+      error: error.message
+    });
+    res.status(500).json({ 
+      success: false,
+      message: 'A apărut o eroare la trimiterea formularului. Te rugăm să încerci din nou.' 
+    });
+  }
+};
+
+
+exports.getPublicMaintenanceStatus = async (req, res) => {
+  try {
+    // Check if maintenance mode is enabled
+    const maintenanceMode = await Setting.getSetting('system.maintenanceMode', false);
+    
+    if (!maintenanceMode) {
+      return res.json({
+        maintenanceMode: false
+      });
+    }
+    
+    // Get maintenance message and completion time
+    const maintenanceMessage = await Setting.getSetting('system.maintenanceMessage', 
+      'We are currently performing scheduled maintenance. Please check back later.');
+    const completionTime = await Setting.getSetting('system.maintenanceCompletionTime', null);
+    
+    res.json({
+      maintenanceMode: true,
+      maintenanceMessage,
+      completionTime
+    });
+  } catch (error) {
+    console.error('Error checking public maintenance status:', error);
+    res.status(500).json({ message: 'Error checking maintenance status' });
+  }
+};
+
+// New controller function for saving maintenance customization
+exports.saveMaintenanceCustomization = async (req, res) => {
+  try {
+    const { message, completionTime } = req.body;
+    
+    // Save maintenance message if provided
+    if (message !== undefined) {
+      await Setting.setSetting('system.maintenanceMessage', message, {
+        group: 'system',
+        description: 'Maintenance mode message',
+        isPublic: true,
+        lastUpdatedBy: req.user._id
+      });
+    }
+    
+    // Save completion time if provided
+    if (completionTime !== undefined) {
+      await Setting.setSetting('system.maintenanceCompletionTime', completionTime, {
+        group: 'system',
+        description: 'Estimated maintenance completion time',
+        isPublic: true,
+        lastUpdatedBy: req.user._id
+      });
+    }
+    
+    // Log the customization update
+    SystemLog.logInfo('Maintenance mode customization updated', 'supportController', {
+      userId: req.user._id
+    });
+    
+    // Get the current maintenance mode status
+    const maintenanceMode = await Setting.getSetting('system.maintenanceMode', false);
+    
+    res.json({ 
+      message: 'Maintenance customization saved successfully',
+      maintenanceMode,
+      maintenanceMessage: message,
+      completionTime
+    });
+  } catch (error) {
+    console.error('Error saving maintenance customization:', error);
+    SystemLog.logError('Error saving maintenance customization', 'supportController', { error: error.message });
+    res.status(500).json({ message: 'Failed to save maintenance customization' });
+  }
+};
+
+// Get all contact submissions for admin
+exports.getContactSubmissions = async (req, res) => {
+  try {
+    const { status, page = 1, limit = 10, search = '' } = req.query;
+    
+    // Build query
+    const query = {};
+    
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+    
+    // Search functionality
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { subject: { $regex: search, $options: 'i' } },
+        { message: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Get submissions with pagination
+    const submissions = await ContactSubmission.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+    
+    const total = await ContactSubmission.countDocuments(query);
+    
+    SystemLog.logInfo('Contact submissions retrieved by admin', 'supportController', {
+      userId: req.user._id,
+      count: submissions.length
+    });
+    
+    res.json({
+      submissions,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching contact submissions:', error);
+    SystemLog.logError('Error fetching contact submissions', 'supportController', { error: error.message });
+    res.status(500).json({ message: 'Failed to fetch contact submissions' });
+  }
+};
+
+// Get a single contact submission
+exports.getSingleContactSubmission = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const submission = await ContactSubmission.findById(id);
+    
+    if (!submission) {
+      return res.status(404).json({ message: 'Contact submission not found' });
+    }
+    
+    res.json({ submission });
+  } catch (error) {
+    console.error(`Error fetching contact submission with ID ${req.params.id}:`, error);
+    SystemLog.logError('Error fetching contact submission', 'supportController', { 
+      error: error.message,
+      submissionId: req.params.id
+    });
+    res.status(500).json({ message: 'Failed to fetch contact submission' });
+  }
+};
+
+// Respond to a contact submission
+exports.respondToContactSubmission = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { response } = req.body;
+    
+    if (!response) {
+      return res.status(400).json({ message: 'Response content is required' });
+    }
+    
+    const submission = await ContactSubmission.findById(id);
+    
+    if (!submission) {
+      return res.status(404).json({ message: 'Contact submission not found' });
+    }
+    
+    // Update submission status and add admin response
+    submission.status = 'responded';
+    submission.adminResponse = {
+      content: response,
+      respondedBy: req.user._id,
+      respondedAt: new Date()
+    };
+    
+    await submission.save();
+    
+    // Check if there is a registered user with this email
+    const user = await User.findOne({ email: submission.email });
+    console.log(`Looking for user with email: ${submission.email}`, user ? `Found user: ${user._id}` : 'No user found');
+    
+    // If a user exists, create an in-app notification
+    let notificationCreated = false;
+    if (user) {
+      try {
+        notificationCreated = await createContactResponseNotification(submission, user, response);
+        console.log(`In-app notification ${notificationCreated ? 'sent' : 'failed'} to user ${user._id} for contact response`);
+      } catch (notifError) {
+        console.error('Error creating in-app notification:', notifError);
+        // Continue execution even if notification fails
+      }
+    } else {
+      console.log(`No registered user found with email ${submission.email}, skipping in-app notification`);
+    }
+    
+    // Send notification to the user's email
+    const emailData = {
+      to: submission.email,
+      subject: `Response to your inquiry: ${submission.subject}`,
+      name: submission.name,
+      message: response,
+      originalInquiry: submission.message
+    };
+    
+    // Send the email using your email service
+    try {
+      await sendContactResponse(emailData);
+      
+      SystemLog.logInfo('Response sent to contact submission', 'supportController', {
+        adminId: req.user._id,
+        submissionId: id,
+        userEmail: submission.email,
+        inAppNotification: notificationCreated
+      });
+      
+      res.json({
+        message: 'Response sent successfully',
+        submission: {
+          ...submission._doc,
+          status: 'responded'
+        },
+        notificationSent: notificationCreated
+      });
+    } catch (emailError) {
+      console.error('Failed to send email response:', emailError);
+      res.status(500).json({ message: 'Failed to send email response' });
+    }
+  } catch (error) {
+    console.error(`Error responding to contact submission ${req.params.id}:`, error);
+    SystemLog.logError('Error responding to contact submission', 'supportController', { 
+      error: error.message,
+      submissionId: req.params.id
+    });
+    res.status(500).json({ message: 'Failed to respond to contact submission' });
+  }
+};
+
+// Helper function for sending email responses
+const sendContactResponse = async (emailData) => {
+  const { to, subject, name, message, originalInquiry } = emailData;
+  
+  try {
+    // Prepare the email content using HTML
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #3b82f6;">Response to Your Inquiry</h2>
+        <p>Hello ${name},</p>
+        <p>Thank you for contacting us. Here is our response to your inquiry:</p>
+        
+        <div style="padding: 15px; background-color: #f8fafc; border-left: 4px solid #3b82f6; margin: 20px 0;">
+          ${message.replace(/\n/g, '<br/>')}
+        </div>
+        
+        <p><strong>Your original message:</strong></p>
+        <div style="padding: 15px; background-color: #f8fafc; border-left: 4px solid #64748b; margin: 20px 0; color: #64748b;">
+          ${originalInquiry.replace(/\n/g, '<br/>')}
+        </div>
+        
+        <p>If you have any further questions, please don't hesitate to reply to this email or submit a new contact form on our website.</p>
+        
+        <p>Best regards,<br>Support Team</p>
+        
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b;">
+          <p>This is an automated response to your contact form submission. Please do not reply to this email if your issue has been resolved.</p>
+        </div>
+      </div>
+    `;
+    
+    // Use the sendEmail utility function
+    return await sendEmail({
+      to,
+      subject,
+      html: htmlContent,
+      text: `Hello ${name},\n\nThank you for contacting us. Here is our response to your inquiry:\n\n${message}\n\nYour original message:\n${originalInquiry}\n\nIf you have any further questions, please don't hesitate to contact us.\n\nBest regards,\nSupport Team`
+    });
+  } catch (error) {
+    console.error('Error sending contact response email:', error);
+    throw error;
   }
 }; 

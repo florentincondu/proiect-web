@@ -288,3 +288,63 @@
     IP: ::1
     User: 67ff8d897b1707da1253e263
   
+[2025-05-01T09:39:59.761Z] 
+    Error: A apărut o eroare la procesarea cererii. Vă rugăm să încercați din nou.
+    Stack: Error: A apărut o eroare la procesarea cererii. Vă rugăm să încercați din nou.
+    at C:\Users\condu\Desktop\proiect-web\backend\controllers\hotelController.js:707:17
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    URL: /api/hotels/user-hotel
+    Method: POST
+    IP: ::1
+    User: 6813233163eeea29af05c810
+  
+[2025-05-01T09:43:22.424Z] 
+    Error: A apărut o eroare la procesarea cererii. Vă rugăm să încercați din nou.
+    Stack: Error: A apărut o eroare la procesarea cererii. Vă rugăm să încercați din nou.
+    at C:\Users\condu\Desktop\proiect-web\backend\controllers\hotelController.js:707:17
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    URL: /api/hotels/user-hotel
+    Method: POST
+    IP: ::1
+    User: 6813233163eeea29af05c810
+  
+[2025-05-01T09:50:47.320Z] 
+    Error: A apărut o eroare la procesarea cererii. Vă rugăm să încercați din nou.
+    Stack: Error: A apărut o eroare la procesarea cererii. Vă rugăm să încercați din nou.
+    at C:\Users\condu\Desktop\proiect-web\backend\controllers\hotelController.js:707:17
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    URL: /api/hotels/user-hotel
+    Method: POST
+    IP: ::1
+    User: 6813233163eeea29af05c810
+  
+[2025-05-01T10:00:31.532Z] 
+    Error: A apărut o eroare la procesarea cererii. Vă rugăm să încercați din nou.
+    Stack: Error: A apărut o eroare la procesarea cererii. Vă rugăm să încercați din nou.
+    at C:\Users\condu\Desktop\proiect-web\backend\controllers\hotelController.js:714:17
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    URL: /api/hotels/user-hotel
+    Method: POST
+    IP: ::1
+    User: 6813233163eeea29af05c810
+  
+[2025-05-01T10:04:27.943Z] 
+    Error: A apărut o eroare la procesarea cererii. Vă rugăm să încercați din nou.
+    Stack: Error: A apărut o eroare la procesarea cererii. Vă rugăm să încercați din nou.
+    at C:\Users\condu\Desktop\proiect-web\backend\controllers\hotelController.js:714:17
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    URL: /api/hotels/user-hotel
+    Method: POST
+    IP: ::1
+    User: 6813233163eeea29af05c810
+  
+[2025-05-01T10:07:42.905Z] 
+    Error: A apărut o eroare la procesarea cererii. Vă rugăm să încercați din nou.
+    Stack: Error: A apărut o eroare la procesarea cererii. Vă rugăm să încercați din nou.
+    at C:\Users\condu\Desktop\proiect-web\backend\controllers\hotelController.js:714:17
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    URL: /api/hotels/user-hotel
+    Method: POST
+    IP: ::1
+    User: 6813233163eeea29af05c810
+  

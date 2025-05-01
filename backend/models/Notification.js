@@ -10,7 +10,7 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['booking', 'support', 'system'],
+      enum: ['booking', 'support', 'system', 'contact'],
       default: 'system'
     },
     title: {
@@ -31,7 +31,10 @@ const notificationSchema = new mongoose.Schema(
     },
     referenceModel: {
       type: String,
-      enum: ['Booking', 'SupportTicket']
+      enum: ['Booking', 'SupportTicket', 'ContactSubmission']
+    },
+    data: {
+      type: mongoose.Schema.Types.Mixed
     }
   },
   { 

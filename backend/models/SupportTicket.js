@@ -28,6 +28,59 @@ const messageSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 
+// Schema for contact form submissions (no authentication required)
+const contactSubmissionSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  email: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  subject: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  category: {
+    type: String,
+    enum: ['booking', 'payment', 'account', 'property', 'rewards', 'other'],
+    default: 'other'
+  },
+  message: {
+    type: String,
+    required: true
+  },
+  bookingId: {
+    type: String,
+    trim: true
+  },
+  status: {
+    type: String,
+    enum: ['new', 'reviewing', 'responded', 'closed'],
+    default: 'new'
+  },
+  isPrivacyAgreed: {
+    type: Boolean,
+    required: true,
+    default: false
+  },
+  adminResponse: {
+    content: String,
+    respondedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    respondedAt: Date
+  },
+  ip: String,
+  userAgent: String
+}, { timestamps: true });
+
+
 const supportTicketSchema = new mongoose.Schema({
   title: {
     type: String,
@@ -99,5 +152,9 @@ supportTicketSchema.index({ priority: 1 });
 supportTicketSchema.index({ createdAt: -1 });
 
 const SupportTicket = mongoose.model('SupportTicket', supportTicketSchema);
+const ContactSubmission = mongoose.model('ContactSubmission', contactSubmissionSchema);
 
-module.exports = SupportTicket; 
+module.exports = {
+  SupportTicket,
+  ContactSubmission
+}; 

@@ -17,48 +17,42 @@ const HotelSearchResults = () => {
   const [selectedFilters, setSelectedFilters] = useState([]);
   const [priceRange, setPriceRange] = useState([0, 1000]);
   const [sortBy, setSortBy] = useState('relevance');
+  const [hotelSource, setHotelSource] = useState('all'); // 'all', 'external', 'internal'
 
   useEffect(() => {
-
     const storedResults = sessionStorage.getItem('searchResults');
     const storedQuery = sessionStorage.getItem('searchQuery');
     
-
     if (location.state?.results && location.state?.searchQuery) {
       console.log('Using results from navigation state');
       const processedResults = processSearchResults(location.state.results);
       
-
-      if (processedResults.length > 0 && processedResults[0].photos) {
-        console.log('Sample photo data from first result:', 
-          processedResults[0].photos.length > 0 ? 
-          JSON.stringify(processedResults[0].photos[0]).substring(0, 100) + '...' : 
-          'No photos');
+      if (processedResults.length > 0) {
+        console.log('Found results:', processedResults.length);
+        console.log('Sources:', processedResults.reduce((acc, hotel) => {
+          acc[hotel.source] = (acc[hotel.source] || 0) + 1;
+          return acc;
+        }, {}));
       }
       
-
       sessionStorage.setItem('searchResults', JSON.stringify(processedResults));
       sessionStorage.setItem('searchQuery', location.state.searchQuery);
       
-
       setSearchQuery(location.state.searchQuery);
       setResults(processedResults);
       setLoading(false);
     } 
-
     else if (storedResults && storedQuery) {
       console.log('Using results from session storage');
       setSearchQuery(storedQuery);
       setResults(JSON.parse(storedResults));
       setLoading(false);
     } 
-
     else {
       console.log('No search results found, redirecting to home');
       navigate('/', { replace: true });
     }
   }, []);
-
 
   const processSearchResults = (searchResults) => {
     return searchResults.map(result => ({
@@ -70,17 +64,10 @@ const HotelSearchResults = () => {
         wifi: Math.random() > 0.2,
         breakfast: Math.random() > 0.6,
         parking: Math.random() > 0.4,
-      }
+      },
+      source: result.source || 'external' // Default to external if not specified
     }));
   };
-
-
-  useEffect(() => {
-    return () => {
-
-
-    };
-  }, []);
 
   const handleFilterChange = (filter) => {
     setSelectedFilters(prev => 
@@ -89,12 +76,24 @@ const HotelSearchResults = () => {
         : [...prev, filter]
     );
   };
+  
+  const handleSourceChange = (source) => {
+    setHotelSource(source);
+  };
 
   const filteredResults = results.filter(result => {
-
-    if (selectedFilters.length > 0) {
-
+    // Filter by source (external API or internal database)
+    if (hotelSource !== 'all' && result.source !== hotelSource) {
+      return false;
     }
+    
+    // Filter by amenities
+    if (selectedFilters.length > 0) {
+      return selectedFilters.every(filter => 
+        result.amenities && result.amenities[filter]
+      );
+    }
+    
     return true;
   });
 
@@ -109,15 +108,24 @@ const HotelSearchResults = () => {
     }
   });
 
-
   const getPhotoUrl = (result) => {
     try {
+      // If the source is internal and we have a direct URL
+      if (result.source === 'internal' && result.photos && result.photos.length > 0) {
+        const photoName = result.photos[0].name;
+        if (photoName.startsWith('http://') || photoName.startsWith('https://')) {
+          return photoName;
+        }
+      }
+      
+      // For external API photos
       if (result.photos && result.photos.length > 0 && result.photos[0].name) {
         const photoName = result.photos[0].name;
-        console.log(`Creating photo URL for: ${photoName.substring(0, 20)}...`);
+        console.log(`Creating photo URL for: ${typeof photoName === 'string' ? photoName.substring(0, 20) : 'non-string'}...`);
 
         return `${API_BASE_URL}/api/places/media/${encodeURIComponent(photoName)}?maxWidthPx=400`;
       }
+      
       console.log('No valid photo found, using placeholder');
       return 'https://placehold.co/400x300/172a45/ffffff?text=No+Image';
     } catch (e) {
@@ -126,11 +134,9 @@ const HotelSearchResults = () => {
     }
   };
 
-
   const getHotelImage = (result) => {
     try {
       if (result.photos && result.photos.length > 0) {
-
         const photoUrl = getPhotoUrl(result);
         
         return (
@@ -198,6 +204,34 @@ const HotelSearchResults = () => {
             <option value="price">Sort by Price</option>
             <option value="rating">Sort by Rating</option>
           </select>
+          
+          {/* Hotel Source Filter */}
+          <select
+            value={hotelSource}
+            onChange={(e) => handleSourceChange(e.target.value)}
+            className="bg-[#172a45] text-white p-2 rounded-lg"
+          >
+            <option value="all">All Sources</option>
+            <option value="external">Partner Hotels</option>
+            <option value="internal">User Hotels</option>
+          </select>
+          
+          {/* Amenity filters */}
+          <div className="flex flex-wrap gap-2">
+            {['wifi', 'pool', 'breakfast', 'parking', 'pets'].map(filter => (
+              <button
+                key={filter}
+                onClick={() => handleFilterChange(filter)}
+                className={`px-3 py-1 rounded-full text-sm ${
+                  selectedFilters.includes(filter) 
+                    ? 'bg-blue-500 text-white' 
+                    : 'bg-[#172a45] text-gray-300'
+                }`}
+              >
+                {filter.charAt(0).toUpperCase() + filter.slice(1)}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Results Grid */}
@@ -225,7 +259,14 @@ const HotelSearchResults = () => {
               >
                 {getHotelImage(result)}
                 <div className="p-4">
-                  <h3 className="text-xl font-bold mb-2">{result.displayName?.text || 'Unnamed Hotel'}</h3>
+                  <div className="flex justify-between items-start">
+                    <h3 className="text-xl font-bold mb-2">{result.displayName?.text || 'Unnamed Hotel'}</h3>
+                    <span className={`text-xs px-2 py-1 rounded ${
+                      result.source === 'internal' ? 'bg-green-600' : 'bg-blue-600'
+                    }`}>
+                      {result.source === 'internal' ? 'User Hotel' : 'Partner'}
+                    </span>
+                  </div>
                   <p className="text-gray-400 mb-2">{result.formattedAddress || 'Address not available'}</p>
                   <div className="flex items-center gap-2 mb-2">
                     <Star className="text-yellow-400" />
@@ -233,7 +274,7 @@ const HotelSearchResults = () => {
                     <span className="text-gray-400">({result.userRatingCount || 0} reviews)</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-xl font-bold">{result.estimatedPrice || 0} RON</span>
+                    <span className="text-xl font-bold">{result.estimatedPrice || 0} {result.currency || 'RON'}</span>
                     <button 
                       onClick={() => navigate(`/hotel/${result.id}`)}
                       className="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg transition-colors"
