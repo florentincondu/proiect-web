@@ -9,6 +9,13 @@ import { generateHotelPrice } from '../utils/priceUtils';
 import { RESULTS_PER_PAGE, getDefaultHeaders } from '../config/api';
 import { IoArrowForward } from 'react-icons/io5';
 import HotelCard from '../components/HotelCard';
+import { 
+  checkRoomsAvailability, 
+  canAccommodateGuests, 
+  calculateRoomAvailability, 
+  filterAvailableRooms,
+  generateNextAvailableDate
+} from '../utils/availabilityUtils';
 
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
@@ -95,6 +102,8 @@ const SearchResults = () => {
   const [currentImageIndexes, setCurrentImageIndexes] = useState({});
   const [dataProcessed, setDataProcessed] = useState(false);
   const [roomAvailability, setRoomAvailability] = useState({});
+  const [hotelAvailability, setHotelAvailability] = useState({});
+  const [nextAvailableDates, setNextAvailableDates] = useState({});
   
 
   const [newSearchQuery, setNewSearchQuery] = useState(searchQuery);
@@ -135,7 +144,8 @@ const SearchResults = () => {
     { value: 'recommended', label: 'Recommended' },
     { value: 'priceAsc', label: 'Price (Low to High)' },
     { value: 'priceDesc', label: 'Price (High to Low)' },
-    { value: 'ratingDesc', label: 'Rating (High to Low)' }
+    { value: 'ratingDesc', label: 'Rating (High to Low)' },
+    { value: 'availability', label: 'Availability' }
   ];
   
   useEffect(() => {
@@ -463,18 +473,27 @@ const SearchResults = () => {
   };
   
 
-  const handleHotelClick = (hotelId) => {
+  const handleHotelClick = (hotelId, dateParams) => {
     if (!hotelId) {
       console.error('No hotel ID provided');
       return;
     }
     
+    // Use the passed date parameters if available
+    const params = dateParams || {
+      checkInDate,
+      checkOutDate,
+      guestCount
+    };
+    
     console.log('Navigating to hotel details page for ID:', hotelId);
+    console.log('Passing dates and guest count:', params.checkInDate, params.checkOutDate, params.guestCount);
     
     try {
-
-
-    navigate(`/hotel/${hotelId}`);
+      // Pass the search parameters to the hotel detail page
+      navigate(`/hotel/${hotelId}`, {
+        state: params
+      });
     } catch (error) {
       console.error('Error navigating to hotel details:', error);
     }
@@ -924,170 +943,139 @@ const SearchResults = () => {
   }, [searchQuery]);
   
 
-  // Add state variables for search parameters
-  const [hotelAvailability, setHotelAvailability] = useState({});
-  const [nextAvailableDates, setNextAvailableDates] = useState({});
-
   // Function to find the next available date for a hotel
   const findNextAvailableDate = (hotelId) => {
-    // In a real application, this would query the backend for availability
-    // Here we'll generate a random future date for demonstration
-    const today = new Date();
-    // Add a random number of days (1-30) to current date
-    const randomDays = Math.floor(Math.random() * 30) + 1;
-    const nextAvailableDate = new Date(today);
-    nextAvailableDate.setDate(nextAvailableDate.getDate() + randomDays);
-    
-    // Format the date as YYYY-MM-DD
-    return nextAvailableDate.toISOString().split('T')[0];
+    // Convertim checkout date într-un obiect Date pentru a asigura formatul corect
+    const checkOutDateObj = new Date(checkOutDate);
+    console.log('Generating next available date based on checkout date:', checkOutDateObj.toISOString().split('T')[0]);
+    return generateNextAvailableDate(checkOutDateObj);
   };
 
   // Function to check if a hotel has rooms that can accommodate the specified number of guests
-  const canAccommodateGuests = (hotel) => {
-    if (!hotel) return false;
-    
-    // For hotels with explicit room data
-    if (hotel.rooms && Array.isArray(hotel.rooms)) {
-      return hotel.rooms.some(room => {
-        const capacity = room.capacity || room.persons || 0;
-        return capacity >= guestCount;
-      });
-    }
-    
-    // For hotels without explicit room data, use maxGuests if available
-    if (hotel.maxGuests) {
-      return hotel.maxGuests >= guestCount;
-    }
-    
-    // Default - assume standard hotels can accommodate up to 4 guests
-    return guestCount <= 4;
+  const canAccommodateGuestsLocal = (hotel) => {
+    return canAccommodateGuests(hotel, guestCount);
   };
 
-  // Function to check hotel availability for the selected dates
-  const checkHotelAvailability = async (hotel) => {
-    if (!hotel || !hotel.id) return false;
-    
-    try {
-      // For internal hotels, query the database
-      if (hotel.source === 'internal') {
-        const response = await axios.post(`${API_BASE_URL}/api/hotels/check-availability`, {
-          hotelId: hotel.id,
-          startDate: checkInDate,
-          endDate: checkOutDate
-        });
-        
-        return {
-          available: response.data.available,
-          roomsAvailable: response.data.availableRooms || 0
-        };
-      } 
-      // For external hotels, use a deterministic approach based on hotel properties
-      else {
-        // Use localStorage to track simulated bookings for external hotels
-        const bookings = JSON.parse(localStorage.getItem('hotelBookings') || '{}');
-        const hotelBookings = bookings[hotel.id] || {};
-        
-        // Calculate a base availability score using hotel rating and price
-        const rating = parseFloat(hotel.rating || hotel.averageRating || 4.0);
-        const basePrice = parseFloat(hotel.price || hotel.estimatedPrice || 500);
-        
-        // Higher ratings and prices typically mean more rooms
-        let roomsAvailable = Math.floor((rating / 5) * 10);
-        
-        // Adjust based on price (more expensive hotels might have fewer rooms but more exclusivity)
-        roomsAvailable += basePrice < 300 ? 2 : basePrice > 800 ? -2 : 0;
-        
-        // Ensure minimum of 0 rooms
-        roomsAvailable = Math.max(0, roomsAvailable);
-        
-        // Reduce by existing "bookings" if any
-        const bookedRooms = hotelBookings[checkInDate] || 0;
-        roomsAvailable = Math.max(0, roomsAvailable - bookedRooms);
-        
-        return {
-          available: roomsAvailable > 0,
-          roomsAvailable
-        };
-      }
-    } catch (error) {
-      console.error(`Error checking availability for hotel ${hotel.id}:`, error);
-      return { available: false, roomsAvailable: 0 };
-    }
-  };
-
-  // Modified useEffect to check availability for all hotels
+  // Verificăm disponibilitatea hotelurilor pentru datele și numărul de persoane selectate
   useEffect(() => {
+    if (!dataProcessed || hotels.length === 0) return;
+    
     const checkAllHotelsAvailability = async () => {
-      if (!dataProcessed || hotels.length === 0) return;
-      
       const availabilityInfo = {};
       const nextDatesInfo = {};
       
-      // Check availability for each hotel
+      // Convertim datele string în obiecte Date pentru a le folosi în utilitarul de disponibilitate
+      const checkInDateObj = new Date(checkInDate);
+      const checkOutDateObj = new Date(checkOutDate);
+      
+      // Verificăm disponibilitatea pentru fiecare hotel
       for (const hotel of hotels) {
         if (!hotel.id) continue;
         
-        // Check if hotel can accommodate the requested number of guests
-        const canAccommodate = canAccommodateGuests(hotel);
+        // Verificăm dacă hotelul poate găzdui numărul cerut de persoane
+        const canAccommodate = canAccommodateGuestsLocal(hotel);
         
-        // If the hotel can't accommodate the guests, mark as unavailable
+        // Dacă hotelul nu poate găzdui numărul de persoane, îl marcăm ca indisponibil
         if (!canAccommodate) {
-          availabilityInfo[hotel.id] = { available: false, roomsAvailable: 0, canAccommodateGuests: false };
+          availabilityInfo[hotel.id] = { 
+            hasAvailableRooms: false,
+            canAccommodateGuests: false 
+          };
           continue;
         }
         
-        // Check availability for the selected dates
-        const availability = await checkHotelAvailability(hotel);
-        availabilityInfo[hotel.id] = { 
-          ...availability, 
-          canAccommodateGuests: canAccommodate 
+        // Generăm camerele dacă nu există
+        if (!hotel.rooms || !Array.isArray(hotel.rooms) || hotel.rooms.length === 0) {
+          // Generăm camere pe baza prețului estimat
+          const basePrice = hotel.price || hotel.estimatedPrice || 500;
+          hotel.rooms = [
+            {
+              type: 'single',
+              capacity: 1,
+              price: Math.round(basePrice * 0.7),
+              count: 2
+            },
+            {
+              type: 'double',
+              capacity: 2,
+              price: basePrice,
+              count: 3
+            },
+            {
+              type: 'triple',
+              capacity: 3,
+              price: Math.round(basePrice * 1.3),
+              count: 2
+            },
+            {
+              type: 'quad',
+              capacity: 4,
+              price: Math.round(basePrice * 1.6),
+              count: 1
+            }
+          ];
+        }
+        
+        // Verificăm disponibilitatea camerelor
+        const roomsAvailability = await checkRoomsAvailability(
+          hotel.id, 
+          hotel.rooms, 
+          checkInDateObj, 
+          checkOutDateObj,
+          hotel
+        );
+        
+        // Filtrăm camerele care pot găzdui numărul de persoane
+        const availableRoomTypes = Object.keys(roomsAvailability).filter(roomType => {
+          const roomData = hotel.rooms.find(r => r.type === roomType);
+          return roomData && (roomData.capacity || roomData.persons || 2) >= guestCount;
+        });
+        
+        // Verificăm dacă există cel puțin o cameră disponibilă care poate găzdui numărul de persoane
+        const hasAvailableRooms = availableRoomTypes.some(roomType => 
+          roomsAvailability[roomType] && roomsAvailability[roomType].available
+        );
+        
+        // Calculăm numărul total de camere disponibile pentru acest hotel
+        const totalAvailableRooms = availableRoomTypes.reduce((sum, roomType) => {
+          return sum + (roomsAvailability[roomType]?.availableRooms || 0);
+        }, 0);
+        
+        // Setăm informațiile de disponibilitate
+        availabilityInfo[hotel.id] = {
+          hasAvailableRooms,
+          canAccommodateGuests: canAccommodate,
+          totalAvailableRooms,
+          availableRoomTypes
         };
         
-        // If hotel is not available, find the next available date
-        if (!availability.available) {
-          nextDatesInfo[hotel.id] = findNextAvailableDate(hotel.id);
-        }
+        // Adăugăm disponibilitatea camerelor
+        Object.keys(roomsAvailability).forEach(roomType => {
+          if (!availabilityInfo[hotel.id][roomType]) {
+            availabilityInfo[hotel.id][roomType] = roomsAvailability[roomType];
+            if (!roomsAvailability[roomType].available && roomsAvailability[roomType].nextAvailableDate) {
+              console.log(`Hotel ${hotel.id}, Room ${roomType} next available date:`, roomsAvailability[roomType].nextAvailableDate);
+            }
+          }
+        });
       }
       
-      setHotelAvailability(availabilityInfo);
-      setNextAvailableDates(nextDatesInfo);
+      setRoomAvailability(availabilityInfo);
       
-      // Update roomAvailability state for display in hotel cards
-      const roomAvailabilityData = {};
-      hotels.forEach(hotel => {
-        const availability = availabilityInfo[hotel.id];
-        if (availability) {
-          roomAvailabilityData[hotel.id] = {
-            hasAvailableRooms: availability.available,
-            totalAvailableRooms: availability.roomsAvailable,
-            canAccommodateGuests: availability.canAccommodateGuests,
-            availableRoomTypes: hotel.rooms ? 
-              hotel.rooms
-                .filter(room => {
-                  const capacity = room.capacity || room.persons || 0;
-                  return capacity >= guestCount;
-                })
-                .map(room => room.type) 
-              : ['Standard', 'Deluxe']
-          };
-        }
-      });
-      setRoomAvailability(roomAvailabilityData);
-      
-      // Apply filters based on availability and guest capacity
+      // Aplicăm filtrele pe baza disponibilității și a capacității
       applyFiltersWithAvailability(availabilityInfo);
     };
     
     checkAllHotelsAvailability();
   }, [hotels, checkInDate, checkOutDate, guestCount, dataProcessed]);
 
-  // Function to apply filters including availability
+  // Actualizăm funcția de filtrare pentru a lua în considerare și disponibilitatea
   const applyFiltersWithAvailability = (availabilityInfo) => {
     if (!hotels || hotels.length === 0) return;
     
     let filtered = [...hotels];
     
-    // Apply filters for rating, price, amenities
+    // Filtrăm după rating, preț, facilități
     if (filters.minRating > 0) {
       filtered = filtered.filter(hotel => 
         parseFloat(hotel.rating || 0) >= filters.minRating
@@ -1108,9 +1096,9 @@ const SearchResults = () => {
       });
     }
     
-    if (filters.amenities && filters.amenities.length > 0) {
+    if (filters.amenities.length > 0) {
       filtered = filtered.filter(hotel => {
-        // Handle different amenities data structures
+        // Gestionăm diferite structuri de date pentru facilități
         if (hotel.amenities) {
           if (Array.isArray(hotel.amenities)) {
             return filters.amenities.every(amenity => 
@@ -1126,7 +1114,7 @@ const SearchResults = () => {
       });
     }
     
-    // Sort by selected criteria
+    // Sortăm după criteriile selectate
     if (filters.sortBy) {
       filtered.sort((a, b) => {
         switch (filters.sortBy) {
@@ -1136,13 +1124,18 @@ const SearchResults = () => {
             return (parseFloat(b.price || b.estimatedPrice || 0) - parseFloat(a.price || a.estimatedPrice || 0));
           case 'ratingDesc':
             return (parseFloat(b.rating || 0) - parseFloat(a.rating || 0));
+          case 'availability':
+            // Sortăm după disponibilitate - cele cu mai multe camere disponibile apar primele
+            const availableRoomsA = availabilityInfo[a.id]?.totalAvailableRooms || 0;
+            const availableRoomsB = availabilityInfo[b.id]?.totalAvailableRooms || 0;
+            return availableRoomsB - availableRoomsA;
           default: // recommended
-            return 0; // No specific sorting
+            return 0; // Fără sortare specifică
         }
       });
     }
     
-    // Don't filter out hotels based on availability - we'll show all hotels but mark unavailable ones
+    // Nu filtrăm din lista hotelurile care nu au disponibilitate, le vom afișa pe toate, dar cu marcajul corespunzător
     setFilteredHotels(filtered);
     setTotalPages(Math.ceil(filtered.length / RESULTS_PER_PAGE));
   };
@@ -1639,19 +1632,19 @@ const SearchResults = () => {
         {/* Results grid */}
         {!loading && !error && filteredHotels.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
-            {getCurrentPageHotels().map((hotel) => {
-              const hotelId = hotel.id || hotel._id;
-              return (
-                <HotelCard 
-                  key={hotelId} 
-                  hotel={hotel}
-                  currentImageIndex={currentImageIndexes[hotelId] || 0}
-                  onImageNavigate={navigateImage}
-                  onClick={handleHotelClick}
-                  roomAvailability={roomAvailability}
-                />
-              );
-            })}
+            {getCurrentPageHotels().map((hotel, index) => (
+              <HotelCard 
+                key={hotel.id}
+                hotel={hotel}
+                onClick={handleHotelClick}
+                currentImageIndex={currentImageIndexes[hotel.id] || 0}
+                onImageNavigate={navigateImage}
+                roomAvailability={roomAvailability}
+                checkInDate={checkInDate}
+                checkOutDate={checkOutDate}
+                guestCount={guestCount}
+              />
+            ))}
           </div>
         )}
         

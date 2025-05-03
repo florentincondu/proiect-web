@@ -87,7 +87,7 @@ const BookingFlow = () => {
         if (extra.priceType === 'per day') {
           return sum + (extra.price * days);
         } else if (extra.priceType === 'per person/day') {
-          return sum + (extra.price * (bookingDetails.adults + bookingDetails.children) * days);
+          return sum + (extra.price * (parseInt(bookingDetails.adults) + parseInt(bookingDetails.children)) * days);
         } else {
           return sum + extra.price;
         }
@@ -446,6 +446,27 @@ const DatesAndRoomsStep = ({ onNext, bookingDetails, onInputChange, selectedRoom
   const rooms = roomsFromHotel.length > 0 ? roomsFromHotel : sampleRooms;
   
 
+  // Add a function to check if the selected dates are available for booking
+  const isDateRangeAvailable = (roomType) => {
+    if (!bookingDetails.checkIn || !bookingDetails.checkOut || !hotelData || !hotelData.id) return false;
+    
+    // Check if we have a next available date in localStorage for this hotel/room
+    const savedNextAvailableDate = localStorage.getItem(`nextAvailable_${hotelData.id}_${roomType}`);
+    
+    if (savedNextAvailableDate) {
+      const nextDateObj = new Date(savedNextAvailableDate);
+      const checkInDateObj = new Date(bookingDetails.checkIn);
+      
+      console.log(`Comparing check-in date ${checkInDateObj.toISOString().split('T')[0]} with next available date ${nextDateObj.toISOString().split('T')[0]}`);
+      
+      // If check-in date is on or after the next available date, it should be available
+      return checkInDateObj >= nextDateObj;
+    }
+    
+    // No saved next available date, assume available
+    return true;
+  };
+  
   const isDateValid = () => {
     if (!bookingDetails.checkIn || !bookingDetails.checkOut) return false;
     
@@ -459,7 +480,9 @@ const DatesAndRoomsStep = ({ onNext, bookingDetails, onInputChange, selectedRoom
     if (checkOut <= checkIn) return false;
     if (!selectedRoom) return false;
     
-    return true;
+    // Check if the selected dates are available for this room
+    const roomType = selectedRoom.type || selectedRoom.name;
+    return isDateRangeAvailable(roomType);
   };
   
   const renderRoomImage = (room) => {
@@ -660,9 +683,11 @@ const DatesAndRoomsStep = ({ onNext, bookingDetails, onInputChange, selectedRoom
               className={`border rounded-xl p-3 sm:p-5 cursor-pointer transition-all duration-300 ${
                 selectedRoom && selectedRoom.id === room.id 
                   ? 'border-blue-500 bg-blue-900 bg-opacity-10' 
-                  : 'border-gray-600 hover:border-blue-400'
+                  : isDateRangeAvailable(room.type) 
+                    ? 'border-gray-600 hover:border-blue-400'
+                    : 'border-gray-700 opacity-70 hover:border-gray-500'
               }`}
-              onClick={() => onRoomSelect(room)}
+              onClick={() => isDateRangeAvailable(room.type) ? onRoomSelect(room) : null}
             >
               <div className="flex flex-col sm:flex-row">
                 <div className="w-full sm:w-1/3 h-32 sm:h-40 rounded-md mb-3 sm:mb-0 sm:mr-6 overflow-hidden">
@@ -678,6 +703,29 @@ const DatesAndRoomsStep = ({ onNext, bookingDetails, onInputChange, selectedRoom
                   </div>
                   
                   <p className="text-gray-400 text-sm sm:text-base mt-1 mb-2 sm:mb-3">{room.description}</p>
+                  
+                  {/* Availability indicator */}
+                  {!isDateRangeAvailable(room.type) && (
+                    <div className="mt-2 mb-2 bg-amber-500/10 border border-amber-500/30 rounded px-3 py-1.5 text-xs text-amber-400">
+                      <span className="font-medium">Indisponibil pentru datele selectate.</span>{' '}
+                      {(() => {
+                        const savedNextAvailableDate = localStorage.getItem(`nextAvailable_${hotelData.id}_${room.type}`);
+                        if (savedNextAvailableDate) {
+                          try {
+                            const date = new Date(savedNextAvailableDate);
+                            if (isNaN(date.getTime())) {
+                              return 'Data următoare indisponibilă.';
+                            }
+                            return `Disponibil începând cu: ${date.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                          } catch (error) {
+                            console.error('Error formatting next available date:', error);
+                            return 'Data următoare indisponibilă.';
+                          }
+                        }
+                        return '';
+                      })()}
+                    </div>
+                  )}
                   
                   <div className="flex flex-wrap gap-2 sm:gap-3 text-xs sm:text-sm">
                     {room.amenities.map((amenity, idx) => (
@@ -707,12 +755,17 @@ const DatesAndRoomsStep = ({ onNext, bookingDetails, onInputChange, selectedRoom
                         className={`py-1 sm:py-2 px-3 sm:px-4 rounded transition text-sm ${
                           selectedRoom && selectedRoom.id === room.id
                             ? 'bg-green-600 hover:bg-green-700 text-white'
-                            : 'bg-blue-500 hover:bg-blue-600 text-white'
+                            : isDateRangeAvailable(room.type)
+                              ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                              : 'bg-gray-600 cursor-not-allowed text-gray-300'
                         }`}
                         onClick={(e) => {
                           e.stopPropagation();
-                          onRoomSelect(room);
+                          if (isDateRangeAvailable(room.type)) {
+                            onRoomSelect(room);
+                          }
                         }}
+                        disabled={!isDateRangeAvailable(room.type)}
                       >
                         {selectedRoom && selectedRoom.id === room.id ? 'Selected' : 'Select'}
                       </button>
@@ -975,7 +1028,7 @@ const PaymentStep = ({ onNext, onBack, bookingDetails, selectedRoom, selectedExt
       if (extra.priceType === 'per day') {
         extrasTotal += extra.price * nights;
       } else if (extra.priceType === 'per person/day') {
-        extrasTotal += extra.price * (bookingDetails.adults + bookingDetails.children) * nights;
+        extrasTotal += extra.price * (parseInt(bookingDetails.adults) + parseInt(bookingDetails.children)) * nights;
       } else {
         extrasTotal += extra.price;
       }
@@ -1031,7 +1084,7 @@ const PaymentStep = ({ onNext, onBack, bookingDetails, selectedRoom, selectedExt
             {formatDate(bookingDetails.checkIn)} - {formatDate(bookingDetails.checkOut)}
           </span>
           <span className="bg-gray-700 px-2 py-1 rounded-md">
-            {bookingDetails.adults + bookingDetails.children} {(bookingDetails.adults + bookingDetails.children) === 1 ? 'guest' : 'guests'}
+            {parseInt(bookingDetails.adults) + parseInt(bookingDetails.children)} {(parseInt(bookingDetails.adults) + parseInt(bookingDetails.children)) === 1 ? 'guest' : 'guests'}
           </span>
         </div>
       </div>
@@ -1220,7 +1273,7 @@ const PaymentStep = ({ onNext, onBack, bookingDetails, selectedRoom, selectedExt
                     extra.priceType === 'per day' 
                       ? (extra.price * nights).toFixed(2)
                       : extra.priceType === 'per person/day'
-                        ? (extra.price * (bookingDetails.adults + bookingDetails.children) * nights).toFixed(2)
+                        ? (extra.price * (parseInt(bookingDetails.adults) + parseInt(bookingDetails.children)) * nights).toFixed(2)
                         : extra.price.toFixed(2)
                   } RON</span>
                 </div>
@@ -1327,7 +1380,7 @@ const ConfirmationStep = ({ onFinish, bookingDetails, selectedRoom }) => {
           </div>
           <div>
             <h4 className="text-blue-300 text-xs sm:text-sm mb-1">Guests</h4>
-            <p className="text-sm sm:text-base">{bookingDetails.adults} Adults, {bookingDetails.children} Children</p>
+            <p className="text-sm sm:text-base">{parseInt(bookingDetails.adults)} Adults, {parseInt(bookingDetails.children)} Children</p>
           </div>
         </div>
         

@@ -4,7 +4,16 @@ import backgr from '../assets/start.avif';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
-const HotelCard = ({ hotel, currentImageIndex = 0, onImageNavigate, onClick, roomAvailability = {} }) => {
+const HotelCard = ({ 
+  hotel, 
+  currentImageIndex = 0, 
+  onImageNavigate, 
+  onClick, 
+  roomAvailability = {},
+  checkInDate,
+  checkOutDate,
+  guestCount
+}) => {
   const [hoveredImage, setHoveredImage] = useState(false);
   
   // Helper function to get the photo URL
@@ -74,10 +83,83 @@ const HotelCard = ({ hotel, currentImageIndex = 0, onImageNavigate, onClick, roo
   // Get hotel availability info
   const availabilityInfo = hotel.id && roomAvailability[hotel.id];
   
+  // Calculate if any room is available and can accommodate the requested guests
+  const hasAvailableRoom = availabilityInfo?.availableRoomTypes?.some(room => {
+    const roomData = roomAvailability[hotel.id]?.[room];
+    return roomData?.available && roomData?.availableRooms > 0;
+  });
+  
+  // Find the next available date if no rooms are available
+  const getNextAvailableDate = () => {
+    if (!availabilityInfo || hasAvailableRoom) return null;
+    
+    // Find the earliest next available date from all room types
+    let earliestDate = null;
+    
+    if (availabilityInfo.availableRoomTypes) {
+      availabilityInfo.availableRoomTypes.forEach(roomType => {
+        const roomData = roomAvailability[hotel.id]?.[roomType];
+        if (roomData?.nextAvailableDate) {
+          if (!earliestDate || new Date(roomData.nextAvailableDate) < new Date(earliestDate)) {
+            earliestDate = roomData.nextAvailableDate;
+          }
+        }
+      });
+    }
+    
+    return earliestDate;
+  };
+  
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        console.error('Invalid date:', dateString);
+        return 'Data indisponibilă';
+      }
+      
+      return date.toLocaleDateString('ro-RO', { 
+        day: 'numeric', 
+        month: 'short', 
+        year: 'numeric' 
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Data indisponibilă';
+    }
+  };
+  
+  // Get total available rooms count
+  const getTotalAvailableRooms = () => {
+    if (!availabilityInfo || !availabilityInfo.availableRoomTypes) return 0;
+    
+    return availabilityInfo.availableRoomTypes.reduce((total, roomType) => {
+      const roomData = roomAvailability[hotel.id]?.[roomType];
+      return total + (roomData?.availableRooms || 0);
+    }, 0);
+  };
+  
+  // Get total rooms count
+  const getTotalRooms = () => {
+    if (!availabilityInfo || !availabilityInfo.availableRoomTypes) return 0;
+    
+    return availabilityInfo.availableRoomTypes.reduce((total, roomType) => {
+      const roomData = roomAvailability[hotel.id]?.[roomType];
+      return total + (roomData?.totalRooms || 0);
+    }, 0);
+  };
+  
+  const nextAvailableDate = getNextAvailableDate();
+  const totalAvailableRooms = getTotalAvailableRooms();
+  const totalRooms = getTotalRooms();
+  
   return (
     <div 
       className="bg-[#172a45] rounded-lg overflow-hidden shadow-lg border border-blue-500/20 cursor-pointer relative flex flex-col h-full transition-transform hover:scale-105"
-      onClick={() => onClick && onClick(hotel.id)}
+      onClick={() => onClick && onClick(hotel.id, { checkInDate, checkOutDate, guestCount })}
     >
       {/* Image Section */}
       <div className="relative h-32 xs:h-36 sm:h-40 md:h-44 overflow-hidden">
@@ -125,13 +207,13 @@ const HotelCard = ({ hotel, currentImageIndex = 0, onImageNavigate, onClick, roo
         {/* Availability badge */}
         {availabilityInfo && (
           <div className={`absolute bottom-1 sm:bottom-2 left-1 sm:left-2 px-1 sm:px-2 py-0.5 rounded text-[9px] sm:text-xs font-medium ${
-            availabilityInfo.hasAvailableRooms 
+            hasAvailableRoom
               ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
               : 'bg-red-500/20 text-red-300 border border-red-500/30'
           }`}>
-            {!availabilityInfo.hasAvailableRooms 
+            {!hasAvailableRoom
               ? 'Indisponibil' 
-              : `${availabilityInfo.totalAvailableRooms} camere disponibile`
+              : `${totalAvailableRooms} ${totalAvailableRooms === 1 ? 'cameră disponibilă' : 'camere disponibile'}`
             }
           </div>
         )}
@@ -144,6 +226,13 @@ const HotelCard = ({ hotel, currentImageIndex = 0, onImageNavigate, onClick, roo
         <p className="text-gray-400 text-[9px] sm:text-xs mb-1 line-clamp-1">
           {hotel.formattedAddress || hotel.location || 'Address information not available'}
         </p>
+        
+        {/* Next available date notification if no rooms available */}
+        {availabilityInfo && !hasAvailableRoom && nextAvailableDate && (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-1 text-[9px] sm:text-xs text-amber-400 mb-1.5">
+            <p className="line-clamp-2">Nu există disponibilitate pentru perioada aleasă. Următoarea dată disponibilă: {formatDate(nextAvailableDate)}</p>
+          </div>
+        )}
         
         {/* Amenities */}
         <div className="flex flex-wrap gap-1 mb-1 sm:mb-2 mt-auto">
@@ -177,11 +266,13 @@ const HotelCard = ({ hotel, currentImageIndex = 0, onImageNavigate, onClick, roo
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onClick && onClick(hotel.id);
+              onClick && onClick(hotel.id, { checkInDate, checkOutDate, guestCount });
             }}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-1.5 py-0.5 sm:px-2 sm:py-1 rounded text-[9px] sm:text-xs font-medium transition-colors"
+            className={`${hasAvailableRoom 
+              ? 'bg-blue-500 hover:bg-blue-600' 
+              : 'bg-gray-500 hover:bg-gray-600'} text-white px-1.5 py-0.5 sm:px-2 sm:py-1 rounded text-[9px] sm:text-xs font-medium transition-colors`}
           >
-            Vezi detalii
+            {hasAvailableRoom ? 'Rezervă' : 'Vezi detalii'}
           </button>
         </div>
       </div>

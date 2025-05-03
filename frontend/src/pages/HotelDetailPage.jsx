@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { FaWifi, FaSwimmingPool, FaParking, FaCoffee, FaUtensils, FaSpa, FaDumbbell, FaConciergeBell, FaBath, FaSnowflake, FaMapMarkerAlt, FaPhoneAlt, FaGlobe, FaRegCalendarAlt, FaArrowLeft } from 'react-icons/fa';
+import { FaWifi, FaSwimmingPool, FaParking, FaCoffee, FaUtensils, FaSpa, FaDumbbell, FaConciergeBell, FaBath, FaSnowflake, FaMapMarkerAlt, FaPhoneAlt, FaGlobe, FaRegCalendarAlt, FaArrowLeft, FaBed, FaUsers, FaCheck, FaTimes } from 'react-icons/fa';
 import { MdPets, MdAirportShuttle, MdRoomService, MdLocalLaundryService, MdOutlineCleaningServices, MdDirections } from 'react-icons/md';
 import { IoArrowBack, IoArrowForward, IoClose } from 'react-icons/io5';
 import { AiFillStar, AiOutlineStar } from 'react-icons/ai';
@@ -11,7 +11,14 @@ import backgroundImage from '../assets/backgr.webp';
 import backgr from '../assets/start.avif';
 import { generateHotelPrice } from '../utils/priceUtils';
 import ReviewItem from '../components/ReviewItem';
-
+// Importăm utilitarele de disponibilitate
+import { 
+  checkRoomsAvailability, 
+  canAccommodateGuests, 
+  calculateRoomAvailability, 
+  filterAvailableRooms,
+  generateNextAvailableDate 
+} from '../utils/availabilityUtils';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
@@ -82,8 +89,50 @@ const HotelDetailPage = ({ reservationMode }) => {
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [coordinates, setCoordinates] = useState({ lat: 44.4268, lng: 26.1025 }); // Default Bucharest coordinates
   const [roomAvailability, setRoomAvailability] = useState({});
-  const [checkInDate] = useState(new Date());
-  const [checkOutDate] = useState(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)); // Default to 2 days from now
+  const [checkInDate, setCheckInDate] = useState(() => {
+    // Get dates from location state if available
+    if (location.state?.checkInDate) {
+      return new Date(location.state.checkInDate);
+    }
+    
+    // Or try to parse from URL search params
+    const params = new URLSearchParams(location.search);
+    const checkInParam = params.get('checkIn');
+    if (checkInParam) {
+      return new Date(checkInParam);
+    }
+    
+    // Default to today
+    return new Date();
+  });
+  
+  const [checkOutDate, setCheckOutDate] = useState(() => {
+    // Get dates from location state if available
+    if (location.state?.checkOutDate) {
+      return new Date(location.state.checkOutDate);
+    }
+    
+    // Or try to parse from URL search params
+    const params = new URLSearchParams(location.search);
+    const checkOutParam = params.get('checkOut');
+    if (checkOutParam) {
+      return new Date(checkOutParam);
+    }
+    
+    // Default to 2 days from now
+    return new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+  });
+  
+  // Get guest count if available
+  const [guestCount, setGuestCount] = useState(() => {
+    if (location.state?.guestCount) {
+      return parseInt(location.state.guestCount);
+    }
+    
+    const params = new URLSearchParams(location.search);
+    const guestsParam = params.get('guests');
+    return guestsParam ? parseInt(guestsParam) : 2;
+  });
   
 
   const [showLightbox, setShowLightbox] = useState(false);
@@ -683,23 +732,27 @@ const HotelDetailPage = ({ reservationMode }) => {
     }
   };
 
-  const handleRoomSelect = (room) => {
-    console.log('Selected room:', room);
-    // Handle both _id (MongoDB) and id (Google Places) formats
-    if (room) {
-      // Use room._id or room.id, whichever is available
-      const roomId = room._id || room.id;
+  const handleRoomSelect = (roomParam) => {
+    console.log('Selected room param:', roomParam);
+    
+    // Check if we received an ID string or a room object
+    if (typeof roomParam === 'string' || typeof roomParam === 'number') {
+      // If we received an ID directly, just set it as the selected room
+      setSelectedRoom(roomParam.toString());
+    } else if (roomParam) {
+      // Handle both _id (MongoDB) and id (Google Places) formats
+      const roomId = roomParam._id || roomParam.id;
       if (roomId) {
         setSelectedRoom(roomId);
       } else {
         // If no ID is found, generate a temporary one based on room type
-        const tempId = `room-${room.type}-${Date.now()}`;
+        const tempId = `room-${roomParam.type}-${Date.now()}`;
         // Add the temporary ID to the room object
-        room.id = tempId;
+        roomParam.id = tempId;
         setSelectedRoom(tempId);
       }
     } else {
-      console.error('Invalid room selected:', room);
+      console.error('Invalid room parameter:', roomParam);
     }
   };
 
@@ -719,10 +772,15 @@ const HotelDetailPage = ({ reservationMode }) => {
       return;
     }
     
-    // Find the selected room, handling both id and _id formats
-    const roomToBook = hotel.rooms.find(room => 
-      room.id === selectedRoom || room._id === selectedRoom
-    );
+    console.log('Finding room with ID:', selectedRoom);
+    
+    // Find the selected room, handling both id and _id formats, and both string and numeric IDs
+    const roomToBook = hotel.rooms.find(room => {
+      // Convert both IDs to strings for comparison
+      const roomIdStr = room.id?.toString() || room._id?.toString();
+      const selectedRoomStr = selectedRoom.toString();
+      return roomIdStr === selectedRoomStr;
+    });
     
     if (!roomToBook) {
       console.error('Selected room not found:', selectedRoom);
@@ -859,140 +917,50 @@ const HotelDetailPage = ({ reservationMode }) => {
   
   // Default facilities when none are specified
   const transformDefaultFacilities = () => [
-    { name: 'WiFi', icon: <FaWifi /> },
-    { name: 'Parking', icon: <FaParking /> },
-    { name: 'Restaurant', icon: <FaUtensils /> },
-    { name: 'Air Conditioning', icon: <FaSnowflake /> },
-    { name: 'Spa', icon: <FaSpa /> },
-    { name: 'Fitness Center', icon: <FaDumbbell /> }
+    { icon: <FaWifi />, name: 'Wi-Fi gratuit' },
+    { icon: <FaParking />, name: 'Parcare' },
+    { icon: <FaUtensils />, name: 'Restaurant' },
+    { icon: <FaSpa />, name: 'Spa' },
+    { icon: <MdPets />, name: 'Pet Friendly' },
+    { icon: <FaDumbbell />, name: 'Sală de Fitness' }
   ];
 
-  // Add a function to calculate room availability deterministically based on hotel properties
-  const calculateRoomAvailability = (hotel, roomType) => {
-    if (!hotel) return 0;
-    
-    // Base availability on rating and price
-    const rating = parseFloat(hotel.rating || hotel.averageRating || 4.0);
-    const basePrice = parseFloat(hotel.price || hotel.basePrice || 500);
-    
-    // Calculate a quality score from 0-10
-    let qualityScore = (rating / 5) * 10; // 0-10 scale based on rating
-    
-    // Adjust based on price range (higher prices might indicate more exclusive hotels with fewer rooms)
-    // Prices below 300 RON get more availability, prices above 800 RON get less
-    const priceAdjustment = basePrice < 300 ? 2 : basePrice > 800 ? -2 : 0;
-    qualityScore += priceAdjustment;
-    
-    // Adjust based on room type
-    let roomTypeMultiplier = 1;
-    switch(roomType) {
-      case 'Standard':
-        roomTypeMultiplier = 0.5; // More standard rooms
-        break;
-      case 'Deluxe':
-        roomTypeMultiplier = 0.4; // Fewer deluxe rooms
-        break;
-      case 'Suite':
-        roomTypeMultiplier = 0.2; // Even fewer suites
-        break;
-      default:
-        roomTypeMultiplier = 1;
-    }
-    
-    // Calculate room count and ensure it's a whole number
-    // Higher quality score = more rooms (max = qualityScore * roomTypeMultiplier)
-    let calculatedRooms = Math.floor(qualityScore * roomTypeMultiplier);
-    
-    // Additional adjustments based on hotel type/category if available
-    if (hotel.types && Array.isArray(hotel.types)) {
-      // Hotels marked as "resort" or "hotel" likely have more rooms
-      if (hotel.types.some(type => type.includes('resort') || type === 'hotel')) {
-        calculatedRooms += 2;
-      }
-      // Hostels or small lodgings have fewer rooms
-      if (hotel.types.some(type => type.includes('hostel') || type.includes('motel'))) {
-        calculatedRooms -= 1;
-      }
-    }
-    
-    // Ensure we have a valid number (minimum 0)
-    return Math.max(0, calculatedRooms);
-  };
-
-  // Add a function to check room availability
-  const checkRoomsAvailability = async (hotelId, rooms) => {
+  // Function to check room availability
+  const checkHotelRoomAvailability = async (hotelId, rooms) => {
     if (!hotelId || !rooms || rooms.length === 0) return;
     
     try {
-      const startDate = checkInDate.toISOString().split('T')[0];
-      const endDate = checkOutDate.toISOString().split('T')[0];
-      const availability = {};
+      // Ensure we have proper Date objects
+      const checkInDateObj = checkInDate instanceof Date ? checkInDate : new Date(checkInDate);
+      const checkOutDateObj = checkOutDate instanceof Date ? checkOutDate : new Date(checkOutDate);
       
-      // Check if this is an API-sourced hotel
-      const isExternalHotel = hotel.source === 'external';
+      const formatDateForDisplay = (date) => {
+        return date.toLocaleDateString('ro-RO', {day: '2-digit', month: '2-digit', year: 'numeric'});
+      };
       
-      // Check each room type
-      for (const room of rooms) {
-        try {
-          console.log('Checking availability for room:', room.type, 'in hotel:', hotelId);
-          
-          if (isExternalHotel) {
-            // For external API hotels, calculate availability deterministically
-            const totalRooms = calculateRoomAvailability(hotel, room.type);
-            
-            // We'll track bookings in localStorage to simulate persistence
-            const bookings = JSON.parse(localStorage.getItem('hotelBookings') || '{}');
-            const hotelBookings = bookings[hotelId] || {};
-            const roomBookings = hotelBookings[room.type] || 0;
-            
-            // Calculate available rooms
-            const availableRooms = Math.max(0, totalRooms - roomBookings);
-            
-            availability[room.type] = {
-              available: availableRooms > 0, // Only available if there are rooms left
-              price: room.price,
-              totalRooms: totalRooms,
-              availableRooms: availableRooms,
-              capacity: room.persons || room.capacity || (room.type === 'Suite' ? 4 : 2)
-            };
-          } else {
-            // For internal hotels, use the API
-            const response = await axios.post(`${API_BASE_URL}/api/hotels/check-availability`, {
-              hotelId,
-              startDate,
-              endDate,
-              roomType: room.type,
-              roomId: room._id || room.id // Send both ID formats
-            });
-            
-            // Calculate the total available rooms
-            const totalRoomCount = room.count || 0;
-            const bookedRoomCount = response.data.bookedCount || 0;
-            const availableRoomCount = totalRoomCount - bookedRoomCount;
-            
-            availability[room.type] = {
-              available: response.data.available,
-              price: room.price,
-              totalRooms: totalRoomCount,
-              availableRooms: availableRoomCount,
-              capacity: room.persons || room.capacity || (room.type === 'Suite' ? 4 : 2)
-            };
-          }
-        } catch (err) {
-          console.error(`Error checking availability for room ${room.type}:`, err);
-          
-          // Fallback for error cases - calculate availability deterministically
-          const totalRooms = calculateRoomAvailability(hotel, room.type);
-          
-          availability[room.type] = { 
-            available: totalRooms > 0, 
-            price: room.price,
-            totalRooms: totalRooms,
-            availableRooms: totalRooms,
-            capacity: room.persons || room.capacity || (room.type === 'Suite' ? 4 : 2)
-          };
+      console.log('Checking room availability for date range:');
+      console.log('Check-in:', formatDateForDisplay(checkInDateObj));
+      console.log('Check-out:', formatDateForDisplay(checkOutDateObj));
+      console.log('Guest count:', guestCount);
+      
+      // Folosim utilitarul nostru pentru a verifica disponibilitatea camerelor
+      const availability = await checkRoomsAvailability(
+        hotelId,
+        rooms,
+        checkInDateObj,
+        checkOutDateObj,
+        hotel
+      );
+      
+      console.log('Room availability result:', JSON.stringify(availability, null, 2));
+      
+      // Verificăm dacă avem date de disponibilitate corecte
+      Object.keys(availability).forEach(roomType => {
+        const roomData = availability[roomType];
+        if (!roomData.available && roomData.nextAvailableDate) {
+          console.log(`Room ${roomType} next available date:`, formatDateForDisplay(new Date(roomData.nextAvailableDate)));
         }
-      }
+      });
       
       setRoomAvailability(availability);
     } catch (error) {
@@ -1000,12 +968,50 @@ const HotelDetailPage = ({ reservationMode }) => {
     }
   };
 
-  // Call this function after getting hotel data
+  // Function to check if room is available for selected dates
+  const isRoomAvailableForSelectedDates = (roomType) => {
+    if (!roomAvailability || !roomAvailability[roomType]) return false;
+    
+    const roomAvailabilityData = roomAvailability[roomType];
+    
+    // Get the room to check capacity
+    const room = hotel.rooms.find(r => r.type === roomType);
+    
+    // Check if room can accommodate the selected number of guests
+    if (room && guestCount > (room.capacity || room.persons || 2)) {
+      console.log(`Room ${roomType} cannot accommodate ${guestCount} guests (capacity: ${room.capacity || room.persons || 2})`);
+      return false;
+    }
+    
+    // Room is available if marked as available
+    if (roomAvailabilityData.available) return true;
+    
+    // If not available but has a next available date
+    if (roomAvailabilityData.nextAvailableDate) {
+      // Compare with current check-in date
+      const nextAvailDate = new Date(roomAvailabilityData.nextAvailableDate);
+      const currentCheckIn = new Date(checkInDate);
+      
+      // If check-in date is on or after the next available date, it should be available
+      return currentCheckIn >= nextAvailDate;
+    }
+    
+    return false;
+  };
+  
+  // Call availability check after getting hotel data
   useEffect(() => {
     if (hotel && hotel.id && hotel.rooms) {
-      checkRoomsAvailability(hotel.id, hotel.rooms);
+      checkHotelRoomAvailability(hotel.id, hotel.rooms);
     }
   }, [hotel]);
+
+  // Update room availability when dates change
+  useEffect(() => {
+    if (hotel && hotel.id && hotel.rooms && checkInDate && checkOutDate) {
+      checkHotelRoomAvailability(hotel.id, hotel.rooms);
+    }
+  }, [hotel, checkInDate, checkOutDate]);
 
   // Add a separate effect to load reviews directly from the reviews API
   useEffect(() => {
@@ -1032,6 +1038,18 @@ const HotelDetailPage = ({ reservationMode }) => {
     
     fetchHotelReviews();
   }, [hotel?.id]);
+
+  // Log the date parameters passed to the component
+  useEffect(() => {
+    console.log('HotelDetailPage - Date Parameters:');
+    console.log('Check-in date:', checkInDate);
+    console.log('Check-out date:', checkOutDate);
+    console.log('Guest count:', guestCount);
+    
+    // Format for display
+    console.log('Formatted check-in date:', checkInDate.toLocaleDateString('ro-RO', {day: '2-digit', month: '2-digit', year: 'numeric'}));
+    console.log('Formatted check-out date:', checkOutDate.toLocaleDateString('ro-RO', {day: '2-digit', month: '2-digit', year: 'numeric'}));
+  }, [checkInDate, checkOutDate, guestCount]);
 
   if (loading) {
     return (
@@ -1432,11 +1450,16 @@ const HotelDetailPage = ({ reservationMode }) => {
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="font-medium text-blue-300">Disponibilitate camere</h3>
                 <div className="flex items-center gap-2">
-                  <div className="text-sm text-gray-400">
-                    Perioada: {checkInDate.toLocaleDateString('ro-RO')} - {checkOutDate.toLocaleDateString('ro-RO')}
+                  <div className="text-sm bg-blue-900/30 px-3 py-1.5 rounded-lg text-blue-200 flex items-center">
+                    <FaRegCalendarAlt className="mr-2" />
+                    Perioada: {checkInDate.toLocaleDateString('ro-RO', {day: '2-digit', month: '2-digit', year: 'numeric'})} - {checkOutDate.toLocaleDateString('ro-RO', {day: '2-digit', month: '2-digit', year: 'numeric'})}
                   </div>
                   
-                  {/* Admin reset button removed */}
+                  {/* Guest count badge */}
+                  <div className="text-sm bg-blue-900/30 px-3 py-1.5 rounded-lg text-blue-200 flex items-center">
+                    <BiUser className="mr-2" />
+                    {guestCount} {guestCount === 1 ? 'persoană' : 'persoane'}
+                  </div>
                 </div>
               </div>
               
@@ -1445,50 +1468,82 @@ const HotelDetailPage = ({ reservationMode }) => {
                   // Use either _id or id, whichever is available
                   const roomId = room._id || room.id || `room-${index}`;
                   
-                  // Check if room has availability
-                  const roomHasAvailability = roomAvailability[room.type] && 
-                                              roomAvailability[room.type].available &&
-                                              roomAvailability[room.type].totalRooms > 0;
+                  // Get room availability data
+                  const roomAvailabilityData = roomAvailability[room.type] || {};
                   
-                  // Skip rooms with zero availability
-                  if (!roomHasAvailability) {
-                    return null;
-                  }
+                  // Determine if room is available using both the availability flag and date check
+                  const isDateAvailable = isRoomAvailableForSelectedDates(room.type);
+                  const roomHasAvailability = roomAvailabilityData.available || isDateAvailable;
                   
+                  // Don't skip rooms with zero availability - show all rooms
                   return (
                     <div
                       key={index}
                       className={`p-4 border rounded-xl transition-all ${
-                        selectedRoom === roomId
-                          ? 'border-blue-500 bg-blue-900/30'
-                          : 'border-gray-700 bg-[#112240] hover:border-blue-400'
-                      }`}
-                      onClick={() => handleRoomSelect(room)}
+                        selectedRoom === roomId ? 'border-blue-500 bg-blue-900/20' : 'border-gray-700 hover:border-gray-500'
+                      } ${roomHasAvailability ? '' : 'opacity-80'} mb-4`}
+                      onClick={() => roomHasAvailability ? handleRoomSelect(room) : null}
                     >
-                      <div className="flex flex-col md:flex-row justify-between">
-                        <div className="mb-4 md:mb-0">
-                          <div className="flex items-center flex-wrap gap-2">
-                            <h3 className="text-lg font-medium mr-3">{room.type}</h3>
-                            <span className="bg-gray-700/70 text-gray-300 text-xs px-2 py-0.5 rounded-full flex items-center">
-                              <BiUser className="mr-1" />
-                              Max. {room.capacity || room.persons || 2} {(room.capacity || room.persons || 2) === 1 ? 'persoană' : 'persoane'}
-                            </span>
-                            
-                            {roomAvailability[room.type] && (
-                              <span className={`text-xs px-2 py-0.5 rounded-full flex items-center ${
-                                roomAvailability[room.type].available ? 'bg-green-600/70 text-green-100' : 'bg-red-600/70 text-red-100'
-                              }`}>
-                                {roomAvailability[room.type].available ? (
-                                  <>{roomAvailability[room.type].availableRooms} / {roomAvailability[room.type].totalRooms} disponibile</>
-                                ) : (
-                                  'Indisponibil'
-                                )}
-                              </span>
+                      <div className="flex flex-col md:flex-row">
+                        <div className="flex items-start flex-1">
+                          <div className="w-24 h-24 sm:w-36 sm:h-36 flex-shrink-0 rounded-lg overflow-hidden mr-4">
+                            {room.image ? (
+                              <img src={room.image} alt={room.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full bg-gray-800 flex items-center justify-center">
+                                <FaBed className="text-gray-600 text-3xl" />
+                              </div>
                             )}
                           </div>
-                          
-                          <div className="mt-3">
+                          <div>
+                            <h3 className="text-xl font-semibold">{room.name}</h3>
+                            <div className="flex gap-2 flex-wrap mt-1">
+                              <span className="bg-blue-900/60 text-blue-200 text-xs px-2 py-0.5 rounded-full">
+                                <FaUsers className="inline-block mr-1" />
+                                {room.capacity || 2} persoane
+                              </span>
+                              <span className="bg-blue-900/60 text-blue-200 text-xs px-2 py-0.5 rounded-full">
+                                <FaBed className="inline-block mr-1" />
+                                {room.type}
+                              </span>
+                              {roomHasAvailability && (
+                                <span className="bg-green-900/60 text-green-200 text-xs px-2 py-0.5 rounded-full">
+                                  <FaCheck className="inline-block mr-1" />
+                                  Disponibil
+                                </span>
+                              )}
+                              {!roomHasAvailability && (
+                                <span className="bg-red-900/60 text-red-200 text-xs px-2 py-0.5 rounded-full">
+                                  <FaTimes className="inline-block mr-1" />
+                                  Indisponibil
+                                </span>
+                              )}
+                            </div>
                             <p className="text-sm text-gray-300">{room.description}</p>
+                            
+                            {/* Display next available date if room is unavailable */}
+                            {!roomHasAvailability && roomAvailabilityData.nextAvailableDate && (
+                              <div className="mt-2 bg-amber-500/10 border border-amber-500/30 rounded px-3 py-1.5 text-xs text-amber-400">
+                                <span className="font-medium">Următoarea dată disponibilă:</span>{' '}
+                                {(() => {
+                                  try {
+                                    const date = new Date(roomAvailabilityData.nextAvailableDate);
+                                    if (isNaN(date.getTime())) {
+                                      console.error('Invalid next available date:', roomAvailabilityData.nextAvailableDate);
+                                      return 'Data indisponibilă';
+                                    }
+                                    return date.toLocaleDateString('ro-RO', { 
+                                      day: 'numeric', 
+                                      month: 'short', 
+                                      year: 'numeric' 
+                                    });
+                                  } catch (error) {
+                                    console.error('Error formatting next available date:', error);
+                                    return 'Data indisponibilă';
+                                  }
+                                })()}
+                              </div>
+                            )}
                             
                             <div className="mt-3 flex flex-wrap gap-2">
                               {room.amenities && room.amenities.map((amenity, i) => (
@@ -1504,22 +1559,35 @@ const HotelDetailPage = ({ reservationMode }) => {
                           <p className="text-gray-400 text-sm">Preț pe noapte</p>
                           <p className="text-2xl font-bold text-white">{room.price} RON</p>
                           
-                          {roomAvailability[room.type] && roomAvailability[room.type].available && roomAvailability[room.type].availableRooms <= 3 && (
+                          {roomHasAvailability && roomAvailabilityData.availableRooms <= 3 && roomAvailabilityData.availableRooms > 0 && (
                             <p className="text-amber-400 text-xs mt-1">
-                              {roomAvailability[room.type].availableRooms === 1 
+                              {roomAvailabilityData.availableRooms === 1 
                                 ? 'Ultima cameră disponibilă!' 
-                                : `Doar ${roomAvailability[room.type].availableRooms} camere rămase!`
+                                : `Doar ${roomAvailabilityData.availableRooms} camere rămase!`
                               }
                             </p>
                           )}
                           
-                          {selectedRoom === roomId && (
+                          {selectedRoom === roomId && roomHasAvailability && (
                             <button
                               className="mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors text-sm flex items-center"
-                              onClick={handleBookNow}
+                              onClick={(e) => {
+                                e.stopPropagation(); // Prevent triggering the parent div's onClick
+                                handleBookNow();
+                              }}
                             >
                               <FaRegCalendarAlt className="mr-2" />
                               Rezervă acum
+                            </button>
+                          )}
+                          
+                          {!roomHasAvailability && (
+                            <button
+                              className="mt-4 px-4 py-2 bg-gray-500 cursor-not-allowed rounded-lg transition-colors text-sm flex items-center opacity-70"
+                              disabled
+                            >
+                              <FaRegCalendarAlt className="mr-2" />
+                              Indisponibil
                             </button>
                           )}
                         </div>
@@ -1528,11 +1596,7 @@ const HotelDetailPage = ({ reservationMode }) => {
                   );
                 })}
                 
-                {!hotel.rooms?.some(room => 
-                  roomAvailability[room.type] && 
-                  roomAvailability[room.type].available &&
-                  roomAvailability[room.type].totalRooms > 0
-                ) && (
+                {!hotel.rooms || hotel.rooms.length === 0 && (
                   <div className="text-center py-8 border border-gray-700 rounded-xl bg-[#112240]">
                     <p className="text-gray-400">Nu există camere disponibile pentru perioada selectată.</p>
                     <p className="text-gray-400 mt-2">Vă rugăm să reveniți mai târziu sau să încercați alte date.</p>
