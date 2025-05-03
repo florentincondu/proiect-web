@@ -19,6 +19,7 @@ import MyBookings from "./pages/MyBookings";
 import NotificationsPage from './pages/NotificationsPage';
 import { useAuth } from './context/authContext';
 import ContactUs from "./pages/ContactUs";
+import AboutUs from "./pages/AboutUs";
 import ResetPassword from './pages/ResetPassword';
 import AdminApprovalConfirmation from './pages/AdminApprovalConfirmation';
 import TermsOfService from "./components/termsOfservice";
@@ -156,6 +157,7 @@ function MainContent() {
       <Route path="/popularhotels" element={<PopularHotelsPage />} />
       <Route path="/search-results" element={<SearchResults />} />
       <Route path="/contact-us" element={<ContactUs />} />
+      <Route path="/about-us" element={<AboutUs />} />
       <Route path="/terms-of-service" element={<TermsOfService />} />
       <Route path="/hotel-search-results" element={<HotelSearchResults />} />
       <Route path="/hotel/:hotelId" element={

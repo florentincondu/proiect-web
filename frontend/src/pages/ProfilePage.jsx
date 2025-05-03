@@ -53,6 +53,8 @@ const ProfilePage = () => {
   const [passwordError, setPasswordError] = useState(null);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isEditingHotel, setIsEditingHotel] = useState(false);
+  const [isDeletingHotel, setIsDeletingHotel] = useState(false);
 
 
   const [accommodation, setAccommodation] = useState({
@@ -1092,6 +1094,7 @@ const ProfilePage = () => {
   // Add this function to save hotel changes
   const handleSaveHotel = async (hotelId) => {
     try {
+      setIsEditingHotel(true);
       
       const updatedHotelData = {
         name: editFormData.title,
@@ -1104,7 +1107,7 @@ const ProfilePage = () => {
       };
       
       const response = await axios.put(
-        `${API_BASE_URL}/api/hotels/${hotelId}`,
+        `${API_BASE_URL}/api/hotels/user/my-hotels/${hotelId}`,
         updatedHotelData,
         {
           headers: {
@@ -1139,51 +1142,9 @@ const ProfilePage = () => {
       }
     } catch (error) {
       console.error('Error updating hotel:', error);
-      
-      // Fallback to localStorage if API call fails
-      try {
-        const mockHotels = JSON.parse(localStorage.getItem('mockHotels') || '[]');
-        const updatedMockHotels = mockHotels.map(hotel => {
-          if (hotel.id === hotelId || hotel._id === hotelId) {
-            return {
-              ...hotel,
-              title: editFormData.title,
-              description: editFormData.description,
-              address: editFormData.address,
-              price: editFormData.price,
-              amenities: editFormData.amenities,
-              updatedAt: new Date().toISOString()
-            };
-          }
-          return hotel;
-        });
-        
-        localStorage.setItem('mockHotels', JSON.stringify(updatedMockHotels));
-        
-        // Update the hotel in the list
-        setUserHotels(prevHotels => 
-          prevHotels.map(hotel => 
-            (hotel.id === hotelId || hotel._id === hotelId) 
-              ? {
-                  ...hotel,
-                  title: editFormData.title,
-                  name: editFormData.title,
-                  description: editFormData.description,
-                  address: editFormData.address,
-                  location: editFormData.address,
-                  price: editFormData.price,
-                  amenities: editFormData.amenities
-                }
-              : hotel
-          )
-        );
-        
-        showNotification('Cazarea a fost actualizată cu succes! (mock)', 'success');
-        setEditingHotelId(null);
-      } catch (localStorageError) {
-        console.error('Error updating localStorage:', localStorageError);
-        showNotification('A apărut o eroare la actualizarea cazării', 'error');
-      }
+      showNotification(error.response?.data?.message || 'A apărut o eroare la actualizarea cazării', 'error');
+    } finally {
+      setIsEditingHotel(false);
     }
   };
 
@@ -1198,9 +1159,10 @@ const ProfilePage = () => {
     if (!hotelToDelete) return;
     
     try {
+      setIsDeletingHotel(true);
       
       const response = await axios.delete(
-        `${API_BASE_URL}/api/hotels/${hotelToDelete.id || hotelToDelete._id}`,
+        `${API_BASE_URL}/api/hotels/user/my-hotels/${hotelToDelete.id || hotelToDelete._id}`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('authToken')}`
@@ -1221,35 +1183,13 @@ const ProfilePage = () => {
       }
     } catch (error) {
       console.error('Error deleting hotel:', error);
-      
-      // Fallback to localStorage if API call fails
-      try {
-        const mockHotels = JSON.parse(localStorage.getItem('mockHotels') || '[]');
-        const filteredMockHotels = mockHotels.filter(hotel => 
-          hotel.id !== (hotelToDelete.id || hotelToDelete._id) && 
-          hotel._id !== (hotelToDelete.id || hotelToDelete._id)
-        );
-        
-        localStorage.setItem('mockHotels', JSON.stringify(filteredMockHotels));
-        
-        // Remove the hotel from the list
-        setUserHotels(prevHotels => 
-          prevHotels.filter(hotel => 
-            hotel.id !== (hotelToDelete.id || hotelToDelete._id) && 
-            hotel._id !== (hotelToDelete.id || hotelToDelete._id)
-          )
-        );
-        
-        showNotification('Cazarea a fost ștearsă cu succes! (mock)', 'success');
-      } catch (localStorageError) {
-        console.error('Error updating localStorage:', localStorageError);
-        showNotification('A apărut o eroare la ștergerea cazării', 'error');
-      }
+      showNotification(error.response?.data?.message || 'A apărut o eroare la ștergerea cazării', 'error');
+    } finally {
+      setIsDeletingHotel(false);
+      // Close the modal
+      setShowDeleteModal(false);
+      setHotelToDelete(null);
     }
-    
-    // Close the modal
-    setShowDeleteModal(false);
-    setHotelToDelete(null);
   };
 
   if (loading) return (
@@ -2941,9 +2881,15 @@ const ProfilePage = () => {
                     <button
                       type="button"
                       onClick={() => handleSaveHotel(hotel.id || hotel._id)}
-                      className="bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600 transition"
+                      className="bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600 transition disabled:opacity-70"
+                      disabled={isEditingHotel}
                     >
-                      Salvare
+                      {isEditingHotel ? (
+                        <div className="flex items-center">
+                          <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                          Salvare...
+                        </div>
+                      ) : 'Salvare'}
                     </button>
                   </div>
                 </div>
@@ -2996,6 +2942,7 @@ const ProfilePage = () => {
                       onClick={() => handleEditHotel(hotel)}
                       className="bg-blue-500 p-2 rounded-full text-white hover:bg-blue-600 transition"
                       title="Edit"
+                      disabled={isEditingHotel || isDeletingHotel}
                     >
                       <FaEdit size={14} />
                     </button>
@@ -3004,6 +2951,7 @@ const ProfilePage = () => {
                       onClick={() => handleDeleteClick(hotel)}
                       className="bg-red-500 p-2 rounded-full text-white hover:bg-red-600 transition"
                       title="Delete"
+                      disabled={isEditingHotel || isDeletingHotel}
                     >
                       <FaTrash size={14} />
                     </button>
@@ -3080,9 +3028,15 @@ const ProfilePage = () => {
         
         <button
           onClick={handleDeleteHotel}
-          className="bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600 transition"
+          className="bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600 transition disabled:opacity-70"
+          disabled={isDeletingHotel}
         >
-          Ștergere
+          {isDeletingHotel ? (
+            <div className="flex items-center">
+              <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+              Ștergere...
+            </div>
+          ) : 'Ștergere'}
         </button>
       </div>
     </div>

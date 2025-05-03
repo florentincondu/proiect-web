@@ -1026,6 +1026,98 @@ exports.toggleHotelRestriction = asyncHandler(async (req, res, next) => {
 });
 
 /**
+ * @desc    Update user's own hotel
+ * @route   PUT /api/hotels/user/my-hotels/:id
+ * @access  Private
+ */
+exports.updateUserHotel = asyncHandler(async (req, res, next) => {
+  try {
+    const hotelId = req.params.id;
+    
+    // Find the hotel by ID and check if it belongs to the current user
+    let hotel = await Hotel.findById(hotelId);
+    
+    if (!hotel) {
+      return res.status(404).json({
+        success: false,
+        message: 'Cazarea nu a fost găsită'
+      });
+    }
+    
+    // Verify ownership
+    if (hotel.owner.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Nu aveți permisiunea să modificați această cazare'
+      });
+    }
+    
+    // Update hotel with the provided data
+    const updateData = {
+      ...req.body,
+      updatedAt: new Date()
+    };
+    
+    // Ensure we're not allowing modification of ownership
+    delete updateData.owner;
+    
+    hotel = await Hotel.findByIdAndUpdate(hotelId, updateData, {
+      new: true,
+      runValidators: true
+    });
+    
+    res.status(200).json({
+      success: true,
+      data: hotel,
+      message: 'Cazarea a fost actualizată cu succes'
+    });
+  } catch (error) {
+    console.error('Error updating user hotel:', error);
+    return next(new CustomError('Eroare la actualizarea cazării. Vă rugăm să încercați din nou.', 500));
+  }
+});
+
+/**
+ * @desc    Delete user's own hotel
+ * @route   DELETE /api/hotels/user/my-hotels/:id
+ * @access  Private
+ */
+exports.deleteUserHotel = asyncHandler(async (req, res, next) => {
+  try {
+    const hotelId = req.params.id;
+    
+    // Find the hotel by ID and check if it belongs to the current user
+    const hotel = await Hotel.findById(hotelId);
+    
+    if (!hotel) {
+      return res.status(404).json({
+        success: false,
+        message: 'Cazarea nu a fost găsită'
+      });
+    }
+    
+    // Verify ownership
+    if (hotel.owner.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Nu aveți permisiunea să ștergeți această cazare'
+      });
+    }
+    
+    // Delete the hotel
+    await hotel.deleteOne();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Cazarea a fost ștearsă cu succes'
+    });
+  } catch (error) {
+    console.error('Error deleting user hotel:', error);
+    return next(new CustomError('Eroare la ștergerea cazării. Vă rugăm să încercați din nou.', 500));
+  }
+});
+
+/**
  * @desc    Încarcă imagini pentru hoteluri
  * @route   POST /api/hotels/upload-images
  * @access  Private

@@ -31,6 +31,10 @@ router.post('/user-hotel', hotelController.createUserHotel);
 
 router.post('/upload-images', hotelImagesUpload, hotelController.uploadHotelImages);
 
+// User hotel routes - allow users to manage their own hotels
+router.put('/user/my-hotels/:id', hotelController.updateUserHotel);
+router.delete('/user/my-hotels/:id', hotelController.deleteUserHotel);
+
 
 router.route('/')
   .post(authorize(['admin']), hotelController.createHotel);
