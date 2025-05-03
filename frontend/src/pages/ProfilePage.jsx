@@ -15,6 +15,8 @@ import { useAuth } from '../context/authContext';
 import { getProfile, updateProfile, uploadProfileImage, uploadCoverImage, changePassword } from '../api/auth';
 import axios from 'axios';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
 const ProfilePage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -183,7 +185,6 @@ const ProfilePage = () => {
       if (activeTab === 'myaccommodations' && user) {
         try {
           setHotelsLoading(true);
-          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
           
 
           try {
@@ -616,7 +617,6 @@ const ProfilePage = () => {
         return [];
       }
 
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
       const token = localStorage.getItem('authToken');
 
       // Încercăm să încărcăm toate fișierele într-o singură cerere
@@ -690,8 +690,6 @@ const ProfilePage = () => {
     try {
 
 
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-      
       try {
         const response = await axios.post(
           `${API_BASE_URL}/api/hotels/payment`,
@@ -724,32 +722,45 @@ const ProfilePage = () => {
     setLoading(true);
     
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-      
       // Process uploaded photos
       const formData = new FormData();
       const photoUrls = [];
       
       for (const photoObj of accommodation.photos) {
         if (photoObj.file) {
-          formData.append('photos', photoObj.file);
+          formData.append('hotelImages', photoObj.file);
         }
       }
       
       if (accommodation.photos.length > 0) {
-        const uploadResponse = await axios.post(
-          `${API_BASE_URL}/api/upload/photos`,
-          formData,
-          {
-            headers: {
-              'Content-Type': 'multipart/form-data',
-              'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        try {
+          // Log the photos being uploaded
+          console.log('Preparing to upload photos:', accommodation.photos.map(p => p.file ? 'File: ' + p.file.name : 'URL: ' + p.url));
+          
+          const uploadResponse = await axios.post(
+            `${API_BASE_URL}/api/hotels/upload-images`,
+            formData,
+            {
+              headers: {
+                'Content-Type': 'multipart/form-data',
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+              }
             }
+          );
+          
+          if (uploadResponse.data && uploadResponse.data.success) {
+            console.log('Upload successful, received image URLs:', uploadResponse.data.imageUrls);
+            photoUrls.push(...uploadResponse.data.imageUrls);
+          } else {
+            console.error('Upload response indicated failure or missing data:', uploadResponse.data);
           }
-        );
-        
-        if (uploadResponse.data && uploadResponse.data.success) {
-          photoUrls.push(...uploadResponse.data.urls);
+        } catch (uploadError) {
+          console.error('Error uploading photos:', uploadError);
+          if (uploadError.response) {
+            console.error('Upload error response:', uploadError.response.status, uploadError.response.data);
+          }
+          showNotification('Eroare la încărcarea fotografiilor. Încercați din nou.', 'error');
+          throw uploadError;
         }
       }
       
@@ -768,6 +779,9 @@ const ProfilePage = () => {
             : 'Card Owner'
         }
       };
+      
+      // Log the photo URLs for debugging
+      console.log('Processed photo URLs:', photoUrls);
       
       // Clean up and prepare room configuration to ensure number values
       const roomsConfig = accommodation.roomTypes.map(room => ({
@@ -1078,7 +1092,6 @@ const ProfilePage = () => {
   // Add this function to save hotel changes
   const handleSaveHotel = async (hotelId) => {
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
       
       const updatedHotelData = {
         name: editFormData.title,
@@ -1185,7 +1198,6 @@ const ProfilePage = () => {
     if (!hotelToDelete) return;
     
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
       
       const response = await axios.delete(
         `${API_BASE_URL}/api/hotels/${hotelToDelete.id || hotelToDelete._id}`,
@@ -2792,6 +2804,11 @@ const ProfilePage = () => {
       <FaBed className="mr-2" /> Cazările mele
     </h3>
     
+    {/* Define API_BASE_URL for this section */}
+    {(() => {
+      return null;
+    })()}
+    
     {hotelsLoading ? (
       <div className="flex justify-center p-6">
         <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
@@ -2937,16 +2954,39 @@ const ProfilePage = () => {
                   <img
                     src={
                       hotel.photos && hotel.photos.length > 0
-                        ? typeof hotel.photos[0] === 'string'
-                          ? hotel.photos[0]
-                          : (hotel.photos[0].name && typeof hotel.photos[0].name === 'string')
-                            ? (hotel.photos[0].name.startsWith('http') ? hotel.photos[0].name : `${API_BASE_URL}/api/places/media/${encodeURIComponent(hotel.photos[0].name)}?maxWidthPx=400`)
-                            : 'https://placehold.co/600x400/172a45/ffffff?text=No+Image'
+                        ? (() => {
+                            const photo = hotel.photos[0];
+                            // For string URLs
+                            if (typeof photo === 'string') {
+                              // User-uploaded hotel photos
+                              if (photo.includes('uploads/hotel')) {
+                                return photo.startsWith('/') 
+                                  ? `${API_BASE_URL}${photo}` 
+                                  : `${API_BASE_URL}/${photo}`;
+                              }
+                              // Regular uploads
+                              if (photo.startsWith('/uploads/')) {
+                                return `${API_BASE_URL}${photo}`;
+                              }
+                              // External URLs
+                              if (photo.startsWith('http')) {
+                                return photo;
+                              }
+                              // Assume it's a filename for hotel uploads
+                              return `${API_BASE_URL}/uploads/hotel/${photo.split(/[\/\\]/).pop()}`;
+                            } 
+                            // For object with name property (Google Places API)
+                            else if (photo && typeof photo === 'object' && photo.name) {
+                              return `${API_BASE_URL}/api/places/media/${encodeURIComponent(photo.name)}?maxWidthPx=400`;
+                            }
+                            return 'https://placehold.co/600x400/172a45/ffffff?text=No+Image';
+                          })()
                         : 'https://placehold.co/600x400/172a45/ffffff?text=No+Image'
                     }
-                  alt={hotel.title || hotel.name} 
-                  className="w-full h-full object-cover"
+                    alt={hotel.title || hotel.name} 
+                    className="w-full h-full object-cover"
                     onError={(e) => {
+                      console.error('Image load error:', e.target.src);
                       e.target.onerror = null;
                       e.target.src = 'https://placehold.co/600x400/172a45/ffffff?text=Image+Error';
                     }}

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const { protect } = require('../middleware/authMiddleware');
-const { profileUpload, coverUpload } = require('../middleware/uploadMiddleware');
+const { profileUpload, coverUpload, hotelImagesUpload } = require('../middleware/uploadMiddleware');
 const path = require('path');
 const fs = require('fs');
 
@@ -607,6 +607,31 @@ router.post('/upload-cover-image', protect, coverUpload, async (req, res) => {
   } catch (err) {
     console.error('Error uploading cover image:', err);
     res.status(500).json({ message: 'Server error during image upload' });
+  }
+});
+
+// Photo upload endpoint for accommodations
+router.post('/upload/photos', protect, hotelImagesUpload, async (req, res) => {
+  try {
+    if (!req.hotelImageUrls || req.hotelImageUrls.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No images uploaded. Please select at least one image.'
+      });
+    }
+
+    // Return the uploaded image URLs
+    res.status(200).json({
+      success: true,
+      message: `${req.hotelImageUrls.length} images uploaded successfully`,
+      urls: req.hotelImageUrls
+    });
+  } catch (error) {
+    console.error('Error uploading hotel images:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error uploading images. Please try again.'
+    });
   }
 });
 

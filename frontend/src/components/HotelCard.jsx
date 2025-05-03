@@ -18,19 +18,41 @@ const HotelCard = ({
   
   // Helper function to get the photo URL
   const getPhotoUrl = (photo, maxWidth = 400) => {
+    // Log for debugging
+    console.log('HotelCard processing photo:', photo, typeof photo);
+    
     // If no photo, return default image
     if (!photo) return backgr;
     
-    // If it's an object with name property (Google Places API)
-    if (typeof photo === 'object' && photo.name) {
-      return `${API_BASE_URL}/api/places/media/${encodeURIComponent(photo.name)}?maxWidthPx=${maxWidth}`;
+    // Handle object with name property
+    if (typeof photo === 'object') {
+      // Special case for user-uploaded images with name property that includes uploads/hotel path
+      if (photo.name && typeof photo.name === 'string') {
+        if (photo.name.includes('/uploads/hotel')) {
+          return `${API_BASE_URL}${photo.name}`;
+        } else {
+          // Google Places API objects with name property
+          return `${API_BASE_URL}/api/places/media/${encodeURIComponent(photo.name)}?maxWidthPx=${maxWidth}`;
+        }
+      }
+      // For photo_reference from Google Places API
+      else if (photo.photo_reference) {
+        return `${API_BASE_URL}/api/places/photo?photo_reference=${encodeURIComponent(photo.photo_reference)}&maxwidth=${maxWidth}`;
+      }
     }
     
-    // If it's a string
+    // Handle string paths
     if (typeof photo === 'string') {
-      // For relative URLs uploaded by users
+      // For relative URLs uploaded by users with /uploads/ prefix
       if (photo.startsWith('/uploads/')) {
         return `${API_BASE_URL}${photo}`;
+      }
+      
+      // For paths containing uploads/hotel without leading slash
+      if (photo.includes('uploads/hotel')) {
+        return photo.startsWith('/') 
+          ? `${API_BASE_URL}${photo}` 
+          : `${API_BASE_URL}/${photo}`;
       }
       
       // For absolute external URLs
@@ -43,23 +65,21 @@ const HotelCard = ({
         return photo;
       }
       
-      // For other strings (media IDs or file paths)
+      // For other strings that might be file paths
       try {
         if (photo.includes('/') || photo.includes('\\')) {
-          const fileName = photo.split(/[\/\\]/).pop(); // Get the filename
-          return `${API_BASE_URL}/uploads/hotels/${fileName}`;
+          // Extract filename and assume it's in hotel uploads
+          const fileName = photo.split(/[\/\\]/).pop();
+          // Use hotels (plural) path as seen in searchLodge.jsx
+          return `${API_BASE_URL}/uploads/hotel/${fileName}`;
         }
         
+        // Default case for other strings - assume it's a media ID
         return `${API_BASE_URL}/api/places/media/${encodeURIComponent(photo)}?maxWidthPx=${maxWidth}`;
       } catch (error) {
         console.error('Error formatting image URL string:', error);
         return backgr;
       }
-    }
-    
-    // For photo_reference from Google Places API
-    if (photo && photo.photo_reference) {
-      return `${API_BASE_URL}/api/places/photo?photo_reference=${encodeURIComponent(photo.photo_reference)}&maxwidth=${maxWidth}`;
     }
     
     // Default case
@@ -165,9 +185,10 @@ const HotelCard = ({
       <div className="relative h-32 xs:h-36 sm:h-40 md:h-44 overflow-hidden">
         <img 
           src={getPhotoUrl(currentPhoto)}
-          alt={hotel.displayName?.text || 'Hotel image'} 
+          alt={hotel.displayName?.text || hotel.name || 'Hotel image'} 
           className="w-full h-full object-cover transition-transform duration-300 hover:scale-110"
           onError={(e) => {
+            console.error('Image failed to load:', e.target.src, 'Original photo:', currentPhoto);
             e.target.onerror = null;
             e.target.src = backgr;
           }}
