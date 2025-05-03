@@ -347,57 +347,27 @@ const PaymentsInvoicesManagement = () => {
       
       console.log('Payment stats response:', response.data);
       
-
       if (response.data) {
-
-        const paidData = response.data.byStatus.find(item => item._id === 'paid') || { count: 0, revenue: 0 };
-        const pendingData = response.data.byStatus.find(item => item._id === 'pending') || { count: 0, revenue: 0 };
-        const refundedData = response.data.byStatus.find(item => item._id === 'refunded') || { count: 0, revenue: 0 };
-        const partiallyRefundedData = response.data.byStatus.find(item => item._id === 'partially_refunded') || { count: 0, revenue: 0 };
-        
-
-        const totalPayments = response.data.byStatus.reduce((sum, status) => sum + status.count, 0);
-        const successRate = totalPayments > 0 ? 
-          ((paidData.count + partiallyRefundedData.count) / totalPayments * 100).toFixed(1) : 0;
-        
-
-        const refundedAmount = refundedData.revenue + (partiallyRefundedData.revenue * 0.5); // Estimate for partially refunded
-        
-
-        let revenueChange = 0;
-        if (response.data.monthlyRevenue && response.data.monthlyRevenue.length >= 2) {
-
-          const sortedMonthlyData = [...response.data.monthlyRevenue].sort((a, b) => {
-            if (a._id.year !== b._id.year) return b._id.year - a._id.year;
-            return b._id.month - a._id.month;
-          });
-          
-
-          const currentMonthRevenue = sortedMonthlyData[0]?.revenue || 0;
-          const previousMonthRevenue = sortedMonthlyData[1]?.revenue || 0;
-          
-
-          if (previousMonthRevenue > 0) {
-            revenueChange = ((currentMonthRevenue - previousMonthRevenue) / previousMonthRevenue * 100).toFixed(1);
-          }
-        }
-        
-
+        // Direct values from the API response
         setPaymentStats({
           totalRevenue: response.data.totals.revenue || 0,
-          revenueChange: parseFloat(revenueChange),
-          successfulPayments: paidData.count,
-          successRate: parseFloat(successRate),
-          pendingPayments: pendingData.count,
-          pendingAmount: pendingData.revenue,
-          refundedAmount: refundedAmount,
-          refundCount: refundedData.count + partiallyRefundedData.count,
+          revenueChange: response.data.totals.revenueChange || 0,
+          successfulPayments: response.data.totals.count || 0,
+          successRate: response.data.totals.successRate || 0,
+          pendingPayments: response.data.totals.pendingCount || 0,
+          pendingAmount: response.data.totals.pendingAmount || 0,
+          refundedAmount: response.data.totals.refundedAmount || 0,
+          refundCount: response.data.totals.refundCount || 0,
           byStatus: response.data.byStatus || [],
           byMethod: response.data.byMethod || [],
           monthlyRevenue: response.data.monthlyRevenue || []
         });
+        
+        // Update the total refunds display
+        setTotalRefunds(response.data.totals.refundedAmount || 0);
+        setRefundedBookingsCount(response.data.totals.refundCount || 0);
       } else {
-
+        // Fallback values
         setPaymentStats({
           totalRevenue: 4800,
           revenueChange: 12.5,
@@ -427,7 +397,7 @@ const PaymentsInvoicesManagement = () => {
       }
     } catch (err) {
       console.error('Error fetching payment stats:', err);
-
+      // Fallback values
       setPaymentStats({
         totalRevenue: 4800,
         revenueChange: 12.5,
@@ -604,32 +574,82 @@ const PaymentsInvoicesManagement = () => {
   };
 
 
-  const handleRefundPayment = () => {
+  const handleRefundPayment = async () => {
     setIsLoading(true);
     
-
-    setTimeout(() => {
-      const isFullRefund = parseFloat(refundAmount) === (selectedPayment?.amount || 0);
-      
-      const newStatus = isFullRefund ? 'Refunded' : 'Partially Refunded';
-      const updatedPayments = payments.map(payment => 
-        payment.id === selectedPayment?.id 
-          ? { 
-              ...payment, 
-              status: newStatus,
-              refundAmount,
-              refundDate: new Date().toISOString().split('T')[0],
-              notes: payment.notes + (payment.notes ? '\n' : '') + `Refund processed: ${refundAmount} ${payment.currency}. Reason: ${refundReason}`
-            } 
-          : payment
+    try {
+      // Call the API to process the refund
+      const response = await axios.post(
+        `${API_BASE_URL}/api/refund`,
+        {
+          paymentId: selectedPayment?.id,
+          amount: parseFloat(refundAmount),
+          reason: refundReason
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
       );
       
-      setPayments(updatedPayments);
+      if (response.data.success) {
+        // Update UI
+        const isFullRefund = parseFloat(refundAmount) === (selectedPayment?.amount || 0);
+        const newStatus = isFullRefund ? 'Refunded' : 'Partially Refunded';
+        
+        // Update the payments list
+        const updatedPayments = payments.map(payment => 
+          payment.id === selectedPayment?.id 
+            ? { 
+                ...payment, 
+                status: newStatus,
+                refundAmount: payment.refundAmount ? parseFloat(payment.refundAmount) + parseFloat(refundAmount) : parseFloat(refundAmount),
+                refundDate: new Date().toISOString().split('T')[0],
+                notes: payment.notes + (payment.notes ? '\n' : '') + `Refund processed: ${refundAmount} ${payment.currency}. Reason: ${refundReason}`
+              } 
+            : payment
+        );
+        
+        // Update the stats
+        setPaymentStats(prevStats => ({
+          ...prevStats,
+          // Decrease total revenue by the refund amount
+          totalRevenue: Math.max(0, (prevStats.totalRevenue || 0) - parseFloat(refundAmount)),
+          // Increase refunded amount
+          refundedAmount: (prevStats.refundedAmount || 0) + parseFloat(refundAmount),
+          // Increment refund count if it's a new refund
+          refundCount: selectedPayment?.status === 'Refunded' || selectedPayment?.status === 'Partially Refunded'
+            ? prevStats.refundCount
+            : (prevStats.refundCount || 0) + 1
+        }));
+        
+        // Update refunded totals
+        setTotalRefunds(prevTotal => prevTotal + parseFloat(refundAmount));
+        
+        // Increment refunded bookings count if it's a first-time refund
+        if (selectedPayment?.status !== 'Refunded' && selectedPayment?.status !== 'Partially Refunded') {
+          setRefundedBookingsCount(prevCount => prevCount + 1);
+        }
+        
+        setPayments(updatedPayments);
+        
+        // Show success notification
+        console.log('Refund processed successfully:', response.data);
+      } else {
+        console.error('Refund failed:', response.data);
+      }
+      
+      // Close the modal
       setShowRefundModal(false);
       setRefundAmount(0);
       setRefundReason('');
+    } catch (error) {
+      console.error('Error processing refund:', error);
+      // You could add error notification here
+    } finally {
       setIsLoading(false);
-    }, 800);
+    }
   };
 
 
@@ -1293,14 +1313,10 @@ const PaymentsInvoicesManagement = () => {
                       type="number"
                       value={refundAmount}
                       onChange={(e) => setRefundAmount(Math.min(
-                        selectedPayment && selectedPayment.status === 'Partially Refunded' 
-                          ? (selectedPayment.amount - selectedPayment.refundAmount) || 0
-                          : selectedPayment?.amount || 0,
+                        selectedPayment?.amount || selectedPayment?.total || 0,
                         e.target.value
                       ))}
-                      max={selectedPayment && selectedPayment.status === 'Partially Refunded' 
-                        ? (selectedPayment.amount - selectedPayment.refundAmount) || 0
-                        : selectedPayment?.amount || 0}
+                      max={selectedPayment?.amount || selectedPayment?.total || 0}
                       min={0.01}
                       step={0.01}
                       className="w-full bg-gray-700 text-white px-4 py-2 rounded-md"
@@ -1308,10 +1324,8 @@ const PaymentsInvoicesManagement = () => {
                     />
                     <div className="text-sm text-gray-400 mt-1">
                       Maximum refund: {formatCurrency(
-                        selectedPayment && selectedPayment.status === 'Partially Refunded' 
-                          ? (selectedPayment.amount - selectedPayment.refundAmount) || 0
-                          : selectedPayment?.amount || 0,
-                        selectedPayment?.currency || 'USD'
+                        selectedPayment?.amount || selectedPayment?.total || 0,
+                        selectedPayment?.currency || 'RON'
                       )}
                     </div>
                   </div>

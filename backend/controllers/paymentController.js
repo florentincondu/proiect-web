@@ -2,6 +2,7 @@ const Payment = require('../models/Payment');
 const Booking = require('../models/Booking');
 const User = require('../models/User');
 const SystemLog = require('../models/SystemLog');
+const PaymentStat = require('../models/PaymentStat');
 
 
 exports.getAllPayments = async (req, res) => {
@@ -387,26 +388,22 @@ exports.processRefund = async (req, res) => {
     
     console.log('Processing refund:', { paymentId, amount, reason });
     
-
     const payment = await Payment.findById(paymentId);
     if (!payment) {
       return res.status(404).json({ message: 'Payment not found' });
     }
     
-
     if (payment.status !== 'paid' && payment.status !== 'partially_refunded') {
       return res.status(400).json({ 
         message: `Cannot refund a payment with status: ${payment.status}` 
       });
     }
     
-
+    // Ensure refund amount is a number
     const refundAmount = amount ? parseFloat(amount) : payment.total;
     
-
     const refundTransactionId = `REF-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     
-
     const refund = {
       amount: refundAmount,
       reason: reason || 'Admin initiated refund',
@@ -416,10 +413,9 @@ exports.processRefund = async (req, res) => {
       createdAt: new Date()
     };
     
-
+    payment.refunds = payment.refunds || [];
     payment.refunds.push(refund);
     
-
     const totalRefundedSoFar = payment.refunds.reduce((total, refund) => 
       refund.status === 'completed' ? total + refund.amount : total, 0);
     
@@ -429,14 +425,12 @@ exports.processRefund = async (req, res) => {
       payment.status = 'partially_refunded';
     }
     
-
     await payment.save();
     
-
+    // Update booking if it exists
     if (payment.booking) {
       const booking = await Booking.findById(payment.booking);
       if (booking) {
-
         if (payment.status === 'refunded') {
           booking.paymentStatus = 'refunded';
         } else {
@@ -444,7 +438,6 @@ exports.processRefund = async (req, res) => {
         }
         await booking.save();
         
-
         SystemLog.logInfo('Booking payment status updated due to refund', 'paymentController', {
           bookingId: booking._id,
           paymentId: payment._id,
@@ -453,7 +446,65 @@ exports.processRefund = async (req, res) => {
       }
     }
     
-
+    // Update payment statistics
+    try {
+      // Find the payment statistic document for the current month
+      const currentDate = new Date();
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth() + 1;
+      
+      console.log(`Finding PaymentStat for ${year}-${month}`);
+      
+      // Use findOneAndUpdate with atomic operations to safely update the document
+      const result = await PaymentStat.findOneAndUpdate(
+        { year, month },
+        {
+          $inc: {
+            refundedAmount: refundAmount,
+            refundCount: 1,
+            totalRevenue: -refundAmount // Decrease totalRevenue
+          },
+          $setOnInsert: {
+            year,
+            month,
+            pendingAmount: 0,
+            successfulPayments: 0,
+            pendingPayments: 0
+          }
+        },
+        { 
+          new: true, // Return the updated document
+          upsert: true, // Create if it doesn't exist
+          runValidators: true
+        }
+      );
+      
+      console.log('Updated payment statistics:', {
+        statId: result._id,
+        totalRevenue: result.totalRevenue,
+        refundedAmount: result.refundedAmount,
+        refundCount: result.refundCount
+      });
+      
+      // Ensure totalRevenue is never negative
+      if (result.totalRevenue < 0) {
+        await PaymentStat.updateOne(
+          { _id: result._id },
+          { $set: { totalRevenue: 0 } }
+        );
+        console.log('Corrected negative totalRevenue to 0');
+      }
+      
+      SystemLog.logInfo('Payment statistics updated due to refund', 'paymentController', {
+        paymentId: payment._id,
+        refundAmount,
+        statId: result._id
+      });
+    } catch (statError) {
+      console.error('Error updating payment statistics:', statError);
+      // Continue processing even if stats update fails
+    }
+    
     SystemLog.logInfo('Refund processed successfully', 'paymentController', {
       paymentId: payment._id,
       refundAmount,
@@ -461,7 +512,6 @@ exports.processRefund = async (req, res) => {
       initiatedBy: req.user._id
     });
     
-
     const refundResponse = {
       _id: payment._id,
       refundId: refundTransactionId,
@@ -498,16 +548,92 @@ exports.getPaymentStats = async (req, res) => {
   try {
     console.log('Payment statistics requested');
     
+    // Get or create payment stats for the current month
+    const currentDate = new Date();
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth() + 1;
+    
+    let currentMonthStats = await PaymentStat.findOne({ year, month });
+    
+    // If no stats document exists for the current month, create one
+    if (!currentMonthStats) {
+      // Calculate stats from payments
+      const paidPayments = await Payment.find({
+        status: { $in: ['paid', 'partially_refunded'] },
+        $expr: {
+          $and: [
+            { $eq: [{ $year: '$createdAt' }, year] },
+            { $eq: [{ $month: '$createdAt' }, month] }
+          ]
+        }
+      });
+      
+      const refundedPayments = await Payment.find({
+        status: { $in: ['refunded', 'partially_refunded'] },
+        $expr: {
+          $and: [
+            { $eq: [{ $year: '$createdAt' }, year] },
+            { $eq: [{ $month: '$createdAt' }, month] }
+          ]
+        }
+      });
+      
+      const pendingPayments = await Payment.find({
+        status: 'pending',
+        $expr: {
+          $and: [
+            { $eq: [{ $year: '$createdAt' }, year] },
+            { $eq: [{ $month: '$createdAt' }, month] }
+          ]
+        }
+      });
+      
+      // Calculate totals
+      const totalRevenue = paidPayments.reduce((sum, p) => sum + (p.total || 0), 0);
+      const refundedAmount = refundedPayments.reduce((sum, p) => {
+        const refundTotal = p.refunds.reduce((rSum, r) => 
+          r.status === 'completed' ? rSum + r.amount : rSum, 0);
+        return sum + refundTotal;
+      }, 0);
+      const pendingAmount = pendingPayments.reduce((sum, p) => sum + (p.total || 0), 0);
+      
+      // Create stats document
+      currentMonthStats = new PaymentStat({
+        year,
+        month,
+        totalRevenue,
+        refundedAmount,
+        pendingAmount,
+        successfulPayments: paidPayments.length,
+        pendingPayments: pendingPayments.length,
+        refundCount: refundedPayments.length
+      });
+      
+      await currentMonthStats.save();
+      console.log('Created new payment stats document for', year, month);
+    }
 
     let statsData = {
       byStatus: [],
       byMethod: [],
       monthlyRevenue: [],
       dailyRevenue: [],
-      totals: { revenue: 0, count: 0, average: 0 }
+      totals: { 
+        revenue: currentMonthStats.totalRevenue || 0, 
+        count: currentMonthStats.successfulPayments || 0, 
+        average: currentMonthStats.successfulPayments > 0 ? 
+          (currentMonthStats.totalRevenue / currentMonthStats.successfulPayments).toFixed(2) : 0,
+        refundedAmount: currentMonthStats.refundedAmount || 0,
+        refundCount: currentMonthStats.refundCount || 0,
+        pendingAmount: currentMonthStats.pendingAmount || 0,
+        successRate: currentMonthStats.successfulPayments > 0 && (currentMonthStats.successfulPayments + currentMonthStats.refundCount) > 0 ?
+          (currentMonthStats.successfulPayments / (currentMonthStats.successfulPayments + currentMonthStats.refundCount) * 100).toFixed(1) : 0,
+        revenueChange: 0 // Will be calculated later if monthly data is available
+      }
     };
     
-
+    // Continue with existing code to get detailed stats
+    
     const byStatus = await Payment.aggregate([
       {
         $group: {
@@ -524,7 +650,6 @@ exports.getPaymentStats = async (req, res) => {
       console.log('Payment stats by status:', JSON.stringify(byStatus));
     }
     
-
     const byMethod = await Payment.aggregate([
       {
         $group: {
@@ -541,7 +666,7 @@ exports.getPaymentStats = async (req, res) => {
       console.log('Payment stats by method:', JSON.stringify(byMethod));
     }
     
-
+    // Get monthly revenue for the last 6 months
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     
@@ -570,33 +695,7 @@ exports.getPaymentStats = async (req, res) => {
       console.log('Monthly revenue stats:', JSON.stringify(monthlyRevenue));
     }
     
-
-    const totalRevenue = await Payment.aggregate([
-      {
-        $match: {
-          status: { $in: ['paid', 'partially_refunded'] }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: '$total' },
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-    
-    if (totalRevenue && totalRevenue.length > 0) {
-      statsData.totals = {
-        revenue: totalRevenue[0].total || 0,
-        count: totalRevenue[0].count || 0,
-        average: totalRevenue[0].count > 0 ? 
-                (totalRevenue[0].total / totalRevenue[0].count).toFixed(2) : 0
-      };
-      console.log('Total revenue stats:', JSON.stringify(totalRevenue));
-    }
-    
-
+    // Get daily revenue for the last 30 days
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
@@ -622,56 +721,13 @@ exports.getPaymentStats = async (req, res) => {
     ]);
     
     if (dailyRevenue && dailyRevenue.length > 0) {
-
       statsData.dailyRevenue = dailyRevenue.map(day => ({
         ...day,
         date: `${day._id.year}-${String(day._id.month).padStart(2, '0')}-${String(day._id.day).padStart(2, '0')}`
       }));
     }
     
-
-    if (statsData.byStatus.length === 0 && statsData.totals.count === 0) {
-      console.log('No payment data in database, checking bookings...');
-      
-
-      const bookings = await Booking.find({
-        paymentStatus: { $in: ['paid', 'partially_refunded'] }
-      }).lean();
-      
-      if (bookings && bookings.length > 0) {
-        console.log(`Found ${bookings.length} paid bookings`);
-        
-
-        const totalFromBookings = bookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
-        
-        statsData.totals = {
-          revenue: totalFromBookings,
-          count: bookings.length,
-          average: bookings.length > 0 ? (totalFromBookings / bookings.length).toFixed(2) : 0
-        };
-        
-
-        const statusMap = {};
-        bookings.forEach(booking => {
-          const status = booking.paymentStatus || 'pending';
-          if (!statusMap[status]) {
-            statusMap[status] = { count: 0, revenue: 0 };
-          }
-          statusMap[status].count += 1;
-          statusMap[status].revenue += booking.totalAmount || 0;
-        });
-        
-        statsData.byStatus = Object.keys(statusMap).map(status => ({
-          _id: status,
-          count: statusMap[status].count,
-          revenue: statusMap[status].revenue
-        }));
-        
-        console.log('Generated payment statistics from bookings');
-      }
-    }
-    
-
+    // Fill in missing data if needed
     if (statsData.byStatus.length === 0) {
       statsData.byStatus = [
         { _id: 'paid', count: 0, revenue: 0 },
@@ -690,56 +746,13 @@ exports.getPaymentStats = async (req, res) => {
       ];
     }
     
-
-    if (statsData.monthlyRevenue.length === 0) {
-      const now = new Date();
-      statsData.monthlyRevenue = [];
-      for (let i = 5; i >= 0; i--) {
-        const month = new Date();
-        month.setMonth(now.getMonth() - i);
-        statsData.monthlyRevenue.push({
-          _id: { 
-            year: month.getFullYear(), 
-            month: month.getMonth() + 1 
-          },
-          revenue: 0,
-          count: 0,
-          date: `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}-01`
-        });
-      }
-    }
-    
-
-    if (statsData.dailyRevenue.length === 0) {
-      const now = new Date();
-      statsData.dailyRevenue = [];
-      for (let i = 29; i >= 0; i--) {
-        const day = new Date();
-        day.setDate(now.getDate() - i);
-        statsData.dailyRevenue.push({
-          _id: { 
-            year: day.getFullYear(), 
-            month: day.getMonth() + 1,
-            day: day.getDate()
-          },
-          revenue: 0,
-          count: 0,
-          date: `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
-        });
-      }
-    }
-    
-
-    statsData.dataSource = statsData.totals.count > 0 ? 'database' : 'fallback';
-    
-    console.log('Returning payment statistics');
-    res.json(statsData);
+    res.status(200).json(statsData);
   } catch (error) {
-    console.error('Error fetching payment statistics:', error);
-    SystemLog.logError('Error fetching payment statistics', 'paymentController', { error: error.message });
-    res.status(500).json({ 
-      message: 'Failed to fetch payment statistics',
-      error: error.message 
+    console.error('Error getting payment statistics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve payment statistics',
+      error: error.message
     });
   }
 };

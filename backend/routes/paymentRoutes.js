@@ -19,7 +19,7 @@ router.get('/payments/recent-summary', protect, admin, paymentController.getRece
 router.get('/payments/:id', protect, admin, paymentController.getPaymentById);
 router.post('/payments', protect, admin, paymentController.createPayment);
 router.put('/payments/:id/status', protect, admin, paymentController.updatePaymentStatus);
-router.post('/payments/refund', protect, admin, paymentController.processRefund);
+router.post('/refund', protect, admin, paymentController.processRefund);
 router.get('/payments/:id/invoice', protect, paymentController.generateInvoice);
 router.get('/payments/:id/invoice-pdf', protect, paymentController.generateInvoicePdf);
 

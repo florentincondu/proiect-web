@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { TokenService, checkAuthToken } from '../api/auth';
+import axios from 'axios';
 
 
 const AuthContext = createContext(null);
@@ -87,11 +88,29 @@ export function AuthProvider({ children }) {
     return true;
   };
 
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    TokenService.removeToken();
-    TokenService.removeUser();
+  const logout = async () => {
+    try {
+      // Call the logout API endpoint if user is authenticated
+      if (token) {
+        await axios.post(
+          `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/auth/logout`,
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        );
+      }
+    } catch (error) {
+      console.error('Logout API error:', error);
+    } finally {
+      // Clear local state regardless of API success
+      setUser(null);
+      setToken(null);
+      TokenService.removeToken();
+      TokenService.removeUser();
+    }
   };
 
   const isAuthenticated = !!token && !TokenService.isTokenExpired();

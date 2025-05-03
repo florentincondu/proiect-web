@@ -71,28 +71,29 @@ const updateUser = asyncHandler(async (req, res) => {
   
   const { status, blockReason, blockDuration, ...updateData } = req.body;
   
-
-  if (status === 'blocked') {
-    user.blockInfo = {
-      isBlocked: true,
-      reason: blockReason,
-      blockedUntil: blockDuration ? new Date(Date.now() + parseInt(blockDuration) * 24 * 60 * 60 * 1000) : null,
-      blockedBy: req.user._id,
-      blockedAt: new Date()
-    };
-    user.status = 'blocked';
-  } else if (status === 'active' && user.status === 'blocked') {
-    user.blockInfo = {
-      isBlocked: false,
-      reason: null,
-      blockedUntil: null,
-      blockedBy: null,
-      blockedAt: null
-    };
-    user.status = 'active';
+  // Only handle status change if explicitly provided in the request
+  if (status) {
+    if (status === 'blocked') {
+      user.blockInfo = {
+        isBlocked: true,
+        reason: blockReason,
+        blockedUntil: blockDuration ? new Date(Date.now() + parseInt(blockDuration) * 24 * 60 * 60 * 1000) : null,
+        blockedBy: req.user._id,
+        blockedAt: new Date()
+      };
+      user.status = 'blocked';
+    } else if (status === 'active' && user.status === 'blocked') {
+      user.blockInfo = {
+        isBlocked: false,
+        reason: null,
+        blockedUntil: null,
+        blockedBy: null,
+        blockedAt: null
+      };
+      user.status = 'active';
+    }
   }
   
-
   Object.keys(updateData).forEach(key => {
     if (updateData[key] !== undefined) {
       user[key] = updateData[key];
@@ -101,7 +102,6 @@ const updateUser = asyncHandler(async (req, res) => {
   
   const updatedUser = await user.save();
   
-
   if (status === 'blocked') {
     try {
       const { createNotification } = require('./notificationController');

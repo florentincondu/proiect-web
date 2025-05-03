@@ -26,10 +26,8 @@ ChartJS.register(
 
 import BookingsManagement from '../components/BookingManagement'
 import UsersManagement from '../components/UserManagment';
-import ServicesManagement from '../components/ServiceManagement';
 import PaymentsInvoicesManagement from '../components/PaymentsInvoicesManagement';
 import Analytics from '../components/Analytics';
-import Settings from '../components/Settings';
 import AdminSupportTools from '../components/AdminSupportTools';
 import HotelManagement from '../components/HotelManagement';
 
@@ -385,14 +383,10 @@ const AdminDashboard = () => {
         return <BookingsManagement />;
       case 'users':
         return <UsersManagement />;
-      case 'services':
-        return <ServicesManagement />;
       case 'payments':
         return <PaymentsInvoicesManagement />;
       case 'analytics':
         return <Analytics />;
-      case 'settings':
-        return <Settings />;
       case 'support':
         return <AdminSupportTools />;
       case 'hotels':
@@ -446,16 +440,6 @@ const AdminDashboard = () => {
             </button>
             
             <button 
-              onClick={() => setActiveSidebar('services')}
-              className={`flex items-center px-4 py-3 w-full rounded-md transition-colors ${
-                activeSidebar === 'services' ? 'bg-blue-600' : 'hover:bg-gray-700'
-              }`}
-            >
-              <FaListAlt className="mr-3" />
-              <span>Services</span>
-            </button>
-            
-            <button 
               onClick={() => setActiveSidebar('payments')}
               className={`flex items-center px-4 py-3 w-full rounded-md transition-colors ${
                 activeSidebar === 'payments' ? 'bg-blue-600' : 'hover:bg-gray-700'
@@ -473,16 +457,6 @@ const AdminDashboard = () => {
             >
               <FaChartBar className="mr-3" />
               <span>Analytics</span>
-            </button>
-            
-            <button 
-              onClick={() => setActiveSidebar('settings')}
-              className={`flex items-center px-4 py-3 w-full rounded-md transition-colors ${
-                activeSidebar === 'settings' ? 'bg-blue-600' : 'hover:bg-gray-700'
-              }`}
-            >
-              <FaCog className="mr-3" />
-              <span>Settings</span>
             </button>
             
             <button 
@@ -589,16 +563,6 @@ const AdminDashboard = () => {
               </button>
               
               <button 
-                onClick={() => { setActiveSidebar('services'); setIsMobileSidebarOpen(false); }}
-                className={`flex items-center px-4 py-3 w-full rounded-md transition-colors ${
-                  activeSidebar === 'services' ? 'bg-blue-600' : 'hover:bg-gray-700'
-                }`}
-              >
-                <FaListAlt className="mr-3" />
-                <span>Services</span>
-              </button>
-              
-              <button 
                 onClick={() => { setActiveSidebar('payments'); setIsMobileSidebarOpen(false); }}
                 className={`flex items-center px-4 py-3 w-full rounded-md transition-colors ${
                   activeSidebar === 'payments' ? 'bg-blue-600' : 'hover:bg-gray-700'
@@ -616,16 +580,6 @@ const AdminDashboard = () => {
               >
                 <FaChartBar className="mr-3" />
                 <span>Analytics</span>
-              </button>
-              
-              <button 
-                onClick={() => { setActiveSidebar('settings'); setIsMobileSidebarOpen(false); }}
-                className={`flex items-center px-4 py-3 w-full rounded-md transition-colors ${
-                  activeSidebar === 'settings' ? 'bg-blue-600' : 'hover:bg-gray-700'
-                }`}
-              >
-                <FaCog className="mr-3" />
-                <span>Settings</span>
               </button>
               
               <button 

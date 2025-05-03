@@ -563,7 +563,6 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-
     const user = await User.findOne({ email })
       .select('-password')
       .lean();
@@ -571,7 +570,6 @@ const login = async (req, res) => {
     if (!user) {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
-
 
     if (user.blockInfo && user.blockInfo.isBlocked) {
       const now = new Date();
@@ -585,7 +583,6 @@ const login = async (req, res) => {
         });
       }
       
-
       if (now >= blockedUntil) {
         await User.findByIdAndUpdate(user._id, {
           $set: {
@@ -599,7 +596,6 @@ const login = async (req, res) => {
       }
     }
 
-
     const userDoc = await User.findById(user._id);
     const isMatch = await userDoc.comparePassword(password);
     
@@ -607,13 +603,13 @@ const login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
-
     const updatedUser = await User.findByIdAndUpdate(
       user._id,
       {
         $set: {
           lastLogin: new Date(),
-          lastActive: new Date()
+          lastActive: new Date(),
+          status: 'active'
         },
         $inc: { loginCount: 1 }
       },
@@ -623,9 +619,7 @@ const login = async (req, res) => {
       }
     );
 
-
     const token = generateToken(updatedUser._id);
-
 
     res.json({
       token,
@@ -961,16 +955,42 @@ const changePassword = async (req, res) => {
   }
 };
 
+const logout = async (req, res) => {
+  try {
+    // Update user status to inactive
+    if (req.user && req.user.id) {
+      await User.findByIdAndUpdate(
+        req.user.id,
+        {
+          $set: {
+            status: 'inactive',
+            lastActive: new Date()
+          }
+        }
+      );
+    }
+    
+    res.json({ message: 'Successfully logged out' });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   register,
   login,
+  logout,
   getProfile,
   verifyAdmin,
+  approveAdminRequest,
+  rejectAdminRequest,
+  forgotPassword,
+  resetPassword,
+  resetPasswordWithToken,
+  changePassword,
   changeSubscription,
   testEmail,
   resendAdminVerification,
-  resetPassword,
-  forgotPassword,
-  resetPasswordWithToken,
-  changePassword
+  createTestUser
 };

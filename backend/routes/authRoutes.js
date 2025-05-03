@@ -11,7 +11,8 @@ const {
   resetPassword,
   forgotPassword,
   resetPasswordWithToken,
-  changePassword
+  changePassword,
+  logout
 } = require('../controllers/authController.js');
 const { protect, admin } = require('../middleware/authMiddleware');
 const profileRoutes = require('./profileRoutes');
@@ -19,6 +20,7 @@ const profileRoutes = require('./profileRoutes');
 
 router.post('/register', register);
 router.post('/login', login);
+router.post('/logout', protect, logout);
 router.get('/verify-admin', verifyAdmin);
 router.post('/resend-admin-verification', resendAdminVerification);
 router.post('/change-subscription', protect, changeSubscription);

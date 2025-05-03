@@ -185,12 +185,11 @@ const UserManagement = () => {
   
   const handleUpdateUser = async (updatedUser) => {
     try {
-
+      // Create userData without status - status should be handled automatically based on login activity
       const userData = {
         name: updatedUser.name,
         email: updatedUser.email,
-        role: updatedUser.role,
-        status: updatedUser.status
+        role: updatedUser.role
       };
 
       const response = await axios.put(
@@ -203,12 +202,12 @@ const UserManagement = () => {
         }
       );
       
-
       setUsers(users.map(user => 
         user._id === updatedUser._id ? {
           ...user,
           ...response.data,
-          status: response.data.status || 'active',
+          name: response.data.name || user.name,
+          email: response.data.email || user.email,
           role: response.data.role || 'client'
         } : user
       ));
@@ -531,15 +530,12 @@ const UserManagement = () => {
                   <label className="block text-sm font-medium text-gray-400 mb-1">
                     Status
                   </label>
-                  <select
-                    className="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-4 text-white focus:outline-none focus:border-blue-500"
-                    defaultValue={currentUser.status}
-                    onChange={(e) => setCurrentUser({...currentUser, status: e.target.value})}
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="blocked">Blocked</option>
-                  </select>
+                  <div className="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-4 text-white">
+                    <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(currentUser.status)}`}>
+                      {currentUser.status}
+                    </span>
+                    <p className="text-xs text-gray-400 mt-1">Status is automatically set based on user activity</p>
+                  </div>
                 </div>
               </div>
             </div>

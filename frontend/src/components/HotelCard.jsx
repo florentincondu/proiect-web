@@ -105,7 +105,7 @@ const HotelCard = ({
   
   // Calculate if any room is available and can accommodate the requested guests
   const hasAvailableRoom = availabilityInfo?.availableRoomTypes?.some(room => {
-    const roomData = roomAvailability[hotel.id]?.[room];
+    const roomData = availabilityInfo[room];
     return roomData?.available && roomData?.availableRooms > 0;
   });
   
@@ -118,7 +118,7 @@ const HotelCard = ({
     
     if (availabilityInfo.availableRoomTypes) {
       availabilityInfo.availableRoomTypes.forEach(roomType => {
-        const roomData = roomAvailability[hotel.id]?.[roomType];
+        const roomData = availabilityInfo[roomType];
         if (roomData?.nextAvailableDate) {
           if (!earliestDate || new Date(roomData.nextAvailableDate) < new Date(earliestDate)) {
             earliestDate = roomData.nextAvailableDate;
@@ -157,7 +157,7 @@ const HotelCard = ({
     if (!availabilityInfo || !availabilityInfo.availableRoomTypes) return 0;
     
     return availabilityInfo.availableRoomTypes.reduce((total, roomType) => {
-      const roomData = roomAvailability[hotel.id]?.[roomType];
+      const roomData = availabilityInfo[roomType];
       return total + (roomData?.availableRooms || 0);
     }, 0);
   };
@@ -167,7 +167,7 @@ const HotelCard = ({
     if (!availabilityInfo || !availabilityInfo.availableRoomTypes) return 0;
     
     return availabilityInfo.availableRoomTypes.reduce((total, roomType) => {
-      const roomData = roomAvailability[hotel.id]?.[roomType];
+      const roomData = availabilityInfo[roomType];
       return total + (roomData?.totalRooms || 0);
     }, 0);
   };
