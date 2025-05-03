@@ -510,22 +510,96 @@ const SearchResults = () => {
     
     const performNewSearch = async () => {
       try {
-        // Fetch from API
-        const queryResponse = await axios.post(
-          `${API_BASE_URL}/api/places/search-text`,
-          { textQuery: `hotels in ${newSearchQuery}` },
-          { headers }
-        );
+        let apiHotels = [];
+        // Fetch from Google Places API
+        try {
+          const queryResponse = await axios.post(
+            `${API_BASE_URL}/api/places/search-text`,
+            { textQuery: `hotels in ${newSearchQuery}` },
+            { headers }
+          );
+          
+          if (queryResponse.data && queryResponse.data.places) {
+            console.log('API search results:', queryResponse.data.places.length);
+            apiHotels = queryResponse.data.places.map(hotel => ({
+              ...hotel,
+              id: hotel.id,
+              estimatedPrice: generateHotelPrice(hotel),
+              amenities: {
+                wifi: Math.random() > 0.2,
+                pool: Math.random() > 0.5,
+                pets: Math.random() > 0.7,
+                breakfast: Math.random() > 0.6,
+                parking: Math.random() > 0.4,
+              },
+              source: 'external'
+            }));
+          }
+        } catch (apiError) {
+          console.error('Error searching external API:', apiError);
+        }
         
-        if (queryResponse.data && queryResponse.data.places) {
-          console.log('API search results:', queryResponse.data.places.length);
-          await processNewResults(queryResponse.data.places);
+        // Also search in our own database for user-added hotels
+        let userHotels = [];
+        try {
+          const userHotelsResponse = await axios.get(
+            `${API_BASE_URL}/api/hotels/search?query=${encodeURIComponent(newSearchQuery)}`,
+            {
+              headers: {
+                'Authorization': localStorage.getItem('authToken') ? `Bearer ${localStorage.getItem('authToken')}` : ''
+              }
+            }
+          );
+          
+          if (userHotelsResponse.data && userHotelsResponse.data.success) {
+            console.log(`Found ${userHotelsResponse.data.data.length} hotels in database`);
+            
+            const approvedHotels = userHotelsResponse.data.data.filter(hotel => 
+              hotel.status === 'approved' || hotel.status === 'active'
+            );
+            
+            userHotels = approvedHotels.map(hotel => ({
+              id: hotel._id,
+              displayName: {
+                text: hotel.name
+              },
+              formattedAddress: hotel.location,
+              photos: hotel.photos?.length > 0 ? hotel.photos.map(url => ({ name: url })) : [],
+              rating: hotel.rating || 4.5,
+              userRatingCount: hotel.reviews?.length || Math.floor(Math.random() * 100) + 10,
+              estimatedPrice: parseFloat(hotel.price),
+              currency: hotel.currency || 'RON',
+              amenities: hotel.amenities?.reduce((obj, amenity) => {
+                obj[amenity] = true; 
+                return obj;
+              }, {}) || {
+                wifi: true,
+                parking: true,
+                breakfast: true
+              },
+              source: 'internal',
+              description: hotel.description,
+              coordinates: hotel.coordinates
+            }));
+          }
+        } catch (dbError) {
+          console.error('Error searching database:', dbError);
+        }
+        
+        // Combine results from both sources
+        const combinedResults = [...apiHotels, ...userHotels];
+        
+        if (combinedResults.length > 0) {
+          console.log(`Combined search results: ${combinedResults.length} hotels`);
+          await processNewResults(combinedResults);
         } else {
-          await searchInDatabase(newSearchQuery);
+          setError(`No hotels found for "${newSearchQuery}". Please try a different search term.`);
+          setLoading(false);
         }
       } catch (error) {
         console.error('Error performing new search:', error);
-        await searchInDatabase(newSearchQuery);
+        setError('Failed to search hotels. Please try again later.');
+        setLoading(false);
       }
     };
     
@@ -584,80 +658,132 @@ const SearchResults = () => {
 
   const searchInDatabase = async (query) => {
     try {
-
       setHotels([]);
       setFilteredHotels([]);
       setCurrentPage(1);
       
-
       setLoading(true);
       setError(null);
       
-
       pricesCache = null;
       restrictionsCache = null;
       setDataProcessed(false);
       
-
-      const formattedQuery = query.toLowerCase().includes('hotel') 
-        ? query.trim()
-        : `hotels in ${query.trim()}`;
-      console.log('Searching with query:', formattedQuery);
-      
-
-      const headers = {
-        'Content-Type': 'application/json',
-        'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.photos,places.rating,places.userRatingCount,places.priceLevel,places.id'
-      };
-      console.log('Using search headers:', headers);
-      
-
-      const response = await axios.post(
-        `${API_BASE_URL}/api/places/search-text`,
-        {
-          textQuery: formattedQuery
-        },
-        { headers }
-      );
-      
-      console.log('Complete search-text API response:', response.data);
-      
-      if (response.data && response.data.places && response.data.places.length > 0) {
-        console.log(`Found ${response.data.places.length} hotels via search-text API`);
-        console.log('First hotel sample:', JSON.stringify(response.data.places[0]));
-        console.log('First place ID example:', response.data.places[0].id);
+      let apiHotels = [];
+      // First, search using Google Places API
+      try {
+        const formattedQuery = query.toLowerCase().includes('hotel') 
+          ? query.trim()
+          : `hotels in ${query.trim()}`;
+        console.log('Searching with query:', formattedQuery);
         
-
-        const hotelsWithPrices = response.data.places.map(hotel => {
-          console.log(`Processing hotel with ID: ${hotel.id}`);
-          return {
-            ...hotel,
-            id: hotel.id, // Explicitly set ID to ensure it's preserved
-            estimatedPrice: generateHotelPrice(hotel),
-            amenities: {
-              wifi: Math.random() > 0.2,
-              pool: Math.random() > 0.5,
-              pets: Math.random() > 0.7,
-              breakfast: Math.random() > 0.6,
-              parking: Math.random() > 0.4,
+        const headers = {
+          'Content-Type': 'application/json',
+          'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.photos,places.rating,places.userRatingCount,places.priceLevel,places.id'
+        };
+        console.log('Using search headers:', headers);
+        
+        const response = await axios.post(
+          `${API_BASE_URL}/api/places/search-text`,
+          {
+            textQuery: formattedQuery
+          },
+          { headers }
+        );
+        
+        console.log('Complete search-text API response:', response.data);
+        
+        if (response.data && response.data.places && response.data.places.length > 0) {
+          console.log(`Found ${response.data.places.length} hotels via search-text API`);
+          console.log('First hotel sample:', JSON.stringify(response.data.places[0]));
+          console.log('First place ID example:', response.data.places[0].id);
+          
+          apiHotels = response.data.places.map(hotel => {
+            console.log(`Processing hotel with ID: ${hotel.id}`);
+            return {
+              ...hotel,
+              id: hotel.id,
+              estimatedPrice: generateHotelPrice(hotel),
+              amenities: {
+                wifi: Math.random() > 0.2,
+                pool: Math.random() > 0.5,
+                pets: Math.random() > 0.7,
+                breakfast: Math.random() > 0.6,
+                parking: Math.random() > 0.4,
+              },
+              source: 'external'
+            };
+          });
+        }
+      } catch (apiError) {
+        console.error('Search-text API error:', apiError);
+        console.error('Error details:', apiError.response?.data || apiError.message);
+      }
+      
+      // Second, search for hotels in our database
+      let userHotels = [];
+      try {
+        // Search in our own database using the same query
+        const userHotelsResponse = await axios.get(
+          `${API_BASE_URL}/api/hotels/search?query=${encodeURIComponent(query)}`,
+          {
+            headers: {
+              'Authorization': localStorage.getItem('authToken') ? `Bearer ${localStorage.getItem('authToken')}` : ''
             }
-          };
-        });
+          }
+        );
         
-        console.log('Fully processed hotels:', hotelsWithPrices.length);
-        console.log('First processed hotel:', hotelsWithPrices[0]);
-        console.log('IDs of processed hotels:', hotelsWithPrices.map(h => h.id));
+        if (userHotelsResponse.data && userHotelsResponse.data.success) {
+          console.log(`Found ${userHotelsResponse.data.data.length} hotels in database`);
+          
+          const approvedHotels = userHotelsResponse.data.data.filter(hotel => 
+            hotel.status === 'approved' || hotel.status === 'active'
+          );
+          
+          userHotels = approvedHotels.map(hotel => ({
+            id: hotel._id,
+            displayName: {
+              text: hotel.name
+            },
+            formattedAddress: hotel.location,
+            photos: hotel.photos?.length > 0 ? hotel.photos.map(url => ({ name: url })) : [],
+            rating: hotel.rating || 4.5,
+            userRatingCount: hotel.reviews?.length || Math.floor(Math.random() * 100) + 10,
+            estimatedPrice: parseFloat(hotel.price),
+            currency: hotel.currency || 'RON',
+            amenities: hotel.amenities?.reduce((obj, amenity) => {
+              obj[amenity] = true; 
+              return obj;
+            }, {}) || {
+              wifi: true,
+              parking: true,
+              breakfast: true
+            },
+            source: 'internal',
+            description: hotel.description,
+            coordinates: hotel.coordinates
+          }));
+        }
+      } catch (dbError) {
+        console.error('Error searching database:', dbError);
+      }
+      
+      // Combine results from both sources
+      const combinedHotels = [...apiHotels, ...userHotels];
+      
+      if (combinedHotels.length > 0) {
+        console.log('Fully processed hotels:', combinedHotels.length);
+        console.log('First processed hotel:', combinedHotels[0]);
+        console.log('IDs of processed hotels:', combinedHotels.map(h => h.id));
         
-
         setSearchQuery(query.trim());
         setNewSearchQuery(query.trim());
-        setHotels(hotelsWithPrices);
-        setFilteredHotels(hotelsWithPrices);
-        setTotalPages(Math.ceil(hotelsWithPrices.length / RESULTS_PER_PAGE));
+        setHotels(combinedHotels);
+        setFilteredHotels(combinedHotels);
+        setTotalPages(Math.ceil(combinedHotels.length / RESULTS_PER_PAGE));
         
-
         const initialIndexes = {};
-        hotelsWithPrices.forEach(hotel => {
+        combinedHotels.forEach(hotel => {
           initialIndexes[hotel.id] = 0;
         });
         setCurrentImageIndexes(initialIndexes);
