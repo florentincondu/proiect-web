@@ -207,7 +207,8 @@ const PaymentsInvoicesManagement = () => {
     refundCount: 0,
     byStatus: [],
     byMethod: [],
-    monthlyRevenue: []
+    monthlyRevenue: [],
+    dailyRevenue: []
   });
 
 
@@ -216,6 +217,41 @@ const PaymentsInvoicesManagement = () => {
     fetchPaymentStats();
   }, [token, currentPage, pageSize, filterStatus, filterMethod, filterDateFrom, filterDateTo, filterAmountMin, filterAmountMax, sortBy, sortOrder]);
 
+  // Update local refund variables when paymentStats changes
+  useEffect(() => {
+    setTotalRefunds(paymentStats.refundedAmount || 0);
+    setRefundedBookingsCount(paymentStats.refundCount || 0);
+  }, [paymentStats]);
+
+  // Add effect to update payment stats from received data
+  useEffect(() => {
+    // If we have payment data and no revenue yet, update the stats
+    if (payments.length > 0 && paymentStats.totalRevenue === 0) {
+      console.log('Updating payment stats from payments data...');
+      
+      // Extract the paid payment amounts
+      const paidPayments = payments.filter(p => 
+        p.status === 'paid' || p.status === 'Paid' || 
+        p.status === 'completed' || p.status === 'Completed'
+      );
+      
+      // Calculate total revenue
+      const totalRevenue = paidPayments.reduce((sum, p) => sum + (p.total || p.amount || 0), 0);
+      
+      console.log('Calculated total revenue:', totalRevenue);
+      console.log('Paid payments:', paidPayments);
+      
+      // Only update if we have real data
+      if (totalRevenue > 0) {
+        setPaymentStats(prev => ({
+          ...prev,
+          totalRevenue,
+          successfulPayments: paidPayments.length,
+          successRate: payments.length > 0 ? (paidPayments.length / payments.length * 100).toFixed(1) : 0
+        }));
+      }
+    }
+  }, [payments, paymentStats.totalRevenue]);
 
   const fetchPayments = async () => {
     setIsLoading(true);
@@ -319,7 +355,8 @@ const PaymentsInvoicesManagement = () => {
           refundCount: localRefundedBookingsCount,
           byStatus: paymentsResponse.data.byStatus || [],
           byMethod: paymentsResponse.data.byMethod || [],
-          monthlyRevenue: paymentsResponse.data.monthlyRevenue || []
+          monthlyRevenue: paymentsResponse.data.monthlyRevenue || [],
+          dailyRevenue: paymentsResponse.data.dailyRevenue || []
         });
       } else {
         console.warn('API response format unexpected, using fallback data');
@@ -341,89 +378,183 @@ const PaymentsInvoicesManagement = () => {
 
   const fetchPaymentStats = async () => {
     try {
+      // Add more detailed logging
+      console.log('Fetching payment stats...');
+      
       const response = await axios.get(`${API_BASE_URL}/api/payments/stats`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      console.log('Payment stats response:', response.data);
+      console.log('Payment stats response status:', response.status);
+      console.log('Payment stats response data type:', typeof response.data);
+      console.log('Payment stats response data:', JSON.stringify(response.data));
       
-      if (response.data) {
-        // Direct values from the API response
+      // Check if we have valid data
+      if (response.data && typeof response.data === 'object' && (response.data.totals || response.data.byStatus)) {
+        // Extract values from the API response safely
+        const { 
+          totals = {}, 
+          byStatus = [], 
+          byMethod = [], 
+          monthlyRevenue = [], 
+          dailyRevenue = [] 
+        } = response.data;
+
+        console.log('Stats totals:', JSON.stringify(totals));
+        console.log('Stats byStatus:', JSON.stringify(byStatus));
+        console.log('Stats byMethod:', JSON.stringify(byMethod));
+
+        // Get values directly or from nested structures
+        const totalRevenue = totals.revenue || 0;
+        const successfulPayments = totals.count || 0;
+        const successRate = totals.successRate || 0;
+        const pendingPayments = totals.pendingCount || 0;
+        const pendingAmount = totals.pendingAmount || 0;
+        const refundedAmount = totals.refundedAmount || 0;
+        const refundCount = totals.refundCount || 0;
+        const revenueChange = totals.revenueChange || 0;
+
+        console.log('Extracted values:', {
+          totalRevenue,
+          successfulPayments,
+          successRate,
+          pendingPayments,
+          pendingAmount,
+          refundedAmount,
+          refundCount
+        });
+
+        // Update state
         setPaymentStats({
-          totalRevenue: response.data.totals.revenue || 0,
-          revenueChange: response.data.totals.revenueChange || 0,
-          successfulPayments: response.data.totals.count || 0,
-          successRate: response.data.totals.successRate || 0,
-          pendingPayments: response.data.totals.pendingCount || 0,
-          pendingAmount: response.data.totals.pendingAmount || 0,
-          refundedAmount: response.data.totals.refundedAmount || 0,
-          refundCount: response.data.totals.refundCount || 0,
-          byStatus: response.data.byStatus || [],
-          byMethod: response.data.byMethod || [],
-          monthlyRevenue: response.data.monthlyRevenue || []
+          totalRevenue,
+          revenueChange,
+          successfulPayments,
+          successRate,
+          pendingPayments,
+          pendingAmount,
+          refundedAmount,
+          refundCount,
+          byStatus,
+          byMethod,
+          monthlyRevenue,
+          dailyRevenue
         });
         
         // Update the total refunds display
-        setTotalRefunds(response.data.totals.refundedAmount || 0);
-        setRefundedBookingsCount(response.data.totals.refundCount || 0);
+        setTotalRefunds(refundedAmount);
+        setRefundedBookingsCount(refundCount);
       } else {
-        // Fallback values
-        setPaymentStats({
-          totalRevenue: 4800,
-          revenueChange: 12.5,
-          successfulPayments: 142,
-          successRate: 94.7,
-          pendingPayments: 18,
-          pendingAmount: 2300,
-          refundedAmount: 450,
-          refundCount: 3,
-          byStatus: [
-            { status: 'paid', count: 142, amount: 4800 },
-            { status: 'pending', count: 18, amount: 2300 },
-            { status: 'refunded', count: 3, amount: 450 }
-          ],
-          byMethod: [
-            { method: 'credit_card', count: 95, amount: 3200 },
-            { method: 'paypal', count: 42, amount: 1600 },
-            { method: 'bank_transfer', count: 23, amount: 2300 }
-          ],
-          monthlyRevenue: [
-            { month: 'Jan', revenue: 1200 },
-            { month: 'Feb', revenue: 1800 },
-            { month: 'Mar', revenue: 2400 },
-            { month: 'Apr', revenue: 1900 }
-          ]
-        });
+        // Create stats from payments data if API response is empty or invalid
+        console.warn('Invalid payment stats response, calculating from payments data');
+        
+        // Calculate all values directly from the payment data we already have
+        calculateStatsFromPayments();
       }
     } catch (err) {
       console.error('Error fetching payment stats:', err);
-      // Fallback values
-      setPaymentStats({
-        totalRevenue: 4800,
-        revenueChange: 12.5,
-        successfulPayments: 142,
-        successRate: 94.7,
-        pendingPayments: 18,
-        pendingAmount: 2300,
-        refundedAmount: 450,
-        refundCount: 3,
-        byStatus: [
-          { status: 'paid', count: 142, amount: 4800 },
-          { status: 'pending', count: 18, amount: 2300 },
-          { status: 'refunded', count: 3, amount: 450 }
-        ],
-        byMethod: [
-          { method: 'credit_card', count: 95, amount: 3200 },
-          { method: 'paypal', count: 42, amount: 1600 },
-          { method: 'bank_transfer', count: 23, amount: 2300 }
-        ],
-        monthlyRevenue: [
-          { month: 'Jan', revenue: 1200 },
-          { month: 'Feb', revenue: 1800 },
-          { month: 'Mar', revenue: 2400 },
-          { month: 'Apr', revenue: 1900 }
-        ]
-      });
+      console.error('Error details:', err.response ? err.response.data : 'No response data');
+      
+      // Calculate values from existing payment data as fallback
+      calculateStatsFromPayments();
+    }
+  };
+
+  // Helper function to calculate stats from the payments data
+  const calculateStatsFromPayments = () => {
+    console.log('Calculating payment stats from existing payments data...');
+    console.log('Current payments data:', payments);
+    
+    // Get payments by status
+    const paidPayments = payments.filter(p => p.status?.toLowerCase() === 'paid');
+    const pendingPayments = payments.filter(p => p.status?.toLowerCase() === 'pending');
+    const refundedPayments = payments.filter(p => 
+      p.status?.toLowerCase() === 'refunded' || 
+      p.status?.toLowerCase() === 'partially_refunded'
+    );
+    
+    console.log('Payment counts by status:', {
+      paid: paidPayments.length,
+      pending: pendingPayments.length,
+      refunded: refundedPayments.length,
+      total: payments.length
+    });
+    
+    // Calculate totals
+    const calcRevenue = paidPayments.reduce((sum, p) => {
+      const amount = p.total || p.amount || 0;
+      console.log(`Paid payment: ${p.id || p._id}, amount: ${amount}`);
+      return sum + amount;
+    }, 0);
+    
+    const calcPendingAmount = pendingPayments.reduce((sum, p) => {
+      const amount = p.total || p.amount || 0;
+      console.log(`Pending payment: ${p.id || p._id}, amount: ${amount}`);
+      return sum + amount;
+    }, 0);
+    
+    console.log('Calculated values:', {
+      paidCount: paidPayments.length,
+      pendingCount: pendingPayments.length,
+      refundedCount: refundedPayments.length,
+      calcRevenue,
+      calcPendingAmount,
+      totalRefunds,
+      refundedBookingsCount
+    });
+    
+    // Group by payment method
+    const methodCounts = {};
+    const methodRevenue = {};
+    
+    payments.forEach(p => {
+      const method = p.paymentMethod?.toLowerCase() || 'unknown';
+      const amount = p.total || p.amount || 0;
+      
+      if (!methodCounts[method]) methodCounts[method] = 0;
+      if (!methodRevenue[method]) methodRevenue[method] = 0;
+      
+      methodCounts[method]++;
+      if (p.status?.toLowerCase() === 'paid') {
+        methodRevenue[method] += amount;
+      }
+    });
+    
+    const byMethod = Object.keys(methodCounts).map(method => ({
+      _id: method,
+      count: methodCounts[method],
+      revenue: methodRevenue[method]
+    }));
+    
+    console.log('Payment method stats:', byMethod);
+    
+    // Create byStatus array
+    const byStatus = [
+      { _id: 'paid', count: paidPayments.length, revenue: calcRevenue },
+      { _id: 'pending', count: pendingPayments.length, revenue: calcPendingAmount },
+      { _id: 'refunded', count: refundedPayments.length, revenue: 0 }
+    ];
+    
+    // Update state with calculated values
+    setPaymentStats({
+      totalRevenue: calcRevenue,
+      revenueChange: 10,  // Default value
+      successfulPayments: paidPayments.length,
+      successRate: payments.length > 0 ? (paidPayments.length / payments.length * 100).toFixed(1) : 0,
+      pendingPayments: pendingPayments.length,
+      pendingAmount: calcPendingAmount,
+      refundedAmount: totalRefunds || 0,
+      refundCount: refundedBookingsCount || 0,
+      byStatus,
+      byMethod,
+      monthlyRevenue: [],
+      dailyRevenue: []
+    });
+    
+    // Also update the refund displays directly
+    if (totalRefunds === 0 && refundedPayments.length > 0) {
+      const calculatedRefunds = refundedPayments.reduce((sum, p) => sum + (p.total || p.amount || 0), 0);
+      setTotalRefunds(calculatedRefunds);
+      setRefundedBookingsCount(refundedPayments.length);
     }
   };
 
@@ -756,10 +887,10 @@ const PaymentsInvoicesManagement = () => {
         {/* Refunded Amount Card */}
         <div className="bg-gray-800 rounded-lg border border-gray-700 p-4 sm:p-6">
           <h3 className="text-sm font-medium text-gray-400 mb-2">Refunded Amount</h3>
-          <p className="text-2xl font-bold text-orange-400">{formatCurrency(totalRefunds || 0)}</p>
+          <p className="text-2xl font-bold text-orange-400">{formatCurrency(paymentStats.refundedAmount || 0)}</p>
           <div className="mt-2 text-xs">
             <span className="text-gray-300">
-              {refundedBookingsCount || 0} {refundedBookingsCount === 1 ? 'booking' : 'bookings'} refunded
+              {paymentStats.refundCount || 0} {paymentStats.refundCount === 1 ? 'booking' : 'bookings'} refunded
             </span>
           </div>
         </div>
